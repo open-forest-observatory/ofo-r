@@ -91,3 +91,5 @@ vis2(pred, obs, obs_foc = TRUE)
 
 obj_mean_dist_to_closest(pred, obs)
 
+best_shift = find_best_shift(pred, obs, method = "optim")
+print(best_shift)
