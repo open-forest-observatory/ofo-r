@@ -1,3 +1,6 @@
+## TODO: how much better is the best match vs the  mean of the alternatives (but only those where there is complete overlap between predicted and observed)? This could be a way to quantify the confidence in the alignment.
+#### TODO: Make sure that the requested range of shifts is still completley within the predicted stem map.
+
 # Functions for determining the optimal alignment between a predicted (e.g. drone-based) and
 # observed (e.g. field-based) tree map.
 
@@ -13,8 +16,7 @@ simulate_tree_maps = function(trees_per_ha = 250, trees_per_clust = 5, cluster_r
                               vert_jitter = 5, # max of 5
                               false_pos = 0.25,
                               false_neg = 0.25,
-                              drop_understory = FALSE, # TODO
-                              drop_small_thresh = 5, # TODO
+                              drop_understory = TRUE,
                               height_bias = 0,
                               shift_x = -9.25,
                               shift_y = 15.5) {
@@ -42,18 +44,31 @@ simulate_tree_maps = function(trees_per_ha = 250, trees_per_clust = 5, cluster_r
   obs = pred |>
     filter(dplyr::between(x, -obs_extent/2, obs_extent/2) & between(y, -obs_extent/2, obs_extent/2))
 
-  # Remove a random fraction of the trees from each map, to simulate false positives and false negatives
+  # Randomly remove a fraction of the trees from each map, to simulate false positives and false negatives
   pred = pred |>
     dplyr::sample_frac(1 - false_neg)
   obs = obs |>
     dplyr::sample_frac(1 - false_pos)
 
-  # Add some noise and bias to the predicted tree heights
-  pred$z = pred$z + runif(nrow(pred), -vert_jitter, vert_jitter) + height_bias
-
   # Add some noise to the predicted tree x-y coords
   pred$x = pred$x + runif(nrow(pred), -horiz_jitter, horiz_jitter)
   pred$y = pred$y + runif(nrow(pred), -horiz_jitter, horiz_jitter)
+
+  # If specified, remove understory trees
+  # TODO: make this flexible to work with tree datasets that have only DBH and not height
+  if (drop_understory) {
+    pred = drop_understory_trees(pred)
+    obs = drop_understory_trees(obs)
+  }
+  
+  # Add some noise and bias to the predicted tree heights
+  pred$z = pred$z + runif(nrow(pred), -vert_jitter, vert_jitter) + height_bias
+
+  # If specified, remove small trees from the observed map, so we only base the alignment on the
+  # large observed trees (matching to any size small trees)
+  # TODO: This made it worse and does not accommodate dataset with only DBH so needs to be refined or
+  # removed. 
+  # obs = obs[obs$z > drop_small_thresh, ]
 
   # Shift obs a known amount that we will attempt to recover
   obs = obs |>
@@ -202,4 +217,69 @@ find_best_shift = function(pred, obs, objective_fn = obj_mean_dist_to_closest, m
   } else {
     stop("Invalid method passed to find_best_shift()")
   }
+}
+
+drop_understory_trees = function(trees) {
+  
+  # Drop all trees that are within 1+0.1h m horiz distance of a taller tree
+  trees$search_rad = 1 + 0.1 * trees$z
+  
+  # For each tree, get the distance to every other tree and then check if within the search radius
+  # of any
+  dists = sqrt(outer(trees$x, trees$x, "-")^2 +
+                 outer(trees$y, trees$y, "-")^2)
+  
+  trees$understory = FALSE
+  
+  for(i in seq_len(nrow(trees))) {
+    
+    # which trees have the focal tree within their radius?
+    within_radius = which(dists[i,] < trees$search_rad)
+    
+    # which of those are taller than the focal tree?
+    taller = which(trees$z[within_radius] > trees$z[i])
+    
+    if(length(taller) > 0) {
+      trees[i, "understory"] = TRUE
+    }
+  }
+  
+  trees = trees[!trees$understory, ]
+  
+  return(trees)
+  
+}
+
+
+# --- Visualization functions
+# Visualize a hypothetical tree map
+vis1 = function(trees) {
+  p = ggplot(trees, aes(x, y, size = z, color = z)) +
+    geom_point() +
+    scale_size_continuous(range = c(0.5, 3)) +
+    scale_color_viridis_c(end = 0.85) +
+    theme_bw() +
+    coord_cartesian(xlim = c(-200, 200), ylim = c(-200, 200))
+
+  print(p)
+}
+
+# Visualize two hypothetica tree maps (predicted and observed) overlaid. obs_foc: zoom in to focus
+# on the observed trees, with some buffer. Assumes the observed tree map is 50 x 50 and that both
+# tree maps are centered at 0,0.
+vis2 = function(pred, obs, obs_foc = FALSE) {
+  pred = pred |> mutate(layer = "predicted")
+  obs = obs |> mutate(layer = "observed")
+
+  trees = bind_rows(pred, obs)
+
+  lim = ifelse(obs_foc, 100, 200)
+
+  p = ggplot(trees, aes(x, y, size = z, color = layer)) +
+    geom_point() +
+    scale_size_continuous(range = c(0.5, 3)) +
+    theme_bw() +
+    coord_cartesian(xlim = c(-lim, lim), ylim = c(-lim, lim))
+
+  print(p)
 }
