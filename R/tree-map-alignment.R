@@ -1,6 +1,69 @@
 # Functions for determining the optimal alignment between a predicted (e.g. drone-based) and
 # observed (e.g. field-based) tree map.
 
+
+## Create a simulated "predicted" and "observed" tree map
+# Generate random, customizably clustered points in x-y space, over an area wider than would
+# reasonably have a field stem map (to represent the drone-based tree predictions). Interpret the
+# x-y coords as meters.
+simulate_tree_maps = function(trees_per_ha = 250, trees_per_clust = 5, cluster_radius = 25,
+                              pred_extent = 400,
+                              obs_extent = 100,
+                              horiz_jitter = 1,
+                              vert_jitter = 5, # max of 5
+                              false_pos = 0.25,
+                              false_neg = 0.25,
+                              drop_understory = FALSE, # TODO
+                              drop_small_thresh = 5, # TODO
+                              height_bias = 0,
+                              shift_x = -9.25,
+                              shift_y = 15.5) {
+
+
+
+  cluster_dens = trees_per_ha / trees_per_clust / 10000 # Converts from trees/ha to trees/m^2
+
+  pred = spatstat.random::rMatClust(kappa = cluster_dens, scale = cluster_radius, mu = trees_per_clust,
+                             win = spatstat.geom::as.owin(c(-pred_extent / 2,
+                                                       pred_extent / 2,
+                                                       -pred_extent / 2,
+                                                       pred_extent / 2)))
+  pred = as.data.frame(pred)
+
+  # Assign the trees heights ranged 5 to 50 m, skewed towards the lower end
+  heights = rnorm(10000, 5, 20)
+  heights = heights[dplyr::between(heights,5,50)]
+  pred$z = sample(heights, nrow(pred), replace = TRUE)
+  # Order by decreasing height, so when plotting the smaller trees are on top
+  pred = pred[order(-pred$z), ]
+
+  # Take a spatial subset of these points, to represent the "observed" tree map (e.g. field
+  # reference plot)
+  obs = pred |>
+    filter(dplyr::between(x, -obs_extent/2, obs_extent/2) & between(y, -obs_extent/2, obs_extent/2))
+
+  # Remove a random fraction of the trees from each map, to simulate false positives and false negatives
+  pred = pred |>
+    dplyr::sample_frac(1 - false_neg)
+  obs = obs |>
+    dplyr::sample_frac(1 - false_pos)
+
+  # Add some noise and bias to the predicted tree heights
+  pred$z = pred$z + runif(nrow(pred), -vert_jitter, vert_jitter) + height_bias
+
+  # Add some noise to the predicted tree x-y coords
+  pred$x = pred$x + runif(nrow(pred), -horiz_jitter, horiz_jitter)
+  pred$y = pred$y + runif(nrow(pred), -horiz_jitter, horiz_jitter)
+
+  # Shift obs a known amount that we will attempt to recover
+  obs = obs |>
+    dplyr::mutate(x = x + shift_x, y = y + shift_y)
+
+  return(list(pred = pred, obs = obs))
+
+}
+
+
 # For each observed point, get the closest predicted point in x, y, z space
 # (note: this is not a true distance, but is fine for our purposes)
 get_closest_obs = function(obs, pred) {
@@ -58,10 +121,11 @@ obj_mean_dist_to_closest = function(pred, obs) {
 
 # Test a given x-y shift and compute the objective function for it, using the objective
 # function supplied to it
-# transform_params: contains (in order) x_shift, y_shift
+# transform_params: contains (in order): x_shift, y_shift
 eval_shift = function(transform_params, pred, obs, objective_fn) {
+
   obs_shifted = obs |>
-    dplyr::mutate(x = x + transform_params[1], y = y + transform_params[2])
+    dplyr::mutate(x = obs$x + transform_params[[1]], y = obs$y + transform_params[[2]])
 
   objective = objective_fn(pred, obs_shifted)
 
@@ -82,16 +146,14 @@ find_best_shift_grid = function(pred, obs, objective_fn,
   shifts_x = seq(-search_window + base_shift_x, search_window + base_shift_x, search_increment)
   shifts_y = seq(-search_window + base_shift_y, search_window + base_shift_y, search_increment)
   shifts = expand.grid(shift_x = shifts_x, shift_y = shifts_y)
+  # NOTE: need to make sure that the order of params in "shifts" matches what's expected by
+  # eval_shift
 
-  # Try each shift and compute the objective function
-  for (i in seq_len(nrow(shifts))) {
-    shift = shifts[i, ]
+  transform_params = split(shifts, 1:nrow(shifts))
 
-    transform_params = c(shift$shift_x, shift$shift_y)
-
-    shifts[i, "objective"] = eval_shift(transform_params, pred, obs, objective_fn)
-
-  }
+  future::plan(future::multicore, workers = parallelly::availableCores())
+  shifts$objective = furrr::future_map_dbl(transform_params, eval_shift, pred, obs, objective_fn)
+  future::plan(future::sequential)
 
   # Get the shift that minimized the objective function
   best_shift = shifts |>
@@ -107,16 +169,16 @@ find_best_shift_grid = function(pred, obs, objective_fn,
 
 # Find the overall best shift using the specified method.
 # Only applies to grid search
-find_best_shift = function(pred, obs, objective_fn = obj_mean_dist_to_closest, method = "grid2") {
+find_best_shift = function(pred, obs, objective_fn = obj_mean_dist_to_closest, method = "grid") {
 
-  if (method == "grid2") {
+  if (method == "grid") {
     # Find the best shift using a grid search, starting wide and coarse
     best1 = find_best_shift_grid(pred, obs, objective_fn,
                                  search_window = 50,
                                  search_increment = 2)
 
-    # Centered around the best coarse shift, do a finer grid search, starting with the best shift from the coarse
-    # iteration
+    # Centered around the best coarse shift, do a finer grid search, starting with the best shift
+    # from the coarse iteration
     best2 = find_best_shift_grid(pred, obs, objective_fn,
                                  search_window = 3,
                                  search_increment = 0.25,
@@ -135,7 +197,7 @@ find_best_shift = function(pred, obs, objective_fn = obj_mean_dist_to_closest, m
           pred = pred,
           obs = obs,
           objective_fn = obj_mean_dist_to_closest,
-          method = "BFGS")
+          method = "Nelder-Mead")
 
   } else {
     stop("Invalid method passed to find_best_shift()")

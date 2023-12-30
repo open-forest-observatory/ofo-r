@@ -43,53 +43,23 @@ vis2 = function(pred, obs, obs_foc = FALSE) {
 
 
 # ---- Simulate a "predicted" and "observed" tree map
+sim = simulate_tree_maps(trees_per_ha = 250, trees_per_clust = 5, cluster_radius = 25,
+                   horiz_jitter = 1,
+                   vert_jitter = 5, # max of 5
+                   false_pos = 0.25,
+                   false_neg = 0.25,
+                   drop_understory = FALSE, # TODO
+                   drop_small_thresh = 5) # TODO
 
-# Generate random, slightly clustered points in x-y space, over an area wider than would reasonably
-# have a field stem map (to represent the drone-based tree predictions). Interpret the x-y coords as
-# meters. These params make a 16 ha stem map with 240 trees/ha.
-pred = rMatClust(kappa = 0.005, scale = 25, mu = 5, win = as.owin(c(-200, 200, -200, 200)))
-pred = as.data.frame(pred)
-# Add random heights from 5 to 50 m, and sort so smallest appear on top
-pred$z = runif(nrow(pred), 5, 50)
-pred = pred[order(-pred$z), ]
+vis2(sim$pred, sim$obs)
 
-# Visualize the map
-vis1(pred)
+obj_mean_dist_to_closest(sim$pred, sim$obs)
 
-# Take a spatial subset of these points, to represent the "observed" tree map (e.g. a 100 m x 100 m
-# field plot)
-obs = pred |>
-  filter(between(x, -50, 50) & between(y, -50, 50))
+tictoc::tic()
+best_shift = find_best_shift(sim$pred, sim$obs)
+tictoc::toc()
 
-# Visualize the map
-vis1(obs)
-
-# Vis the two overlaid
-vis2(pred, obs)
-
-# Remove 25% of the trees from each map, to simulate false positives and false negatives
-pred = pred |>
-  sample_frac(0.75)
-obs = obs |>
-  sample_frac(0.75)
-
-# Add some noise to the predicted tree heights
-pred$z = pred$z + runif(nrow(pred), -5, 5)
-
-# Shift the "observe" tree map slightly to help visualize the slight differences and the alignment challenge
-obs_offset = obs |>
-  mutate(x = x + 2, y = y + 2)
-
-vis2(pred, obs_offset, obs_foc = TRUE)
-
-# Shift obs a known amount that we will attempt to recover
-obs = obs |>
-  mutate(x = x + 12, y = y - 23)
-
-vis2(pred, obs, obs_foc = TRUE)
-
-
-obj_mean_dist_to_closest(pred, obs)
-
-best_shift = find_best_shift(pred, obs, method = "optim")
 print(best_shift)
+
+
+# Try different random tree maps and see if it works every time
