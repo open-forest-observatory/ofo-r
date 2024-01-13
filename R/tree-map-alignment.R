@@ -9,7 +9,6 @@
 # Generate random, customizably clustered points in x-y space, over an area wider than would
 # reasonably have a field stem map (to represent the drone-based tree predictions). Interpret the
 # x-y coords as meters.
-
 simulate_tree_maps = function(trees_per_ha = 250, trees_per_clust = 5, cluster_radius = 25,
                               pred_extent = 400,
                               obs_extent = 100,
@@ -41,9 +40,9 @@ simulate_tree_maps = function(trees_per_ha = 250, trees_per_clust = 5, cluster_r
   # Take a spatial subset of these points, to represent the "observed" tree map (e.g. field
   # reference plot)
   obs = pred[pred$x > -obs_extent / 2 &
-             pred$x < obs_extent / 2 &
-             pred$y > -obs_extent / 2 &
-             pred$y < obs_extent / 2, ]
+               pred$x < obs_extent / 2 &
+               pred$y > -obs_extent / 2 &
+               pred$y < obs_extent / 2, ]
 
   # Randomly remove a fraction of the trees from each map, to simulate false positives and false negatives
   pred = pred |>
@@ -81,23 +80,6 @@ simulate_tree_maps = function(trees_per_ha = 250, trees_per_clust = 5, cluster_r
 }
 
 
-# For each observed point, get the closest predicted point in x, y, z space
-# (note: this is not a true distance, but is fine for our purposes)
-get_closest_obs = function(obs, pred) {
-  # Get the closest predicted point to each observed point, in x, y, z space
-  closest = pred |>
-    dplyr::group_by(x, y) |>
-    dplyr::mutate(dist = sqrt((x - first(obs$x))^2 + (y - first(obs$y))^2 + (z - first(obs$z))^2)) |>
-    dplyr::filter(dist == min(dist)) |>
-    dplyr::ungroup()
-
-  # Join back to the observed points
-  obs = obs |>
-    dplyr::left_join(closest, by = c("x", "y"))
-
-  return(obs)
-}
-
 # Objective function: the mean x,y,z distance between each observed tree and its nearest predicted
 # tree
 obj_mean_dist_to_closest = function(pred, obs) {
@@ -130,9 +112,6 @@ obj_mean_dist_to_closest = function(pred, obs) {
   # Summarize the alignment as the mean distance to the nearest predicted point
   objective = mean(min_dists)
 
-  # Any values over 10 don't make sense
-  # objective = pmin(objective, 10)
-
   return(objective)
 }
 
@@ -163,11 +142,11 @@ find_best_shift_grid = function(pred, obs, objective_fn,
   # Approach: make predicted and observed tree maps into spatial 'sf' objects, get the bounds of
   # each as convex hulls, and then check if the observed tree map is fully within the bounds of the
   # predicted.
-  
+
   obs_w_base_shift = obs
   obs_w_base_shift$x = obs$x + base_shift_x
   obs_w_base_shift$y = obs$y + base_shift_y
-  
+
   obs_bounds = obs_w_base_shift |>
     sf::st_as_sf(coords = c("x", "y")) |>
     sf::st_union() |>
@@ -182,7 +161,7 @@ find_best_shift_grid = function(pred, obs, objective_fn,
                                   pred_bounds,
                                   sparse = FALSE)
 
-  if(!obs_inside_pred[1, 1]) {
+  if (!obs_inside_pred[1, 1]) {
     stop("The observed tree map (including its base shift of ", base_shift_x, ",", base_shift_y,
          ")is not fully within the bounds of the predicted tree map.")
   }
@@ -200,8 +179,8 @@ find_best_shift_grid = function(pred, obs, objective_fn,
                                      pred_bounds,
                                      sparse = FALSE)
 
-  if(!search_inside_pred[1, 1]) {
- 
+  if (!search_inside_pred[1, 1]) {
+
     # Get the maximum search window that fits, and reduce the search window to that distance
     obs_bounds_line = sf::st_cast(obs_bounds, "MULTILINESTRING")
     pred_bounds_line = sf::st_cast(pred_bounds, "MULTILINESTRING")
@@ -229,8 +208,7 @@ find_best_shift_grid = function(pred, obs, objective_fn,
   future::plan(future::sequential)
 
   # Get the shift that minimized the objective function
-  best_shift = shifts |>
-    dplyr::filter(objective == min(objective))
+  best_shift = shifts[shifts$objective == min(shifts$objective), ]
 
   # Return it, along with the full grid if requested
   if (return_full_grid) {
@@ -278,46 +256,46 @@ find_best_shift = function(pred, obs, objective_fn = obj_mean_dist_to_closest, m
 }
 
 drop_understory_trees = function(trees) {
-  
+
   # Drop all trees that are within 1+0.1h m horiz distance of a taller tree
   trees$search_rad = 1 + 0.1 * trees$z
-  
+
   # For each tree, get the distance to every other tree and then check if within the search radius
   # of any
   dists = sqrt(outer(trees$x, trees$x, "-")^2 +
                  outer(trees$y, trees$y, "-")^2)
-  
+
   trees$understory = FALSE
-  
-  for(i in seq_len(nrow(trees))) {
-    
+
+  for (i in seq_len(nrow(trees))) {
+
     # which trees have the focal tree within their radius?
-    within_radius = which(dists[i,] < trees$search_rad)
-    
+    within_radius = which(dists[i, ] < trees$search_rad)
+
     # which of those are taller than the focal tree?
     taller = which(trees$z[within_radius] > trees$z[i])
-    
-    if(length(taller) > 0) {
+
+    if (length(taller) > 0) {
       trees[i, "understory"] = TRUE
     }
   }
-  
+
   trees = trees[!trees$understory, ]
-  
+
   return(trees)
-  
+
 }
 
 
 # --- Visualization functions
 # Visualize a hypothetical tree map
 vis1 = function(trees) {
-  p = ggplot(trees, aes(x, y, size = z, color = z)) +
-    geom_point() +
-    scale_size_continuous(range = c(0.5, 3)) +
-    scale_color_viridis_c(end = 0.85) +
-    theme_bw() +
-    coord_cartesian(xlim = c(-200, 200), ylim = c(-200, 200))
+  p = ggplot2::ggplot(trees, ggplot2::aes(x, y, size = z, color = z)) +
+    ggplot2::geom_point() +
+    ggplot2::scale_size_continuous(range = c(0.5, 3)) +
+    ggplot2::scale_color_viridis_c(end = 0.85) +
+    ggplot2::theme_bw() +
+    ggplot2::coord_cartesian(xlim = c(-200, 200), ylim = c(-200, 200))
 
   print(p)
 }
