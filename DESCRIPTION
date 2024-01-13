@@ -13,6 +13,7 @@ Imports:
     furrr,
     stats,
     terra,
-    spatstat
+    spatstat,
+    ggplot2
 URL: https://github.com/open-forest-observatory/ofo
 BugReports: https://github.com/open-forest-observatory/ofo/issues
