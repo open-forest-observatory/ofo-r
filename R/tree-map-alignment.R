@@ -9,6 +9,7 @@
 # Generate random, customizably clustered points in x-y space, over an area wider than would
 # reasonably have a field stem map (to represent the drone-based tree predictions). Interpret the
 # x-y coords as meters.
+
 simulate_tree_maps = function(trees_per_ha = 250, trees_per_clust = 5, cluster_radius = 25,
                               pred_extent = 400,
                               obs_extent = 100,
@@ -16,33 +17,33 @@ simulate_tree_maps = function(trees_per_ha = 250, trees_per_clust = 5, cluster_r
                               vert_jitter = 5, # max of 5
                               false_pos = 0.25,
                               false_neg = 0.25,
-                              drop_understory = TRUE,
+                              drop_observed_understory = TRUE,
                               height_bias = 0,
                               shift_x = -9.25,
                               shift_y = 15.5) {
 
-
-
   cluster_dens = trees_per_ha / trees_per_clust / 10000 # Converts from trees/ha to trees/m^2
 
   pred = spatstat.random::rMatClust(kappa = cluster_dens, scale = cluster_radius, mu = trees_per_clust,
-                             win = spatstat.geom::as.owin(c(-pred_extent / 2,
-                                                       pred_extent / 2,
-                                                       -pred_extent / 2,
-                                                       pred_extent / 2)))
+                                    win = spatstat.geom::as.owin(c(-pred_extent / 2,
+                                                                   pred_extent / 2,
+                                                                   -pred_extent / 2,
+                                                                   pred_extent / 2)))
   pred = as.data.frame(pred)
 
   # Assign the trees heights ranged 5 to 50 m, skewed towards the lower end
   heights = rnorm(10000, 5, 20)
-  heights = heights[dplyr::between(heights,5,50)]
+  heights = heights[heights > 5 & heights < 50]
   pred$z = sample(heights, nrow(pred), replace = TRUE)
   # Order by decreasing height, so when plotting the smaller trees are on top
   pred = pred[order(-pred$z), ]
 
   # Take a spatial subset of these points, to represent the "observed" tree map (e.g. field
   # reference plot)
-  obs = pred |>
-    filter(dplyr::between(x, -obs_extent/2, obs_extent/2) & between(y, -obs_extent/2, obs_extent/2))
+  obs = pred[pred$x > -obs_extent / 2 &
+             pred$x < obs_extent / 2 &
+             pred$y > -obs_extent / 2 &
+             pred$y < obs_extent / 2, ]
 
   # Randomly remove a fraction of the trees from each map, to simulate false positives and false negatives
   pred = pred |>
@@ -54,25 +55,26 @@ simulate_tree_maps = function(trees_per_ha = 250, trees_per_clust = 5, cluster_r
   pred$x = pred$x + runif(nrow(pred), -horiz_jitter, horiz_jitter)
   pred$y = pred$y + runif(nrow(pred), -horiz_jitter, horiz_jitter)
 
-  # If specified, remove understory trees
-  # TODO: make this flexible to work with tree datasets that have only DBH and not height
-  if (drop_understory) {
-    pred = drop_understory_trees(pred)
-    obs = drop_understory_trees(obs)
-  }
-  
+  # Remove understory trees from the predicted dataset (to simulate drone not seeing them)
+  pred = drop_understory_trees(pred)
+
   # Add some noise and bias to the predicted tree heights
   pred$z = pred$z + runif(nrow(pred), -vert_jitter, vert_jitter) + height_bias
+
+  # If specified, remove understory trees from observed dataset (to see if it improves alignment)
+  if (drop_observed_understory) {
+    obs = drop_understory_trees(obs)
+  }
 
   # If specified, remove small trees from the observed map, so we only base the alignment on the
   # large observed trees (matching to any size small trees)
   # TODO: This made it worse and does not accommodate dataset with only DBH so needs to be refined or
-  # removed. 
+  # removed.
   # obs = obs[obs$z > drop_small_thresh, ]
 
   # Shift obs a known amount that we will attempt to recover
-  obs = obs |>
-    dplyr::mutate(x = x + shift_x, y = y + shift_y)
+  obs$x = obs$x + shift_x
+  obs$y = obs$y + shift_y
 
   return(list(pred = pred, obs = obs))
 
@@ -157,6 +159,62 @@ find_best_shift_grid = function(pred, obs, objective_fn,
                                 base_shift_y = 0,
                                 return_full_grid = FALSE) {
 
+  # Make sure the observed tree map is within the predicted tree map
+  # Approach: make predicted and observed tree maps into spatial 'sf' objects, get the bounds of
+  # each as convex hulls, and then check if the observed tree map is fully within the bounds of the
+  # predicted.
+  
+  obs_w_base_shift = obs
+  obs_w_base_shift$x = obs$x + base_shift_x
+  obs_w_base_shift$y = obs$y + base_shift_y
+  
+  obs_bounds = obs_w_base_shift |>
+    sf::st_as_sf(coords = c("x", "y")) |>
+    sf::st_union() |>
+    sf::st_convex_hull()
+
+  pred_bounds = pred |>
+    sf::st_as_sf(coords = c("x", "y")) |>
+    sf::st_union() |>
+    sf::st_convex_hull()
+
+  obs_inside_pred = sf::st_within(obs_bounds,
+                                  pred_bounds,
+                                  sparse = FALSE)
+
+  if(!obs_inside_pred[1, 1]) {
+    stop("The observed tree map (including its base shift of ", base_shift_x, ",", base_shift_y,
+         ")is not fully within the bounds of the predicted tree map.")
+  }
+
+  # Make sure the search window does not result in a shift that would put the observed tree map
+  # outside the bounds of the predicted tree map. Approach: make predicted and observed tree maps
+  # into spatial 'sf' objects, get the bounds of each as convex hulls, buffer the observed tree map
+  # by the search window, and then check if the buffered observed tree map is fully within the
+  # bounds of the predicted.
+
+  obs_search_bounds = obs_bounds |>
+    sf::st_buffer(search_window)
+
+  search_inside_pred = sf::st_within(obs_search_bounds,
+                                     pred_bounds,
+                                     sparse = FALSE)
+
+  if(!search_inside_pred[1, 1]) {
+ 
+    # Get the maximum search window that fits, and reduce the search window to that distance
+    obs_bounds_line = sf::st_cast(obs_bounds, "MULTILINESTRING")
+    pred_bounds_line = sf::st_cast(pred_bounds, "MULTILINESTRING")
+    max_search_window = sf::st_distance(obs_bounds_line, pred_bounds_line)
+
+    warning("The specified search window of ", search_window, " is too large. Accounting for the base shift of (",
+            base_shift_x, ",", base_shift_y,
+            ") it would result in a search outside the bounds of the predicted tree map. Reducing the search window to the maximum possible of ",
+            round(max_search_window, 2), ".")
+
+    search_window = max_search_window
+  }
+
   # Define the shifts to test
   shifts_x = seq(-search_window + base_shift_x, search_window + base_shift_x, search_increment)
   shifts_y = seq(-search_window + base_shift_y, search_window + base_shift_y, search_increment)
@@ -164,7 +222,7 @@ find_best_shift_grid = function(pred, obs, objective_fn,
   # NOTE: need to make sure that the order of params in "shifts" matches what's expected by
   # eval_shift
 
-  transform_params = split(shifts, 1:nrow(shifts))
+  transform_params = split(shifts, seq_len(nrow(shifts)))
 
   future::plan(future::multicore, workers = parallelly::availableCores())
   shifts$objective = furrr::future_map_dbl(transform_params, eval_shift, pred, obs, objective_fn)
@@ -268,18 +326,18 @@ vis1 = function(trees) {
 # on the observed trees, with some buffer. Assumes the observed tree map is 50 x 50 and that both
 # tree maps are centered at 0,0.
 vis2 = function(pred, obs, obs_foc = FALSE) {
-  pred = pred |> mutate(layer = "predicted")
-  obs = obs |> mutate(layer = "observed")
+  pred = pred |> dplyr::mutate(layer = "predicted")
+  obs = obs |> dplyr::mutate(layer = "observed")
 
-  trees = bind_rows(pred, obs)
+  trees = dplyr::bind_rows(pred, obs)
 
   lim = ifelse(obs_foc, 100, 200)
 
-  p = ggplot(trees, aes(x, y, size = z, color = layer)) +
-    geom_point() +
-    scale_size_continuous(range = c(0.5, 3)) +
-    theme_bw() +
-    coord_cartesian(xlim = c(-lim, lim), ylim = c(-lim, lim))
+  p = ggplot2::ggplot(trees, ggplot2::aes(x, y, size = z, color = layer)) +
+    ggplot2::geom_point() +
+    ggplot2::scale_size_continuous(range = c(0.5, 3)) +
+    ggplot2::theme_bw() +
+    ggplot2::coord_cartesian(xlim = c(-lim, lim), ylim = c(-lim, lim))
 
   print(p)
 }

@@ -2,10 +2,7 @@
 # tree maps
 
 # Setup
-
-library(spatstat)
-library(ggplot2)
-library(dplyr)
+devtools::load_all()
 
 # ---- Simulate a "predicted" and "observed" tree map
 sim = simulate_tree_maps(trees_per_ha = 300, trees_per_clust = 5, cluster_radius = 5,
@@ -14,7 +11,7 @@ sim = simulate_tree_maps(trees_per_ha = 300, trees_per_clust = 5, cluster_radius
                          vert_jitter = 5, # max of 5
                          false_pos = 0.25,
                          false_neg = 0.50,
-                         drop_understory = TRUE,
+                         drop_observed_understory = TRUE,
                          shift_x = -9.25,
                          shift_y = 15.5)
 
