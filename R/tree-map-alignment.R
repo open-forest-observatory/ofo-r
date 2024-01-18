@@ -136,7 +136,8 @@ find_best_shift_grid = function(pred, obs, objective_fn,
                                 search_increment = 2,
                                 base_shift_x = 0,
                                 base_shift_y = 0,
-                                return_full_grid = FALSE) {
+                                return_full_grid = FALSE,
+                                parallel = TRUE) {
 
   # Make sure the observed tree map is within the predicted tree map
   # Approach: make predicted and observed tree maps into spatial 'sf' objects, get the bounds of
@@ -203,7 +204,10 @@ find_best_shift_grid = function(pred, obs, objective_fn,
 
   transform_params = split(shifts, seq_len(nrow(shifts)))
 
-  future::plan(future::multicore, workers = parallelly::availableCores())
+  if (parallel) {
+    future::plan(future::multicore, workers = parallelly::availableCores())
+  }
+
   shifts$objective = furrr::future_map_dbl(transform_params, eval_shift, pred, obs, objective_fn)
   future::plan(future::sequential)
 
@@ -219,14 +223,24 @@ find_best_shift_grid = function(pred, obs, objective_fn,
 }
 
 # Find the overall best shift using the specified method.
-# Only applies to grid search
-find_best_shift = function(pred, obs, objective_fn = obj_mean_dist_to_closest, method = "grid") {
+# Currently only works for grid search
+find_best_shift = function(pred, obs,
+                           objective_fn = obj_mean_dist_to_closest,
+                           method = "grid",
+                           parallel = TRUE) {
 
   if (method == "grid") {
+
+    # Keep track of execution time
+    tictoc::tic.clear()
+    tictoc::tic()
+
     # Find the best shift using a grid search, starting wide and coarse
     best1 = find_best_shift_grid(pred, obs, objective_fn,
                                  search_window = 50,
-                                 search_increment = 2)
+                                 search_increment = 2,
+                                 return_full_grid = TRUE,
+                                 parallel = parallel)
 
     # Centered around the best coarse shift, do a finer grid search, starting with the best shift
     # from the coarse iteration
@@ -234,10 +248,35 @@ find_best_shift = function(pred, obs, objective_fn = obj_mean_dist_to_closest, m
                                  search_window = 3,
                                  search_increment = 0.25,
                                  base_shift_x = best1$best_shift$shift_x,
-                                 base_shift_y = best1$best_shift$shift_y)
+                                 base_shift_y = best1$best_shift$shift_y,
+                                 parallel = parallel)
+
+
+    # Determine how much better the best shift (of the second iteration) is than the mean of the
+    # alternatives from the first iteration
+
+    shifts = best1$shifts
+
+    # Get the mean obj value of the alternatives from the first iteration
+    median_obj = median(shifts$objective, na.rm = TRUE)
+    # Get the number of shifts tried
+    n_shifts = sum(!is.na(shifts$objective))
+    # Get the time taken
+    toc = tictoc::toc()
+    time_taken = toc$toc - toc$tic
+
+    # Return the best shift and the ancillary data
+    result = data.frame(shift_x = best2$best_shift$shift_x,
+                        shift_y = best2$best_shift$shift_y,
+                        shift_obj = best2$best_shift$objective,
+                        median_obj = median_obj,
+                        n_tested = n_shifts,
+                        time_taken = time_taken)
+
+    row.names(result) = NULL
 
     # Return the best shift
-    return(best2$best_shift)
+    return(result)
 
   } else if (method == "optim") {
     # Find the best shift using an optimization algorithm
@@ -251,9 +290,55 @@ find_best_shift = function(pred, obs, objective_fn = obj_mean_dist_to_closest, m
           method = "Nelder-Mead")
 
   } else {
-    stop("Invalid method passed to find_best_shift()")
+    stop("Invalid method ", method, " passed to find_best_shift()")
   }
 }
+
+# Generate one pair of random tree maps (pred and observed) with observed shifted a known amt, test
+# alignment, and return the result
+make_map_and_test_alignment = function(method, ...) {
+
+  sim = simulate_tree_maps(...)
+
+  # Find the optimal shift, unparallelized because it is more efficient to parallelize over multiple
+  # runs of the current function
+  result = find_best_shift(sim$pred, sim$obs, method = method, parallel = FALSE)
+
+  vis2(sim$pred, sim$obs)
+
+  return(result)
+}
+
+# Try aligning multiple times, each with a new random tree map generated with the same parameters
+# (to get percent of time we are able to recover the true shift)
+
+calc_alignment_success_rate = function(n_tries = 100,
+                                       method = "grid",
+                                       ...) {
+
+  future::plan(future::multicore, workers = parallelly::availableCores())
+  # This looks convoluted (and it is), but it is the cleanest way I could find to pass the "..."
+  # parameter (essentially R's **kwargs) to the function called by future_map (which enables simple
+  # parallelization). The parameter 'x' of the anonymous function is the index of the current
+  # iteration, but we don't pass it to the function called by future_map because we don't care about
+  # the index, we just want multiple random iterations
+  shifts = furrr::future_map(1:n_tries,
+                             function(x, method, ...) make_map_and_test_alignment(method = method, ...), #nolint
+                             method = method,
+                             ...,
+                             .options = furrr::furrr_options(seed = TRUE))
+  future::plan(future::sequential)
+
+  shifts = dplyr::bind_rows(shifts)
+
+  ## TODO: attribute with whether successfully recovered the shift
+
+  ## TODO: allow this function to return the full list or the summary
+
+  return(shifts)
+
+}
+
 
 drop_understory_trees = function(trees) {
 

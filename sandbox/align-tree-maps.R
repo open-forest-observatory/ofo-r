@@ -20,10 +20,22 @@ vis2(sim$pred, sim$obs)
 
 obj_mean_dist_to_closest(sim$pred, sim$obs)
 
-tictoc::tic()
-best_shift = find_best_shift(sim$pred, sim$obs)
-tictoc::toc()
-print(best_shift)
+search_result = find_best_shift(sim$pred, sim$obs)
+
+print(search_result)
 
 
 # Try different random tree maps and see if it works every time
+set.seed(123)
+a = calc_alignment_success_rate(n_tries = 4,
+                                trees_per_ha = 300,
+                                trees_per_clust = 5,
+                                cluster_radius = 5,
+                                obs_extent = 60,
+                                horiz_jitter = 3,
+                                vert_jitter = 5, # max of 5
+                                height_bias = 0,
+                                false_pos = 0.25,
+                                false_neg = 0.50,
+                                drop_observed_understory = TRUE)
+a
