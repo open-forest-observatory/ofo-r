@@ -319,7 +319,7 @@ calc_alignment_success_rate = function(n_tries = 100,
   future::plan(future::multicore, workers = parallelly::availableCores())
   # This looks convoluted (and it is), but it is the cleanest way I could find to pass the "..."
   # parameter (essentially R's **kwargs) to 'make_map_and_test_alignment' and also run it for
-  # multiple random iterations times in parallel
+  # multiple random iterations in parallel
   shifts = furrr::future_map(1:n_tries,
                              function(x, method, ...) make_map_and_test_alignment(method = method, ...), #nolint
                              method = method,
