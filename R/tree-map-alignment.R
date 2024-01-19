@@ -341,14 +341,14 @@ calc_alignment_success_rate = function(n_tries = 4,
 
   # If requested, return a summary across all iterations, as a single row
   if (return_summary) {
-    iterations_tested = mean(shifts$n_tested_coarse)
-    mean_n_trees_obs = mean(shifts$n_trees_obs)
-    mean_time_taken = mean(shifts$time_taken)
-    recovery_rate = mean(shifts$shift_recovered)
+    n_gridcells_per_trial = mean(shifts$n_tested_coarse) |> round(2)
+    mean_n_trees_obs = mean(shifts$n_trees_obs) |> round(1)
+    mean_secs_per_trial = mean(shifts$time_taken) |> round(2)
+    recovery_rate = mean(shifts$shift_recovered) |> round(4)
 
-    summary = data.frame(iterations_tested,
+    summary = data.frame(n_gridcells_per_trial,
                          mean_n_trees_obs,
-                         mean_time_taken,
+                         mean_secs_per_trial,
                          recovery_rate,
                          n_trials = n_tries)
 
