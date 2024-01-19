@@ -25,9 +25,9 @@ search_result = find_best_shift(sim$pred, sim$obs)
 print(search_result)
 
 
-# Try different random tree maps and see if it works every time
+# Try different random tree maps and see how often the shift is recovered
 set.seed(123)
-a = calc_alignment_success_rate(n_tries = 8,
+a = calc_alignment_success_rate(n_tries = 32,
                                 parallel = TRUE,
                                 trees_per_ha = 300,
                                 trees_per_clust = 5,
