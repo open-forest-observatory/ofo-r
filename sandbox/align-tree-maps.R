@@ -1,7 +1,7 @@
 # Purpose: Demonstrate function for identifying the optimal x, y, z shift to align two (simulated)
 # tree maps
 
-# Setup
+# # Setup
 devtools::load_all()
 
 # ---- Simulate a "predicted" and "observed" tree map
@@ -27,7 +27,8 @@ print(search_result)
 
 # Try different random tree maps and see if it works every time
 set.seed(123)
-a = calc_alignment_success_rate(n_tries = 4,
+a = calc_alignment_success_rate(n_tries = 64,
+                                parallel = TRUE,
                                 trees_per_ha = 300,
                                 trees_per_clust = 5,
                                 cluster_radius = 5,

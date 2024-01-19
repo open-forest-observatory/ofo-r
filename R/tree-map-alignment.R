@@ -236,41 +236,44 @@ find_best_shift = function(pred, obs,
     tictoc::tic()
 
     # Find the best shift using a grid search, starting wide and coarse
-    best1 = find_best_shift_grid(pred, obs, objective_fn,
-                                 search_window = 50,
-                                 search_increment = 2,
-                                 return_full_grid = TRUE,
-                                 parallel = parallel)
+    result_coarse = find_best_shift_grid(pred, obs, objective_fn,
+                                         search_window = 50,
+                                         search_increment = 2,
+                                         return_full_grid = TRUE,
+                                         parallel = parallel)
 
     # Centered around the best coarse shift, do a finer grid search, starting with the best shift
     # from the coarse iteration
-    best2 = find_best_shift_grid(pred, obs, objective_fn,
-                                 search_window = 3,
-                                 search_increment = 0.25,
-                                 base_shift_x = best1$best_shift$shift_x,
-                                 base_shift_y = best1$best_shift$shift_y,
-                                 parallel = parallel)
+    result_fine = find_best_shift_grid(pred, obs, objective_fn,
+                                       search_window = 3,
+                                       search_increment = 0.25,
+                                       base_shift_x = result_coarse$best_shift$shift_x,
+                                       base_shift_y = result_coarse$best_shift$shift_y,
+                                       parallel = parallel)
 
 
     # Determine how much better the best shift (of the second iteration) is than the mean of the
     # alternatives from the first iteration
 
-    shifts = best1$shifts
+    shifts = result_coarse$shifts
 
     # Get the mean obj value of the alternatives from the first iteration
     median_obj = median(shifts$objective, na.rm = TRUE)
     # Get the number of shifts tried
-    n_shifts = sum(!is.na(shifts$objective))
+    n_shifts_coarse = sum(!is.na(shifts$objective))
+    # Get the number of trees in the observed dataset
+    n_trees_obs = nrow(obs)
     # Get the time taken
     toc = tictoc::toc()
     time_taken = toc$toc - toc$tic
 
     # Return the best shift and the ancillary data
-    result = data.frame(shift_x = best2$best_shift$shift_x,
-                        shift_y = best2$best_shift$shift_y,
-                        shift_obj = best2$best_shift$objective,
+    result = data.frame(shift_x = result_fine$best_shift$shift_x,
+                        shift_y = result_fine$best_shift$shift_y,
+                        shift_obj = result_fine$best_shift$objective,
                         median_obj = median_obj,
-                        n_tested = n_shifts,
+                        n_tested_coarse = n_shifts_coarse,
+                        n_trees_obs = n_trees_obs,
                         time_taken = time_taken)
 
     row.names(result) = NULL
@@ -298,13 +301,18 @@ find_best_shift = function(pred, obs,
 # alignment, and return the result
 make_map_and_test_alignment = function(method, ...) {
 
-  sim = simulate_tree_maps(...)
+  #Simulate a predicted and observed tree map with a known offset
+  sim = simulate_tree_maps(shift_x = 12, shift_y = 21, ...)
 
   # Find the optimal shift, unparallelized because it is more efficient to parallelize over multiple
   # runs of the current function
   result = find_best_shift(sim$pred, sim$obs, method = method, parallel = FALSE)
 
-  vis2(sim$pred, sim$obs)
+  # Determine if the x-y shift was successfully recovered, using a hard-coded tolerance of +- 3 m in both dimensions
+  result$shift_recovered = result$shift_x < -12 + 3 &
+    result$shift_x > -12 - 3 &
+    result$shift_y < -21 + 3 &
+    result$shift_y > -21 - 3
 
   return(result)
 }
@@ -312,11 +320,13 @@ make_map_and_test_alignment = function(method, ...) {
 # Try aligning multiple times, each with a new random tree map generated with the same parameters
 # (to get percent of time we are able to recover the true shift)
 
-calc_alignment_success_rate = function(n_tries = 100,
+calc_alignment_success_rate = function(n_tries = 4,
                                        method = "grid",
+                                       parallel = TRUE,
+                                       return_summary = TRUE,
                                        ...) {
 
-  future::plan(future::multicore, workers = parallelly::availableCores())
+  if (parallel) future::plan(future::multicore, workers = parallelly::availableCores())
   # This looks convoluted (and it is), but it is the cleanest way I could find to pass the "..."
   # parameter (essentially R's **kwargs) to 'make_map_and_test_alignment' and also run it for
   # multiple random iterations in parallel
@@ -329,11 +339,24 @@ calc_alignment_success_rate = function(n_tries = 100,
 
   shifts = dplyr::bind_rows(shifts)
 
-  ## TODO: attribute with whether successfully recovered the shift
+  # If requested, return a summary across all iterations, as a single row
+  if (return_summary) {
+    iterations_tested = mean(shifts$n_tested_coarse)
+    mean_n_trees_obs = mean(shifts$n_trees_obs)
+    mean_time_taken = mean(shifts$time_taken)
+    recovery_rate = mean(shifts$shift_recovered)
 
-  ## TODO: allow this function to return the full list or the summary
+    summary = data.frame(iterations_tested,
+                         mean_n_trees_obs,
+                         mean_time_taken,
+                         recovery_rate,
+                         n_trials = n_tries)
 
-  return(shifts)
+    return(summary)
+
+  } else {
+    return(shifts)
+  }
 
 }
 
