@@ -1,6 +1,8 @@
 # For 6 test image sets, read the EXIF data and save to file. This is to prepare EXIF data for
 # development of functions to extract OFO metadata from EXIF.
 
+# Intended to be run on an OFO Jetstream2 VM for access to the raw drone imagery.
+
 library(exifr)
 library(dplyr)
 
