@@ -2,7 +2,7 @@
 
 # --- Setup ---
 
-# Load all the fucntions (and package dependencies) of this R package
+# Load all the functions (and package dependencies) of this R package
 devtools::load_all()
 
 # Define the root of the local data directory
