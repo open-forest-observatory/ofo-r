@@ -8,14 +8,14 @@ extract_metadata_dy = function(exif_filepath) {
   # (These are steps that provide setup for extraction of multiple different metadata attributes,
   # but the actual extraction happens in the subsequent section(s).)
 
-  # Read in the EXIF data from file for the first test dataset, as a data frame
+  # Read in the EXIF data from file for the provided dataset filepath, as a data frame
   exif = read.csv(exif_filepath)
 
   # Get the dataset ID from the filename (knowing the naming convention is "exif_<dataset_id>.csv")
   dataset_id = stringr::str_extract(basename(exif_filepath), "(?<=exif_)(.*)(?=\\.csv)")
   # Alternatively, if we wanted to match the convention for the dataset_id, it would be "(([0-9]){8}-([0-9]){4})"
 
-  # Convert the data frame into a geospatial 'sf' object (you could anternatively use a 'terra' 'vect'
+  # Convert the data frame into a geospatial 'sf' object (you could anternatively use a 'terra::vect'
   # object)
   exif = sf::st_as_sf(exif, crs = 4326, coords = c("GPSLongitude", "GPSLatitude"))
 
