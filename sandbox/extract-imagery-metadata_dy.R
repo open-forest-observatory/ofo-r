@@ -12,15 +12,17 @@ datadir = readLines(file.path("sandbox", "data-dirs", "derek-metadata-laptop.txt
 
 # --- 1. Workflow for running metadata extraction ---
 
-# Get a list of the files containing the test EXIF data (one file per image dataset)
+# Get a list of the files containing the test EXIF data (one file per image dataset). These files
+# have already been created and saved into the project data folder.
 exif_files = list.files(file.path(datadir, "exif-examples"), pattern = "^exif.+\\.csv$", full.names = TRUE)
 
-# Define which test EXIF file to use run the functions on
+# Define which test EXIF file to run the functions on
 exif_file = exif_files[1]
 
-# Run for that one EXIF file. If you want to inspect the definition of this function, it is at the
-# bottom of 'R/imagery-metadata-extraction_dy.R'.
+# Run for that one EXIF file.
 extract_metadata_dy(exif_file, plot_flightpath = TRUE)
+# ^ If you want to inspect the definition of this function, it is at the bottom of
+# 'R/imagery-metadata-extraction_dy.R'.
 
 # Run extraction on all EXIF files
 metadata = purrr::map_dfr(exif_files, extract_metadata_dy, plot_flightpath = TRUE)
