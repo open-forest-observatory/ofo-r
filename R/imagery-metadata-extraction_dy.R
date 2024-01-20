@@ -15,13 +15,13 @@ extract_metadata_dy = function(exif_filepath) {
   dataset_id = stringr::str_extract(basename(exif_filepath), "(?<=exif_)(.*)(?=\\.csv)")
   # Alternatively, if we wanted to match the convention for the dataset_id, it would be "(([0-9]){8}-([0-9]){4})"
 
-  # Convert the data frame into a geospatial 'sf' object (you could anternatively use a 'terra::vect'
+  # Convert the data frame into a geospatial 'sf' object (you could alternatively use a 'terra::vect'
   # object)
   exif = sf::st_as_sf(exif, crs = 4326, coords = c("GPSLongitude", "GPSLatitude"))
 
-  # Convert the capture datetime to an R object. This uses the EXIF attribute 'DateTimeOriginal', but it
+  # Convert the capture datetime to an R 'lubridate' object. This uses the EXIF attribute 'DateTimeOriginal', but it
   # looks like there is another one called 'CreateDate' which has the same info. The lubridate parsing
-  # function assumes the time zone is UTC, even when it's not (the EXIF attribute doesn't include TZ), but we will drop that later and
+  # function assumes the time zone is UTC when not specified (the EXIF attribute doesn't include the TZ), but we will drop that later and
   # interpret this as local time.
   exif$capture_datetime = lubridate::ymd_hms(exif$DateTimeOriginal)
 
