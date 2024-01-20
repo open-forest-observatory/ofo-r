@@ -25,9 +25,6 @@ extract_metadata_dy = function(exif_filepath) {
   # interpret this as local time.
   exif$capture_datetime = lubridate::ymd_hms(exif$DateTimeOriginal)
 
-
-  # --- Compute mean flight speed ---
-
   # Arrange images by capture time (presumably they're already in capture order, but just to be sure).
   # First arrange by full file path (assuming that is the capture order), then by capture time. This
   # way, the capture time is used as top priority, with the file path used as a tiebreaker (e.g. if
@@ -38,6 +35,12 @@ extract_metadata_dy = function(exif_filepath) {
   # TODO: Deal with the case where a dataset was collected by two drones flying at once.
   exif = exif[order(exif$ImageDescription), ]
   exif = exif[order(exif$capture_datetime), ]
+
+  # Plot the flight path as a visual check
+  flightpath = exif |> dplyr::summarize(do_union = FALSE) |> sf::st_cast("LINESTRING")
+  plot(flightpath)
+
+  # --- Compute mean flight speed ---
 
   # Get distance from each image to the next, in meters.
   start_image = exif[1:(nrow(exif) - 1), ]
