@@ -61,7 +61,7 @@ simulate_tree_maps = function(trees_per_ha = 250, trees_per_clust = 5, cluster_r
   pred$z = pred$z + runif(nrow(pred), -vert_jitter, vert_jitter) + height_bias
 
   # If specified, remove understory trees from observed dataset (to see if it improves alignment)
-  if (drop_observed_understory) {
+  if (drop_observed_understory & nrow(obs) > 0) {
     obs = drop_understory_trees(obs)
   }
 
@@ -233,7 +233,7 @@ find_best_shift = function(pred, obs,
 
     # Keep track of execution time
     tictoc::tic.clear()
-    tictoc::tic()
+    tictoc::tic(quiet = TRUE)
 
     # Find the best shift using a grid search, starting wide and coarse
     result_coarse = find_best_shift_grid(pred, obs, objective_fn,
@@ -301,8 +301,11 @@ find_best_shift = function(pred, obs,
 # alignment, and return the result
 make_map_and_test_alignment = function(method, ...) {
 
-  #Simulate a predicted and observed tree map with a known offset
+  # Simulate a predicted and observed tree map with a known offset
   sim = simulate_tree_maps(shift_x = 12, shift_y = 21, ...)
+
+  # If there are too few trees in the simulated observed map, skip
+  if(nrow(sim$obs) < 10) return(NULL)
 
   # Find the optimal shift, unparallelized because it is more efficient to parallelize over multiple
   # runs of the current function
@@ -320,6 +323,8 @@ make_map_and_test_alignment = function(method, ...) {
 # Try aligning multiple times, each with a new random tree map generated with the same parameters
 # (to get percent of time we are able to recover the true shift)
 
+
+### need to deal with fact that one trial may have < 10 trees but if the other does, it still gets included and 2 trials are recorded
 calc_alignment_success_rate = function(n_tries = 4,
                                        method = "grid",
                                        parallel = TRUE,
@@ -341,6 +346,12 @@ calc_alignment_success_rate = function(n_tries = 4,
 
   # If requested, return a summary across all iterations, as a single row
   if (return_summary) {
+
+    # remove rows with NAs (no data)
+    if (nrow(shifts) == 0) return(data.frame(n_trials = 0))
+    shifts = shifts[!is.na(shifts$n_trees_obs), ]
+
+    n_trials = nrow(shifts) # can be different from 'n_tries' because some tries may have < 10 trees in obs map and thus be excluded
     n_gridcells_per_trial = mean(shifts$n_tested_coarse) |> round(2)
     mean_n_trees_obs = mean(shifts$n_trees_obs) |> round(1)
     mean_secs_per_trial = mean(shifts$time_taken) |> round(2)
@@ -350,7 +361,7 @@ calc_alignment_success_rate = function(n_tries = 4,
                          mean_n_trees_obs,
                          mean_secs_per_trial,
                          recovery_rate,
-                         n_trials = n_tries)
+                         n_trials = n_trials)
 
     return(summary)
 
