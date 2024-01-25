@@ -60,8 +60,14 @@ simulate_tree_maps = function(trees_per_ha = 250, trees_per_clust = 5, cluster_r
   # Add some noise and bias to the predicted tree heights
   pred$z = pred$z + runif(nrow(pred), -vert_jitter, vert_jitter) + height_bias
 
+  # If there are no trees in the observed dataset, skip some operations on it and return an empty
+  # data frame for obs, along with the (non-empty) predicted tree data
+  if (nrow(obs) == 0) {
+    return(list(pred = pred, obs = obs))
+  }
+
   # If specified, remove understory trees from observed dataset (to see if it improves alignment)
-  if (drop_observed_understory & nrow(obs) > 0) {
+  if (drop_observed_understory) {
     obs = drop_understory_trees(obs)
   }
 
@@ -75,7 +81,12 @@ simulate_tree_maps = function(trees_per_ha = 250, trees_per_clust = 5, cluster_r
   obs$x = obs$x + shift_x
   obs$y = obs$y + shift_y
 
-  return(list(pred = pred, obs = obs))
+  # Compute the bounds of the observed tree map and return as 'sf' object
+  obs_sf = sf::st_as_sf(obs, coords = c("x", "y"))
+  obs_bbox = sf::st_bbox(obs_sf)
+  obs_bound = sf::st_as_sfc(obs_bbox) |> sf::st_as_sf()
+
+  return(list(pred = pred, obs = obs, obs_bound = obs_bound))
 
 }
 

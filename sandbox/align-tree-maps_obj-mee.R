@@ -19,8 +19,21 @@ sim = simulate_tree_maps(trees_per_ha = 300, trees_per_clust = 5, cluster_radius
 
 vis2(sim$pred, sim$obs)
 
-obs = sim$obs
-pred = sim$pred
 
-# Prep observed map
+# Prep predicted and observed tree maps for comparison
+obs = prep_obs_map(obs = sim$obs, obs_bound = sim$obs_bound, edge_buffer = 5)
+pred = prep_pred_map(pred = sim$pred, obs_bound = sim$obs_bound, edge_buffer = 5)
 
+
+
+# --- Params
+search_distance_fun_intercept = 1
+search_distance_fun_slope = 0.1
+search_height_proportion = 0.5
+
+# --- Match predicted and observed trees
+
+obs_matched = match_obs_to_pred(obs, pred,
+                                search_distance_fun_intercept = 1,
+                                search_distance_fun_slope = 0.1,
+                                search_height_proportion = 0.5)
