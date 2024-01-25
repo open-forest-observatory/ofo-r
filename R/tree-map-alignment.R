@@ -115,6 +115,36 @@ obj_mean_dist_to_closest = function(pred, obs) {
   return(objective)
 }
 
+
+obj_mee_matching = function(pred, obs) {
+
+  # Crop the predicted points to the x-y extent of the observed points +- 25%, so we don't waste
+  # time computing distances to points that are definitely not the closest
+
+  xmin = min(obs$x)
+  ymin = min(obs$y)
+  xmax = max(obs$x)
+  ymax = max(obs$y)
+  xrange = xmax - xmin
+  yrange = ymax - ymin
+
+  pred_crop = pred |>
+    dplyr::filter(dplyr::between(x, xmin - xrange / 4, xmax + xrange / 4) &
+                    dplyr::between(y, ymin - yrange / 4, ymax + yrange / 4))
+
+  # TODO !! Perform observed tree map prep
+
+  # TODO !! Determine matches
+
+  # TODO !! 
+
+
+
+
+}
+
+
+
 # Test a given x-y shift and compute the objective function for it, using the objective
 # function supplied to it
 # transform_params: contains (in order): x_shift, y_shift
@@ -194,6 +224,13 @@ find_best_shift_grid = function(pred, obs, objective_fn,
 
     search_window = max_search_window
   }
+
+  # TODO !! Perform predicted tree map prep (attribute with in/outside plot bounds, ensure correct
+  # projection, assign tree IDs, determine whether in internal buffer, etc)
+
+
+
+
 
   # Define the shifts to test
   shifts_x = seq(-search_window + base_shift_x, search_window + base_shift_x, search_increment)
