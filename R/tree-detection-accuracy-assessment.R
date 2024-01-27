@@ -7,16 +7,16 @@ prep_obs_map = function(obs, obs_bound, edge_buffer) {
 
   # Prep an internally buffered region (to accommodate edge uncertainty)
   obs_bound_internal = obs_bound |> sf::st_buffer(-edge_buffer)
-  obs_bound_internal$internal_area = TRUE
+  obs_bound_internal$core_area = TRUE
 
   # Assign an incremental unique ID to each observed tree
   obs$observed_tree_id = 1:nrow(obs)
 
   # Assign the trees an attribute that designates whether they are within the internally-buffered region
-  obs$internal_area = sf::st_intersects(obs, obs_bound_internal, sparse = FALSE) |> as.vector()
+  obs$core_area = sf::st_intersects(obs, obs_bound_internal, sparse = FALSE) |> as.vector()
 
   # Add an (empty for now) attribute that will store which predicted tree the observed tree is matched to
-  obs$final_predicted_tree_match_id = NA
+  obs$matched_predicted_tree_id = NA
 
   return(obs)
 
@@ -31,7 +31,7 @@ prep_pred_map = function(pred, obs_bound, edge_buffer) {
 
   # Prep an internally buffered region (to accommodate edge uncertainty)
   obs_bound_internal = obs_bound |> sf::st_buffer(-edge_buffer)
-  obs_bound_internal$internal_area = TRUE
+  obs_bound_internal$core_area = TRUE
 
   # Crop the predicted map to the observed map
   pred = sf::st_intersection(pred, obs_bound)
@@ -40,7 +40,7 @@ prep_pred_map = function(pred, obs_bound, edge_buffer) {
   pred$predicted_tree_id = 1:nrow(pred)
 
   # Assign the trees an attribute that designates whether they are within the internally-buffered region
-  pred$internal_area = sf::st_intersects(pred, obs_bound_internal, sparse = FALSE) |> as.vector()
+  pred$core_area = sf::st_intersects(pred, obs_bound_internal, sparse = FALSE) |> as.vector()
 
   return(pred)
 
@@ -105,7 +105,7 @@ match_obs_to_pred = function(obs, pred, search_distance_fun_intercept, search_di
       #this is a new match; record it
       predicted_ids_matched = c(predicted_ids_matched, row$predicted_tree_id)
       observed_ids_matched = c(observed_ids_matched, row$observed_tree_id)
-      obs[obs$observed_tree_id == row$observed_tree_id, "final_predicted_tree_match_id"] = row$predicted_tree_id
+      obs[obs$observed_tree_id == row$observed_tree_id, "matched_predicted_tree_id"] = row$predicted_tree_id
     }
 
   }
