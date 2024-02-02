@@ -576,3 +576,16 @@ metadata6 <- extract_metadata_emp(exif_file)
 
 write.csv(metadata6, file.path("C:\\Users\\emily\\Box\\imagery-metadata-dev\\extracted-metadata\\image-level-metadata\\image-metadata_20230706-0153.csv"), row.names = FALSE)
 
+# In the future, different datasets from different drone makes/models may have different EXIF outputs. Derek's suggestions for writing functions that can account for different column names:
+
+# df$dummy_column = NA (dummy column is used when a function can't be completed with the columns that exist-- will return a vector of NAs)
+
+# if ("dji_column_name" %in% names(df) {
+#   focal_column_name = "dji_column_name"
+# } else if ("other_brand_column_name" %in% names(df) {
+#   focal_column_name = "other_brand_column_name"
+# } else {
+#   focal_column_name = "dummy_column"
+# }
+
+# value_to_return = df[focal_column_name, ]
