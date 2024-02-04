@@ -127,7 +127,12 @@ dataset_id
 
 # BEGIN FUNCTION CODE
 
-datatime_local = (exif$DateTimeOriginal)
+exif$DateTimeOriginal_nocolon <- sub(":", "", exif$DateTimeOriginal)
+exif$DateTimeOriginal_nocolon <- sub(":", "", exif$DateTimeOriginal_nocolon)
+exif$DateTimeOriginal_nocolon <- sub(":", "", exif$DateTimeOriginal_nocolon)
+exif$DateTimeOriginal_nocolon <- sub(":", "", exif$DateTimeOriginal_nocolon)
+
+datatime_local = (exif$DateTimeOriginal_nocolon)
 
 # END FUNCTION CODE
 
@@ -135,7 +140,12 @@ datatime_local = (exif$DateTimeOriginal)
 
 extract_datatime_local = function (exif) {
 
-  datatime_local = (exif$DateTimeOriginal)
+  exif$DateTimeOriginal_nocolon <- sub(":", "", exif$DateTimeOriginal)
+  exif$DateTimeOriginal_nocolon <- sub(":", "", exif$DateTimeOriginal_nocolon)
+  exif$DateTimeOriginal_nocolon <- sub(":", "", exif$DateTimeOriginal_nocolon)
+  exif$DateTimeOriginal_nocolon <- sub(":", "", exif$DateTimeOriginal_nocolon)
+
+  datatime_local = (exif$DateTimeOriginal_nocolon)
 
   return(datatime_local)
 
@@ -147,7 +157,7 @@ datatime_local = extract_datatime_local(exif)
 
 datatime_local
 
-#### lat (Format: dd.dddddddd (EPSG:4326)) ####
+#### lat and lon (Format: dd.dddddddd (EPSG:4326)) ####
 
 # BEGIN FUNCTION CODE
 
@@ -155,49 +165,29 @@ exif_coordinates <- data.frame(exif$X, sf::st_coordinates(exif[,1], st_coordinat
 
 lat = exif_coordinates$Y
 
-# END FUNCTION CODE
-
-# turn code into a function
-
-extract_lat = function (exif) {
-
-  exif_coordinates <- data.frame(exif$X, sf::st_coordinates(exif[,1], st_coordinates(exif[,2])))
-
-  lat = exif_coordinates$Y
-
-  return(lat)
-}
-
-# test function on exif data
-
-lat = extract_lat(exif)
-lat
-
-#### lon (Format: dd.dddddddd (EPSG:4326)) ####
-
-# BEGIN FUNCTION CODE
-
-exif_coordinates <- data.frame(exif$X, sf::st_coordinates(exif[,1], st_coordinates(exif[,2])))
-
 lon = exif_coordinates$X
 
 # END FUNCTION CODE
 
 # turn code into a function
 
-extract_lon = function (exif) {
+extract_lat_lon = function (exif) {
 
   exif_coordinates <- data.frame(exif$X, sf::st_coordinates(exif[,1], st_coordinates(exif[,2])))
 
+  lat = exif_coordinates$Y
+
   lon = exif_coordinates$X
 
-  return(lon)
+  lat_lon = data.frame (lat, lon)
+
+  return(lat_lon)
 }
 
 # test function on exif data
 
-lon = extract_lon(exif)
-lon
+lat_lon = extract_lat_lon(exif)
+lat_lon
 
 #### rtk_fix (Format: True/False. Use EXIF RTKFlat) ####
 
@@ -205,19 +195,24 @@ lon
 
 # BEGIN FUNCTION CODE
 
-rtk_fix = ifelse (exif$RtkFlag == 50, "TRUE", ifelse (exif$RtkFlag == 0, "FALSE", "Other"))
+rtk_fix = {
+  if ("RtkFlag" %in% names(exif)) {rtk_fix = exif$RtkFlag == 50}
+  else {rtk_fix = rep(FALSE, nrow(exif))}
+}
 
 # END FUNCTION CODE
 
 # turn code into a function
 
 extract_rtk_fix = function(exif) {
-
-  exif["RtkFlag"[!("RtkFlag" %in% colnames(exif))]] = NA
-
-  rtk_fix = ifelse (exif$RtkFlag == 50, "TRUE", ifelse (exif$RtkFlag == 0, "FALSE", "Other"))
-
-  return (rtk_fix)
+  if ("RtkFlag" %in% names(exif)) {
+  rtk_fix = exif$RtkFlag == 50
+  return(rtk_fix)
+  }
+  else {
+  rtk_fix = rep(FALSE, nrow(exif))
+  return(rtk_fix)
+  }
 }
 
 # test function on exif data
@@ -227,126 +222,51 @@ rtk_fix
 
 #### accuracy_x (Units: m rmse) ####
 
-# EXIF files have an RTK standard longitude deviation (RtkStdLon), the standard deviation (in meters) of the photo recording position in longitude direction. We want the accuracy in meters RMSE, the square root of the standard deviation.
+# EXIF files have an RTK standard longitude deviation (RtkStdLon, the standard deviation (in meters) of the photo recording position in longitude direction), an RTK standard latitude deviation (RtkStdLat, the standard deviation (in meters) of the photo recording position in latitude direction), and an RTK standard altitude deviation (RtkStdHgt, the RTK positioning standard elevation deviation in meters).
 
 # BEGIN FUNCTION CODE
 
-accuracy_x = sqrt(as.numeric(exif$RtkStdLon))
+accuracy_x = exif$RtkStdLon
+
+accuracy_y = exif$RtkStdLat
+
+accuracy_z = exif$RtkStdHgt
 
 # END FUNCTION CODE
 
 # turn code into a function
 
-extract_accuracy_x = function (exif) {
+extract_accuracy = function (exif) {
 
   exif["RtkStdLon"[!("RtkStdLon" %in% colnames(exif))]] = NA
 
-  accuracy_x = sqrt(as.numeric(exif$RtkStdLon))
-
-  return(accuracy_x)
-}
-
-# test function on exif data
-
-accuracy_x = extract_accuracy_x(exif)
-accuracy_x
-
-#### accuracy_y (Units: m rmse) ####
-
-# EXIF files have an RTK standard latitude deviation (RtkStdLat), the standard deviation (in meters) of the photo recording position in latitude direction. We want the accuracy in meters RMSE, the square root of the standard deviation.
-
-# BEGIN FUNCTION CODE
-
-accuracy_y = sqrt(as.numeric(exif$RtkStdLat))
-
-# END FUNCTION CODE
-
-# turn code into a function
-
-extract_accuracy_y = function (exif) {
+  accuracy_x = exif$RtkStdLon
 
   exif["RtkStdLat"[!("RtkStdLat" %in% colnames(exif))]] = NA
 
-  accuracy_y = sqrt(as.numeric(exif$RtkStdLat))
-
-  return(accuracy_y)
-}
-
-# test function on exif data
-
-accuracy_y = extract_accuracy_y(exif)
-accuracy_y
-
-#### accuracy_z (Units: m rmse) ####
-
-# DJI EXIF altitude and RtkStdHgt (RTK positioning standard elevation deviation) data is in meters. We want the accuracy in meters RMSE, the square root of the standard deviation.
-
-# BEGIN FUNCTION CODE
-
-accuracy_z = sqrt(as.numeric(exif$RtkStdHgt))
-
-# END FUNCTION CODE
-
-# turn code into a function
-
-extract_accuracy_z = function (exif) {
+  accuracy_y = exif$RtkStdLat
 
   exif["RtkStdHgt"[!("RtkStdHgt" %in% colnames(exif))]] = NA
 
-  accuracy_z = sqrt(as.numeric(exif$RtkStdHgt))
+  accuracy_z = exif$RtkStdHgt
 
-  return(accuracy_z)
+  accuracy = data.frame (accuracy_x, accuracy_y, accuracy_z)
+
+  return(accuracy)
 }
 
 # test function on exif data
 
-accuracy_z = extract_accuracy_z(exif)
-accuracy_z
+accuracy = extract_accuracy(exif)
+accuracy
 
-#### camera_pitch (Units: deg, degrees up from nadir) ####
-
-# BEGIN FUNCTION CODE
-
-camera_pitch = exif$GimbalPitchDegree
-
-# END FUNCTION CODE
-
-# turn code into a function
-
-extract_camera_pitch = function(exif) {
-
-  camera_pitch = exif$GimbalPitchDegree
-
-  return(camera_pitch)
-}
-
-# test function on exif data
-
-camera_pitch = extract_camera_pitch(exif)
-camera_pitch
-
-#### camera_roll (Units: deg, degrees clockwise from up) ####
+#### pitch_roll_yaw: camera_pitch (Units: deg, degrees up from nadir), camera_roll (Units: deg, degrees clockwise from up), camera_yaw (Units: deg, degrees right from true north) ####
 
 # BEGIN FUNCTION CODE
+
+camera_pitch = exif$GimbalPitchDegree + 90
 
 camera_roll = exif$GimbalRollDegree
-
-# END FUNCTION CODE
-
-# turn code into a function
-
-extract_camera_roll = function (exif) {
-  camera_roll = exif$GimbalRollDegree
-  return(camera_roll)
-}
-
-# test function on exif data
-camera_roll = extract_camera_roll(exif)
-camera_roll
-
-#### camera_yaw (Units: deg, degrees right from true north) ####
-
-# BEGIN FUNCTION CODE
 
 camera_yaw = exif$GimbalYawDegree
 
@@ -354,15 +274,23 @@ camera_yaw = exif$GimbalYawDegree
 
 # turn code into a function
 
-extract_camera_yaw = function (exif) {
+extract_pitch_roll_yaw = function(exif) {
+
+  camera_pitch = exif$GimbalPitchDegree + 90
+
+  camera_roll = exif$GimbalRollDegree
+
   camera_yaw = exif$GimbalYawDegree
-  return(camera_yaw)
+
+  pitch_roll_yaw = data.frame (camera_pitch, camera_roll, camera_yaw)
+
+  return(pitch_roll_yaw)
 }
 
 # test function on exif data
 
-camera_yaw = extract_camera_yaw(exif)
-camera_yaw
+pitch_roll_yaw = extract_pitch_roll_yaw(exif)
+pitch_roll_yaw
 
 #### exposure (Units: sec) ####
 
@@ -430,14 +358,22 @@ iso
 
 # BEGIN FUNCTION CODE
 
-white_balance = ifelse (exif$WhiteBalance == 0, "Automatic", ifelse (exif$WhiteBalance == 1, "Manual", "Unknown"))
+white_balance = dplyr::case_when(
+  exif$WhiteBalance == 0 ~ "auto",
+  exif$WhiteBalance == 1 ~ "manual"
+)
 
 # END FUNCTION CODE
 
 # turn code into a function
 
 extract_white_balance = function(exif) {
-  white_balance = ifelse (exif$WhiteBalance == 0, "Automatic", ifelse (exif$WhiteBalance == 1, "Manual", "Unknown"))
+
+  white_balance = dplyr::case_when(
+    exif$WhiteBalance == 0 ~ "auto",
+    exif$WhiteBalance == 1 ~ "manual"
+  )
+
   return(white_balance)
 }
 
@@ -450,14 +386,20 @@ white_balance
 
 # BEGIN FUNCTION CODE
 
-received_image_path = exif$SourceFile
+received_image_path = stringr::str_split_fixed(exif$SourceFile, "/", 5)
+
+received_image_path <- received_image_path[,5]
 
 # END FUNCTION CODE
 
 # turn code into a function
 
 extract_received_image_path = function(exif) {
-  received_image_path = exif$SourceFile
+
+  received_image_path = stringr::str_split_fixed(exif$SourceFile, "/", 5)
+
+  received_image_path <- received_image_path[,5]
+
   return(received_image_path)
 }
 
@@ -465,6 +407,34 @@ extract_received_image_path = function(exif) {
 
 received_image_path = extract_received_image_path(exif)
 received_image_path
+
+#### altitude: returns altitude above ground level (agl) and above sea level (asl) in meters ####
+
+# BEGIN FUNCTION CODE
+
+altitude_agl = exif$RelativeAltitude
+
+altitude_asl = exif$AbsoluteAltitude
+
+# END FUNCTION CODE
+
+# turn code into a function
+
+extract_altitude = function(exif) {
+
+  altitude_agl = exif$RelativeAltitude
+
+  altitude_asl = exif$AbsoluteAltitude
+
+  altitude = data.frame (altitude_agl, altitude_asl)
+
+  return(altitude)
+}
+
+# test function on exif data
+
+altitude = extract_altitude(exif)
+altitude
 
 #### standardized_image_path (Image path in standardized dataset) ####
 
@@ -488,38 +458,30 @@ extract_metadata_emp = function(exif_filepath) {
   # Extract/compute metadata attributes
   dataset_id = extract_dataset_id (exif)
   datatime_local = extract_datatime_local(exif)
-  lat = extract_lat(exif)
-  lon = extract_lon(exif)
+  lat_lon = extract_lat_lon(exif)
   rtk_fix = extract_rtk_fix(exif)
-  accuracy_x = extract_accuracy_x(exif)
-  accuracy_y = extract_accuracy_y(exif)
-  accuracy_z = extract_accuracy_z(exif)
-  camera_pitch = extract_camera_pitch(exif)
-  camera_roll = extract_camera_roll(exif)
-  camera_yaw = extract_camera_yaw(exif)
+  accuracy = extract_accuracy(exif)
+  pitch_roll_yaw = extract_pitch_roll_yaw(exif)
   exposure = extract_exposure(exif)
   aperture = extract_aperture (exif)
   iso = extract_iso(exif)
   white_balance = extract_white_balance(exif)
   received_image_path = extract_received_image_path(exif)
+  altitude = extract_altitude(exif)
 
   # Return extracted/computed metadata as a data frame row
   metadata = data.frame(dataset_id = dataset_id,
                         datatime_local = datatime_local,
-                        lat = lat,
-                        lon = lon,
+                        lat_lon,
                         rtk_fix = rtk_fix,
-                        accuracy_x = accuracy_x,
-                        accuracy_y = accuracy_y,
-                        accuracy_z = accuracy_z,
-                        camera_pitch = camera_pitch,
-                        camera_roll = camera_roll,
-                        camera_yaw = camera_yaw,
+                        accuracy,
+                        pitch_roll_yaw,
                         exposure = exposure,
                         aperture = aperture,
                         iso = iso,
                         white_balance = white_balance,
-                        received_image_path = received_image_path
+                        received_image_path = received_image_path,
+                        altitude
   )
 
   return(metadata)
@@ -531,6 +493,7 @@ extract_metadata_emp = function(exif_filepath) {
 exif_files = list.files(file.path(datadir, "exif-examples"), pattern = "^exif.+\\.csv$", full.names = TRUE)
 
 out_dir = file.path(datadir, "extracted-metadata", "image-level-metadata")
+
 if (!dir.exists(out_dir)) dir.create(out_dir, recursive = TRUE)
 
 # Extract metadata for one EXIF file at a time and save to csv
@@ -575,17 +538,3 @@ exif_file = exif_files[6]
 metadata6 <- extract_metadata_emp(exif_file)
 
 write.csv(metadata6, file.path("C:\\Users\\emily\\Box\\imagery-metadata-dev\\extracted-metadata\\image-level-metadata\\image-metadata_20230706-0153.csv"), row.names = FALSE)
-
-# In the future, different datasets from different drone makes/models may have different EXIF outputs. Derek's suggestions for writing functions that can account for different column names:
-
-# df$dummy_column = NA (dummy column is used when a function can't be completed with the columns that exist-- will return a vector of NAs)
-
-# if ("dji_column_name" %in% names(df) {
-#   focal_column_name = "dji_column_name"
-# } else if ("other_brand_column_name" %in% names(df) {
-#   focal_column_name = "other_brand_column_name"
-# } else {
-#   focal_column_name = "dummy_column"
-# }
-
-# value_to_return = df[focal_column_name, ]
