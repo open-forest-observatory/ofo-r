@@ -10,12 +10,12 @@ datadir = readLines("sandbox/data-dirs/js2-metashape-tuning.txt")
 
 focal_polygons = st_read(file.path(datadir, "site-subsets.gpkg"))
 
-focal_polygon = focal_polygons[1, ]
-image_source_folder = file.path(datadir, "raw-images-full/delta")
-image_subset_dest_folder = file.path(datadir, "raw-images-subset/delta1")
+focal_polygon = focal_polygons[5, ]
+image_source_folder = file.path(datadir, "raw-images-full/yuba")
+image_subset_dest_folder = file.path(datadir, "raw-images-subset/yuba")
 
 # Read the image exif to get coords and produce a sf object of image points
-image_files = list.files(photo_source_folder, pattern = ".JPG", full.names = TRUE, recursive = TRUE)
+image_files = list.files(image_source_folder, pattern = ".JPG", full.names = TRUE, recursive = TRUE)
 exif = read_exif(image_files, tags = c("GPSLatitude", "GPSLongitude", "DateTimeOriginal"))
 image_points = st_as_sf(exif, coords = c("GPSLongitude", "GPSLatitude"), crs = 4326)
 
