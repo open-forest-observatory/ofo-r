@@ -127,10 +127,7 @@ dataset_id
 
 # BEGIN FUNCTION CODE
 
-exif$DateTimeOriginal_nocolon <- sub(":", "", exif$DateTimeOriginal)
-exif$DateTimeOriginal_nocolon <- sub(":", "", exif$DateTimeOriginal_nocolon)
-exif$DateTimeOriginal_nocolon <- sub(":", "", exif$DateTimeOriginal_nocolon)
-exif$DateTimeOriginal_nocolon <- sub(":", "", exif$DateTimeOriginal_nocolon)
+exif$DateTimeOriginal_nocolon = stringr::str_replace_all(exif$DateTimeOriginal, ":", "")
 
 datatime_local = (exif$DateTimeOriginal_nocolon)
 
@@ -140,10 +137,7 @@ datatime_local = (exif$DateTimeOriginal_nocolon)
 
 extract_datatime_local = function (exif) {
 
-  exif$DateTimeOriginal_nocolon <- sub(":", "", exif$DateTimeOriginal)
-  exif$DateTimeOriginal_nocolon <- sub(":", "", exif$DateTimeOriginal_nocolon)
-  exif$DateTimeOriginal_nocolon <- sub(":", "", exif$DateTimeOriginal_nocolon)
-  exif$DateTimeOriginal_nocolon <- sub(":", "", exif$DateTimeOriginal_nocolon)
+  exif$DateTimeOriginal_nocolon = stringr::str_replace_all(exif$DateTimeOriginal, ":", "")
 
   datatime_local = (exif$DateTimeOriginal_nocolon)
 
@@ -386,9 +380,11 @@ white_balance
 
 # BEGIN FUNCTION CODE
 
-received_image_path = stringr::str_split_fixed(exif$SourceFile, "/", 5)
+received_image_path = stringr::str_split_fixed(exif$SourceFile, fixed(dataset_id), 2)
 
-received_image_path <- received_image_path[,5]
+received_image_path <- received_image_path[,2]
+
+received_image_path <- with(exif, paste0(dataset_id, received_image_path))
 
 # END FUNCTION CODE
 
@@ -396,9 +392,11 @@ received_image_path <- received_image_path[,5]
 
 extract_received_image_path = function(exif) {
 
-  received_image_path = stringr::str_split_fixed(exif$SourceFile, "/", 5)
+  received_image_path = stringr::str_split_fixed(exif$SourceFile, fixed(dataset_id), 2)
 
-  received_image_path <- received_image_path[,5]
+  received_image_path <- received_image_path[,2]
+
+  received_image_path <- with(exif, paste0(dataset_id, received_image_path))
 
   return(received_image_path)
 }
