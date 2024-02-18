@@ -27,7 +27,7 @@ extract_singleset_exif = function(image_folder, out_folder, sets_to_skip) {
     return(TRUE)
   }
 
-  out_filepath = file.path(out_folder, paste0(basename(image_folder), ".csv"))
+  out_filepath = file.path(out_folder, paste0("exif_", basename(image_folder), ".csv"))
 
   if (file.exists(out_filepath)) {
     message("EXIF data already extracted for ", image_folder)
