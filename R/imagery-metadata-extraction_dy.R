@@ -25,6 +25,25 @@ extract_flight_speed = function(exif) {
 
 }
 
+# Get a polygon of the mission
+# image_merge_distance: The horizontal distance between images below which they are merged into one mission polygon
+create_mission_polygon = function(exif, image_merge_distance) {
+
+  exif = sf::st_transform(exif, 3310)
+  ptbuff = sf::st_buffer(exif, image_merge_distance)
+  polybuff = sf::st_union(ptbuff)
+  poly = sf::st_buffer(polybuff, -image_merge_distance + 1)
+
+  # Check if multipolygon and return warning if so
+  n_polys = length(sf::st_geometry(poly)[[1]])
+  if (n_polys > 1) warning("Non-contiguous images in dataset ", exif$dataset_id)
+
+  polysimp = sf::st_simplify(poly, dTolerance = 10)
+
+  return(polysimp)
+
+}
+
 # Wrapper for Derek's metadata extraction functions. Preps the EXIF data for passing to the
 # extraction functions, then calls all the individual extraction functions to extract the respecive attributes.
 extract_metadata_dy = function(exif_filepath, plot_flightpath = FALSE) {
@@ -41,6 +60,12 @@ extract_metadata_dy = function(exif_filepath, plot_flightpath = FALSE) {
                         # Add more metadata variables here
                         )
 
-  return(metadata)
+  # Compute geospatial features
+  mission_polygon = create_mission_polygon(exif, image_merge_distance = 50)
+
+  ret = list(metadata = metadata,
+             mission_polygon = mission_polygon)
+
+  return(ret)
 
 }
