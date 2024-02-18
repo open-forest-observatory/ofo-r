@@ -1,5 +1,4 @@
-# This script has two purposes: 1. Demonstrate how to run functions to extract metadata from imagery
-# dataset EXIF data, and 2. Demonstrate how to write a new metadata extraction function.
+# This script will extract the EXIF data to a CSV for all image sets in a directory.
 
 # --- Setup ---
 
