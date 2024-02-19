@@ -1,13 +1,11 @@
-# This script has two purposes: 1. Demonstrate how to run functions to extract metadata from imagery
-# dataset EXIF data, and 2. Demonstrate how to write a new metadata extraction function.
+# Take EXIF data and extract metadata (e.g. altitude, gimbal pitch) and mission polygon and write to
+# gpkg
 
 # --- Setup ---
 
 # Load all the functions (and package dependencies) of this R package
 devtools::load_all()
 library(terra)
-devtools::dev_mode()
-library(elevatr)
 
 # Define the root of the local data directory
 datadir = readLines(file.path("sandbox", "data-dirs", "derek-map-imagery-js.txt"))
@@ -20,7 +18,7 @@ exif_files = list.files(file.path(datadir, "extracted-exif"), pattern = "^exif.+
 
 
 # Define which test EXIF file to run the functions on
-exif_file = exif_files[]
+exif_file = exif_files[1]
 
 # Run for that one EXIF file
 extract_metadata_dy(exif_file, plot_flightpath = TRUE)
@@ -29,84 +27,7 @@ extract_metadata_dy(exif_file, plot_flightpath = TRUE)
 
 
 
-
-
-
-
-
-
-
-
-# # Run extraction on all EXIF files
-# metadata = purrr::map_dfr(exif_files, extract_metadata_dy, plot_flightpath = TRUE)
-# metadata
-
-# # Write results to file (creating directory if it doesn't exist)
-# out_dir = file.path(datadir, "extracted-metadata", "dataset-level-tabular")
-# if (!dir.exists(out_dir)) dir.create(out_dir, recursive = TRUE)
-# write.csv(metadata, file.path(out_dir, "dataset-metadata_dy.csv"), row.names = FALSE)
-
-
-# --- 2. Example of how to use this sandbox script to write a metadata extraction function ---
-
-# Select an EXIF file to test on, and prep the EXIF data by loading it as a geospatial data frame
-# using the 'prep_exif' function. The 'prep_exif' function is defined in
-# 'R/imagery-metadata-extraction_general.R'            # nolint
 exif_file = exif_files[29]
 exif = prep_exif(exif_file)
 exif$dataset_id |> unique()
-# Note that the 'prep_exif' function returns the EXIF data as a geospatial data frame (an 'sf'
-# object) with point geometry. So any geospatial operations you attempt on it should use functions
-# from the 'sf' package. If you are more familiar with 'terra' objects and would rather work with
-# them, let Derek know and we can create an option to return 'terra::vect' objects.
 
-# Between the BEGIN and END comments below, write code to extract the metadata attribute you're
-# working on. When you're done, you can wrap it in a function definition, taking only one parameter,
-# 'exif'. Here is an example of developing code to extract the number of images in an imagery
-# dataset.
-
-# BEGIN FUNCTION CODE
-
-# Get the altitude of each image above ground
-
-# Define the AOI as a polygon
-aoi = sf::st_convex_hull(sf::st_union(exif)) |> sf::st_as_sf()
-
-# Get an elev raster for this AOI
-dem = elevatr::get_elev_raster(aoi, z = 14, prj = 4326, src = "gl1e")
-
-## Try it with USGS dem
-
-# Get the elevation of all the points
-ground_elev = terra::extract(dem, exif, method = "bilinear")
-
-agl = exif$AbsoluteAltitude - ground_elev
-
-summary(agl)
-hist(agl)
-
-# END FUNCTION CODE
-
-
-# Now here is an example of turning that code into a function
-
-extract_image_count = function(exif) {
-
-  # Get the number of images in the dataset by counting the rows of the EXIF data frame
-  image_count = nrow(exif)
-
-  return(image_count)
-
-}
-
-
-# Now you can test the function on the EXIF data
-
-image_count = extract_image_count(exif)
-image_count
-
-# Once it is working right, you can move this function to your
-# 'R/imagery-metadata-extraction_<initials>.R' file and then add a call to this function from within
-# your 'extract_metadata_<initials>' function. Once it is in there, then you can run the top part of
-# this script again, and when it extracts the metadata for each EXIF dataset, your additional
-# metadata should be included.

@@ -44,6 +44,39 @@ create_mission_polygon = function(exif, image_merge_distance) {
 
 }
 
+# Get the correlation between the altitude of the drone and the ground elevation (i.e. trerrain
+# follow tightness)
+extract_flight_terrain_correlation = function(exif) {
+  # Define the AOI as a polygon
+  aoi = sf::st_convex_hull(sf::st_union(exif)) |> sf::st_as_sf()
+
+  # Get an elev raster for this AOI
+  dem = elevatr::get_elev_raster(aoi, z = 14, prj = 4326, src = "aws")
+
+  ## Try it with USGS dem
+
+  # Get the ground elevation beneath all the photo points
+  ground_elev = terra::extract(dem, exif, method = "bilinear")
+
+  # Get the difference between the drone's altitude and the ground elevation
+  agl = exif$GPSAltitude - ground_elev
+
+  # Get the middle 80% of AGL (to exclude outliers like landscape shots in mission)
+  agl_lwr = quantile(agl, 0.1)
+  agl_upr = quantile(agl, 0.9)
+
+  agl_core = agl[agl > agl_lwr & agl < agl_upr]
+  exif_elev_core = exif$GPSAltitude[agl > agl_lwr & agl < agl_upr]
+  ground_elev_core = ground_elev[agl > agl_lwr & agl < agl_upr]
+
+  # Get the correlation between the altitude of the drone and the ground elevation (i.e. trerrain
+  # follow tightness)
+  flight_terrain_correlation = cor(exif_elev_core, ground_elev_core)
+
+  return(flight_terrain_correlation)
+
+}
+
 # Wrapper for Derek's metadata extraction functions. Preps the EXIF data for passing to the
 # extraction functions, then calls all the individual extraction functions to extract the respecive attributes.
 extract_metadata_dy = function(exif_filepath, plot_flightpath = FALSE) {
