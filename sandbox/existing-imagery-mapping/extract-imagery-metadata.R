@@ -6,6 +6,8 @@
 # Load all the functions (and package dependencies) of this R package
 devtools::load_all()
 library(terra)
+devtools::dev_mode()
+library(elevatr)
 
 # Define the root of the local data directory
 datadir = readLines(file.path("sandbox", "data-dirs", "derek-map-imagery-js.txt"))
@@ -18,7 +20,7 @@ exif_files = list.files(file.path(datadir, "extracted-exif"), pattern = "^exif.+
 
 
 # Define which test EXIF file to run the functions on
-exif_file = exif_files[1]
+exif_file = exif_files[]
 
 # Run for that one EXIF file
 extract_metadata_dy(exif_file, plot_flightpath = TRUE)
@@ -50,7 +52,7 @@ extract_metadata_dy(exif_file, plot_flightpath = TRUE)
 # Select an EXIF file to test on, and prep the EXIF data by loading it as a geospatial data frame
 # using the 'prep_exif' function. The 'prep_exif' function is defined in
 # 'R/imagery-metadata-extraction_general.R'            # nolint
-exif_file = exif_files[15]
+exif_file = exif_files[29]
 exif = prep_exif(exif_file)
 exif$dataset_id |> unique()
 # Note that the 'prep_exif' function returns the EXIF data as a geospatial data frame (an 'sf'
@@ -71,7 +73,9 @@ exif$dataset_id |> unique()
 aoi = sf::st_convex_hull(sf::st_union(exif)) |> sf::st_as_sf()
 
 # Get an elev raster for this AOI
-dem = elevatr::get_elev_raster(aoi, z = 14, prj = 4326, src = "aws")
+dem = elevatr::get_elev_raster(aoi, z = 14, prj = 4326, src = "gl1e")
+
+## Try it with USGS dem
 
 # Get the elevation of all the points
 ground_elev = terra::extract(dem, exif, method = "bilinear")
