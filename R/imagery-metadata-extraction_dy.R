@@ -86,10 +86,12 @@ extract_metadata_dy = function(exif_filepath, plot_flightpath = FALSE) {
 
   # Extract/compute metadata attributes
   flight_speed_derived = extract_flight_speed(exif)
+  flight_terrain_correlation = extract_flight_terrain_correlation(exif)
 
   # Return extracted/computed metadata as a data frame row
   metadata = data.frame(dataset_id = exif$dataset_id[1],
-                        flight_speed_derived = flight_speed_derived
+                        flight_speed_derived = flight_speed_derived,
+                        flight_terrain_correlation = flight_terrain_correlation
                         # Add more metadata variables here
                         )
 
@@ -101,4 +103,19 @@ extract_metadata_dy = function(exif_filepath, plot_flightpath = FALSE) {
 
   return(ret)
 
+}
+
+# Post-processes the data returned by extract_metadata(_dy): Combines the extracted mission polygon
+# and metadata by applying the metadata as attributes of the polygon
+get_mission_polygon_w_metadata = function(exif_file, image_merge_distance = 10) {
+
+  # Get the metadata and mission polygon
+  mission = extract_metadata_dy(exif_file, plot_flightpath = TRUE)
+
+  # Add the metadata as attributes to the mission polygon
+  mission_polygon = mission$mission_polygon |> sf::st_as_sf()
+  mission_polygon_attributed = dplyr::bind_cols(mission_polygon, mission$metadata)
+  
+  # Return the attributed mission polygon
+  return(mission_polygon_attributed)
 }
