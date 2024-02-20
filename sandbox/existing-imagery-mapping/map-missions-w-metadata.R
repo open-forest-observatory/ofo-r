@@ -25,7 +25,7 @@ polys_df = dplyr::bind_rows(polys)
 polys = polys_df
 
 
-# If the dataset ID includes the string '_and_', split it into two separate datasetson that strong
+# If the dataset ID includes the string '_and_', split it into two separate datasets on that string
 polys = polys |>
   tidyr::separate_longer_delim(dataset_id, delim = "_and_")
 
