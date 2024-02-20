@@ -6,6 +6,7 @@ library(sf)
 library(readxl)
 
 datadir = readLines("sandbox/data-dirs/derek-fieldref-laptop.txt")
+datadir_imagery = readLines("sandbox/data-dirs/derek-map-imagery-laptop.txt")
 
 projects = read_excel(file.path(datadir, "field-reference-data.xlsx"), sheet = "field-projects")
 plots = read_excel(file.path(datadir, "field-reference-data.xlsx"), sheet = "field-plots")
