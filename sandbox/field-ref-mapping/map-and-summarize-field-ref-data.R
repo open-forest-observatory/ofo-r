@@ -145,24 +145,24 @@ imagery_polys = st_read(file.path(datadir_imagery, "dataset-polys", "dataset-pol
 # Consolidate the imagery polygons to 120m nadir imagery, one polygon per location
 
 imagery_polys = imagery_polys |>
-  filter(altitude > 100 & pitch < 8)
+  filter(altitude > 95 & altitude < 145 & pitch < 8)
 
 
 
 #### RESUME HERE
 
-parts <- st_cast(st_union(x),"POLYGON")
-plot(parts)
+parts <- st_cast(st_union(imagery_polys),"POLYGON")
 
-clust <- unlist(st_intersects(x, parts))
+clust <- unlist(st_intersects(imagery_polys, parts))
 
-diss <- cbind(x, clust) %>%
-  group_by(clust) %>%
-  summarize(box = paste(box, collapse = ", "))
+flattened <- cbind(imagery_polys, clust) |>
+  group_by(clust) |>
+  summarize(dataset_id = paste(dataset_id, collapse = ","),
+            altitude = paste(altitude, collapse = ","),
+            pitch = paste(pitch, collapse = ","))
 
-plot(diss[1])
-
-
+st_write(flattened, file.path(datadir, "temp", "imagery-polys-flattened.gpkg"), delete_dsn = TRUE)
+st_write(imagery_polys, file.path(datadir, "temp", "imagery-polys-unflattened.gpkg"), delete_dsn = TRUE)
 
 
 
