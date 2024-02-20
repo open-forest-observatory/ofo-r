@@ -34,9 +34,19 @@ create_mission_polygon = function(exif, image_merge_distance) {
   polybuff = sf::st_union(ptbuff)
   poly = sf::st_buffer(polybuff, -image_merge_distance + 1)
 
-  # Check if multipolygon and return warning if so
+  # Check if multipolygon and if so, return warning and keep only largest polygon
   n_polys = length(sf::st_geometry(poly)[[1]])
-  if (n_polys > 1) warning("Non-contiguous images in dataset ", exif$dataset_id)
+  if (n_polys > 1) {
+
+    warning("Non-contiguous images in dataset ", exif$dataset_id[1], ". Dropping all but largest contiguous set.")
+    
+    parts = sf::st_cast(poly, "POLYGON")
+    areas = sf::st_area(parts)
+    part = parts[which.max(areas)]
+    poly = part
+  } else if (n_polys == 0) {
+    stop("No contiguous images in dataset ", exif$dataset_id[1])
+  }
 
   polysimp = sf::st_simplify(poly, dTolerance = 10)
 
@@ -79,11 +89,25 @@ extract_flight_terrain_correlation = function(exif) {
 
 # Wrapper for Derek's metadata extraction functions. Preps the EXIF data for passing to the
 # extraction functions, then calls all the individual extraction functions to extract the respecive attributes.
-extract_metadata_dy = function(exif_filepath, plot_flightpath = FALSE) {
+# crop_to_contiguous: Keeps only the images within the largest contiguoug patch of images (which is
+# what is returned by create_mission_polygon)
+extract_metadata_dy = function(exif_filepath, plot_flightpath = FALSE, crop_to_contiguous = FALSE) {
 
   # Prep the EXIF data for extraction of metadata attributes
   exif = prep_exif(exif_filepath, plot_flightpath = plot_flightpath)
 
+  # Compute geospatial features
+  mission_polygon = create_mission_polygon(exif, image_merge_distance = 50)
+
+  if (crop_to_contiguous) {
+
+    # Keep only the images within the largest contiguous patch of images
+    polygon_proj_buffer = mission_polygon |> sf::st_transform(3310) |> sf::st_buffer(20)
+    exif_proj = sf::st_transform(exif, 3310)
+    intersection_idxs = sf::st_intersects(exif_proj, polygon_proj_buffer, sparse = FALSE)
+    exif = exif[intersection_idxs[,1], ]
+  }
+  
   # Extract/compute metadata attributes
   flight_speed_derived = extract_flight_speed(exif)
   flight_terrain_correlation = extract_flight_terrain_correlation(exif)
@@ -94,9 +118,6 @@ extract_metadata_dy = function(exif_filepath, plot_flightpath = FALSE) {
                         flight_terrain_correlation = flight_terrain_correlation
                         # Add more metadata variables here
                         )
-
-  # Compute geospatial features
-  mission_polygon = create_mission_polygon(exif, image_merge_distance = 50)
 
   ret = list(metadata = metadata,
              mission_polygon = mission_polygon)
@@ -109,8 +130,10 @@ extract_metadata_dy = function(exif_filepath, plot_flightpath = FALSE) {
 # and metadata by applying the metadata as attributes of the polygon
 get_mission_polygon_w_metadata = function(exif_file, image_merge_distance = 10) {
 
+  message("Extracting metadata and mission polygon from ", exif_file)
+
   # Get the metadata and mission polygon
-  mission = extract_metadata_dy(exif_file, plot_flightpath = TRUE)
+  mission = extract_metadata_dy(exif_file, plot_flightpath = FALSE, crop_to_contiguous = TRUE)
 
   # Add the metadata as attributes to the mission polygon
   mission_polygon = mission$mission_polygon |> sf::st_as_sf()
