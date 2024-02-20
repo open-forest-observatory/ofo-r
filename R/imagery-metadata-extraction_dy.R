@@ -107,7 +107,7 @@ extract_metadata_dy = function(exif_filepath, plot_flightpath = FALSE, crop_to_c
     intersection_idxs = sf::st_intersects(exif_proj, polygon_proj_buffer, sparse = FALSE)
     exif = exif[intersection_idxs[,1], ]
   }
-  
+
   # Extract/compute metadata attributes
   flight_speed_derived = extract_flight_speed(exif)
   flight_terrain_correlation = extract_flight_terrain_correlation(exif)
