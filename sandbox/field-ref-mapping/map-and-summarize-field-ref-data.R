@@ -133,3 +133,37 @@ ggplot(plot_summ, aes(y = dbh_mean, x = tph, size = plot_area, color = project_n
   scale_size_continuous(range = c(1.5, 6)) +
   theme_bw(15) +
   labs(size = "Plot area (ha)", x = "Trees per hectare", y = "DBH (cm)")
+
+
+
+
+# ---- Determine whether covered by drone imagery ----
+
+# Load the drone imagery polygons
+imagery_polys = st_read(file.path(datadir_imagery, "dataset-polys", "dataset-polys_v1.gpkg"))
+
+# Consolidate the imagery polygons to 120m nadir imagery, one polygon per location
+
+imagery_polys = imagery_polys |>
+  filter(altitude > 100 & pitch < 8)
+
+
+
+#### RESUME HERE
+
+parts <- st_cast(st_union(x),"POLYGON")
+plot(parts)
+
+clust <- unlist(st_intersects(x, parts))
+
+diss <- cbind(x, clust) %>%
+  group_by(clust) %>%
+  summarize(box = paste(box, collapse = ", "))
+
+plot(diss[1])
+
+
+
+
+
+## NOTE: need to get imagery year
