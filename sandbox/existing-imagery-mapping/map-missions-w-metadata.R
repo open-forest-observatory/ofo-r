@@ -33,7 +33,8 @@ polys = polys |>
 
 # Write the tabular data as CSV for a human to add flight altitude and camera pitch info and year
 polys_nonspatial = polys
-sf::st_geometry(polys_nonspatial) = NULL
+polys_nonspatial = sf::st_drop_geometry(polys_nonspatial)
+polys_nonspatial = dplyr::select(polys_nonspatial, -x)
 polys_nonspatial$altitude_annotated = NA
 polys_nonspatial$pitch_annotated = NA
 polys_nonspatial$year_annotated = NA
@@ -41,7 +42,7 @@ readr::write_csv(polys_nonspatial, file.path(datadir, "ancillary", "altitude-pit
 
 # Pull in the annotated data and add it to the spatial data
 annotated = readr::read_csv(file.path(datadir, "ancillary", "altitude-pitch-annotation", "missions-for-annotation-annotated.csv"))
-annotated = annotated |> dplyr::select(dataset_id, altitude_annotated, pitch_annotated)
+annotated = annotated |> dplyr::select(dataset_id, altitude_annotated, pitch_annotated, year_annotated)
 polys = dplyr::left_join(polys, annotated, by = "dataset_id")
 
 # Pull in the baserow data and add it to the spatial data
@@ -57,4 +58,4 @@ polys = polys |>
                 pitch = dplyr::coalesce(camera_pitch_nominal, pitch_annotated))
 
 # Save to gpkg
-sf::st_write(polys, file.path(datadir, "ancillary", "dataset-polys", "dataset-polys_v1.gpkg"), delete_dsn = TRUE)
+sf::st_write(polys, file.path(datadir, "ancillary", "dataset-polys", "dataset-polys_v2.gpkg"), delete_dsn = TRUE)
