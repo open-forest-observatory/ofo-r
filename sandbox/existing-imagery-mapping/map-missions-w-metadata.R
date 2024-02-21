@@ -14,12 +14,12 @@ datadir = readLines(file.path("sandbox", "data-dirs", "derek-map-imagery-js.txt"
 # --- 1. Workflow for running metadata extraction ---
 
 # Get a list of the files containing the EXIF data (one file per image dataset).
-exif_files = list.files(file.path(datadir, "extracted-exif"), pattern = "^exif.+\\.csv$", recursive = TRUE, full.names = TRUE)
+exif_files = list.files(file.path(datadir, "ancillary", "extracted-exif"), pattern = "^exif.+\\.csv$", recursive = TRUE, full.names = TRUE)
 
 
 future::plan(future::multicore)
 polys = furrr::future_map(exif_files, get_mission_polygon_w_metadata, .options = furrr::furrr_options(chunk_size = 1, seed = TRUE))
-future::plan(sequential)
+future::plan(future::sequential)
 
 polys_df = dplyr::bind_rows(polys)
 polys = polys_df
@@ -31,10 +31,12 @@ polys = polys |>
 
 
 
-# Write the tabular data as CSV for a human to add flight altitude and camera pitch info
-polys_nonspatial = sf::st_drop_geometry(polys)
+# Write the tabular data as CSV for a human to add flight altitude and camera pitch info and year
+polys_nonspatial = polys
+sf::st_geometry(polys_nonspatial) = NULL
 polys_nonspatial$altitude_annotated = NA
 polys_nonspatial$pitch_annotated = NA
+polys_nonspatial$year_annotated = NA
 readr::write_csv(polys_nonspatial, file.path(datadir, "ancillary", "altitude-pitch-annotation", "missions-for-annotation.csv"))
 
 # Pull in the annotated data and add it to the spatial data
