@@ -47,9 +47,9 @@ centers = st_as_sf(plots, coords = c("plot_lon", "plot_lat"), crs = 4326)
 
 trees = st_as_sf(trees, coords = c("tree_lon", "tree_lat"), crs = 4326)
 
-st_write(centers, file.path(datadir, "temp", "field-plot-centers.gpkg"), delete_dsn = TRUE)
-st_write(boundaries, file.path(datadir, "temp", "field-plot-boundaries_v2.gpkg"), delete_dsn = TRUE)
-st_write(trees, file.path(datadir, "temp", "field-trees.gpkg"), delete_dsn = TRUE)
+st_write(centers, file.path(datadir, "field-plot-summaries", "field-plot-centers.gpkg"), delete_dsn = TRUE)
+st_write(boundaries, file.path(datadir, "field-plot-summaries", "field-plot-boundaries_v2.gpkg"), delete_dsn = TRUE)
+st_write(trees, file.path(datadir, "field-plot-summaries", "field-trees.gpkg"), delete_dsn = TRUE)
 
 
 
@@ -69,6 +69,7 @@ plot_summ = trees_tabular |>
   group_by(plot_id) |>
   summarize(dbh_mean = mean(dbh) |> round(1),
             dbh_sd = sd(dbh) |> round(1),
+            dbh_cv = (sd(dbh) / mean(dbh)) |> round(2),
             n_trees = n(),
             height_measured = (sum(!is.na(height)) / n()) > 0.9)
 
@@ -110,60 +111,9 @@ plot_summ = left_join(plot_summ, plots_foc, by = "plot_id")
 
 plot_summ = plot_summ |>
   mutate(tph = round(n_trees / plot_area)) |>
-  select(plot_id, project_name, contributor_plot_id, survey_year, plot_area, height_measured, tph, dbh_mean, dbh_sd, top_species)
-
-# Manually exclude Johnston plots which are not accurate yet, and some others that are not
-# exhaustive plots or don't include height
-plot_summ = plot_summ |>
-  filter(tph < 5000) |>
-  filter(!(contributor_plot_id %in% c("Chips_1_ABCO"))) |> # not exhaustive
-  filter(height_measured)
+  select(plot_id, project_name, contributor_plot_id, survey_year, plot_area, height_measured, tph, dbh_mean, dbh_sd, dbh_cv, top_species)
 
 
 
-# Make a scatterplot of plots
-# Size is area of plot
-# x and y are mean dbh and TPH
-# error bars for sd of dbh
-# color for project
-
-ggplot(plot_summ, aes(y = dbh_mean, x = tph, size = plot_area, color = project_name)) +
-  geom_point() +
-  geom_errorbar(aes(ymin = dbh_mean - dbh_sd * 0.05, ymax = dbh_mean + dbh_sd * 0.05), width = 0.0, size = 0.5) +
-  scale_size_continuous(range = c(1.5, 6)) +
-  theme_bw(15) +
-  labs(size = "Plot area (ha)", x = "Trees per hectare", y = "DBH (cm)")
-
-
-
-
-# ---- Determine whether covered by drone imagery ----
-
-# Load the drone imagery polygons
-imagery_polys = st_read(file.path(datadir_imagery, "dataset-polys", "dataset-polys_v1.gpkg"))
-
-# Consolidate the imagery polygons to 120m nadir imagery, one polygon per location
-
-imagery_polys = imagery_polys |>
-  filter(altitude > 95 & altitude < 145 & pitch < 8)
-
-
-
-#### RESUME HERE
-
-parts <- st_cast(st_union(imagery_polys),"POLYGON")
-
-clust <- unlist(st_intersects(imagery_polys, parts))
-
-flattened <- cbind(imagery_polys, clust) |>
-  group_by(clust) |>
-  summarize(dataset_id = paste(dataset_id, collapse = ","),
-            altitude = paste(altitude, collapse = ","),
-            pitch = paste(pitch, collapse = ","))
-
-st_write(flattened, file.path(datadir, "temp", "imagery-polys-flattened.gpkg"), delete_dsn = TRUE)
-st_write(imagery_polys, file.path(datadir, "temp", "imagery-polys-unflattened.gpkg"), delete_dsn = TRUE)
-
-
-
-## NOTE: need to get imagery year
+# Write summarized plot data to file
+write_csv(plot_summ, file.path(datadir, "field-plot-summaries", "field-plot-summaries.csv"))
