@@ -111,7 +111,7 @@ plot_summ = left_join(plot_summ, plots_foc, by = "plot_id")
 
 plot_summ = plot_summ |>
   mutate(tph = round(n_trees / plot_area)) |>
-  select(plot_id, project_name, contributor_plot_id, survey_year, plot_area, height_measured, tph, dbh_mean, dbh_sd, dbh_cv, top_species)
+  select(plot_id, project_name, contributor_plot_id, survey_year, plot_area, height_measured, includes_snags, min_dbh, min_ht, tph, dbh_mean, dbh_sd, dbh_cv, top_species)
 
 
 

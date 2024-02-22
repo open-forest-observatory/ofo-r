@@ -93,7 +93,7 @@ ggplot(field_summ, aes(y = dbh_mean, x = tph, size = plot_area, color = project_
 
 # Repeat but with only the plots that are covered by drone imagery
 
-ggplot(field_summ_w_imagery, aes(y = dbh_mean, x = tph, size = plot_area, color = project_name)) +
+fig = ggplot(field_summ_w_imagery, aes(y = dbh_mean, x = tph, size = plot_area, color = project_name)) +
   geom_point() +
   geom_errorbar(aes(ymin = dbh_mean - dbh_cv * 3, ymax = dbh_mean + dbh_cv * 3), width = 0.0, size = 0.5) +
   scale_size_continuous(range = c(1.5, 6)) +
@@ -102,6 +102,68 @@ ggplot(field_summ_w_imagery, aes(y = dbh_mean, x = tph, size = plot_area, color 
   labs(size = "Plot area (ha)", x = "Trees per hectare", y = "Mean DBH (cm)")
 
 
-## Get a list of all the plots with imagery, along with their relevant details
+png(file.path(datadir_field, "field-plot-summaries", "field-plots_w-ht_w-imagery_structure-scatterplot.png"), width = 12, height = 8, units = "in", res = 300)
+fig
+dev.off()
 
-# Get a shapefile of the plot centers
+
+## Get a list of all the plots with imagery, along with their relevant details (including drone imagery params)
+
+field_plots_w_imagery_save = field_summ_w_imagery |>
+  select(field_plot_id, project_name, survey_year, plot_area, min_dbh, min_ht, tph, dbh_mean, dbh_cv, top_species, contributor_field_plot_id = contributor_plot_id)
+
+# Bring in the drone imagery details
+field_drone_selected = field_drone |>
+  select(field_plot_id, drone_dataset_id, drone_imagery_year = year)
+field_drone_selected = st_drop_geometry(field_drone_selected)
+
+field_plots_w_imagery_save = left_join(field_plots_w_imagery_save, field_drone_selected, by = "field_plot_id")
+
+# Condense the comma-separated list of imagery years into only unique years
+field_plots_w_imagery_save = field_plots_w_imagery_save |>
+  mutate(drone_imagery_year = str_split(drone_imagery_year, ",") |> map_chr(~ str_c(unique(.x), collapse = ",")))
+
+# Write it
+write_csv(field_plots_w_imagery_save, file.path(datadir_field, "field-plot-summaries", "field-plots_w-ht_w-imagery.csv"))
+
+# Get a shapefile of the plot centroids
+field_centers = st_centroid(field_bounds)
+
+field_plot_locs = inner_join(field_centers, field_summ_w_imagery, by = "field_plot_id")
+
+st_write(field_plot_locs, file.path(datadir_field, "field-plot-summaries", "field-plots _w-ht_w-imagery.gpkg"))
+
+
+
+# Make a map figure of the field plots with imagery
+
+ofo_locations <- 
+  field_plot_locs |>
+  sf::st_transform(3857)
+
+ofo_extent <-
+  sf::st_bbox(ofo_locations) |>
+  sf::st_as_sfc() |>
+  sf::st_as_sf() |>
+  sf::st_buffer(dist = 200000) |>
+  sf::st_bbox() |>
+  sf::st_as_sfc() |>
+  sf::st_as_sf()
+
+states <-
+  rnaturalearth::ne_states(country = "United States of America", 
+                            returnclass = "sf") |>
+  sf::st_transform(3857) |>
+  sf::st_intersection(ofo_extent)
+  
+  
+map = ggplot() +
+  geom_sf(data = states) +
+  geom_sf(data = ofo_locations, aes(color = project_name)) +
+  scale_color_viridis_d(option = "magma", end = 0.9) +
+  theme_bw(15)
+map
+
+png(file.path(datadir_field, "field-plot-summaries", "field-plots_w-ht_w-imagery_map.png"), width = 12, height = , units = "in", res = 300)
+map
+dev.off()
