@@ -1,4 +1,5 @@
 # Purpose: Map the locations of field reference data plots, and make a table summarizing the data
+# TODO: Need to make sure there are field plot bounds for all plots with tabular data and vice-versa
 
 devtools::load_all()
 library(tidyverse)
