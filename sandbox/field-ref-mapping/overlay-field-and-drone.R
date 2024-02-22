@@ -19,8 +19,7 @@ field_summ = read_csv(file.path(datadir_field, "field-plot-summaries", "field-pl
 # exhaustive plots or don't include height
 field_summ = field_summ |>
   filter(tph < 5000) |>
-  filter(!(contributor_plot_id %in% c("Chips_1_ABCO")),
-         !project_name %in% c("osu_stem_data")) |> # not exhaustive
+  filter(!(contributor_plot_id %in% c("Chips_1_ABCO"))) |> # not exhaustive  # TODO: add back: 20230709-0199,20230709-0201,20230710-0205,20230710-0206,20230710-0207
   filter(height_measured)
 
 # Spatial
