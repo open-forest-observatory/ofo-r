@@ -98,7 +98,6 @@ plot_summ = left_join(plot_summ, top_species, by = "plot_id")
 # Bring in plot-level attributes: project, contributor plot id, plot area, year
 
 plots_foc = plots |>
-  select(plot_id, project_id, survey_date, plot_area, includes_snags, includes_damage, min_dbh, min_ht, contributor_plot_id) |>
   mutate(survey_year = str_sub(survey_date, 1, 4),
          plot_area = round(plot_area / 10000, 2))
 
@@ -111,7 +110,7 @@ plot_summ = left_join(plot_summ, plots_foc, by = "plot_id")
 
 plot_summ = plot_summ |>
   mutate(tph = round(n_trees / plot_area)) |>
-  select(plot_id, project_name, contributor_plot_id, survey_year, plot_area, height_measured, includes_snags, min_dbh, min_ht, tph, dbh_mean, dbh_sd, dbh_cv, top_species)
+  select(plot_id, project_name, contributor_plot_id, survey_year, plot_area, height_measured, includes_snags, min_dbh, min_ht, min_ht_ohvis, num_ohvis_trees_excluded, tph, dbh_mean, dbh_sd, dbh_cv, top_species)
 
 
 

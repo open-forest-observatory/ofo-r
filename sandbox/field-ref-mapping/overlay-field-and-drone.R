@@ -29,7 +29,7 @@ field_bounds = st_read(file.path(datadir_field, "field-plot-summaries", "field-p
 
 
 
-# Reach in and prep drone plot data
+# Read in and prep drone plot data
 
 imagery_polys = st_read(file.path(datadir_imagery, "dataset-polys", "dataset-polys_v2.gpkg"))
 
@@ -51,7 +51,6 @@ imagery_polys_flat <- cbind(imagery_polys, clust) |>
             altitude = paste(altitude, collapse = ","),
             pitch = paste(pitch, collapse = ","),
             year = paste(year_annotated, collapse = ","))
-
 
 
 # ---- Determine whether field plots are covered by drone imagery ----
@@ -82,13 +81,17 @@ field_summ_w_imagery = field_summ |>
 
 # Plot the plots along DBH, TPH, and plot area axes
 
-ggplot(field_summ, aes(y = dbh_mean, x = tph, size = plot_area, color = project_name)) +
+fig = ggplot(field_summ, aes(y = dbh_mean, x = tph, size = plot_area, color = project_name)) +
   geom_point() +
   geom_errorbar(aes(ymin = dbh_mean - dbh_cv * 3, ymax = dbh_mean + dbh_cv * 3), width = 0.0, size = 0.5) +
   geom_point(data = field_summ_w_imagery, color = "black", pch = 1) +
   scale_size_continuous(range = c(1.5, 6)) +
   theme_bw(15) +
   labs(size = "Plot area (ha)", x = "Trees per hectare", y = "Mean DBH (cm)")
+fig
+png(file.path(datadir_field, "field-plot-summaries", "field-plots_structure-scatterplot.png"), width = 12, height = 8, units = "in", res = 300)
+fig
+dev.off()
 
 
 # Repeat but with only the plots that are covered by drone imagery
@@ -100,7 +103,7 @@ fig = ggplot(field_summ_w_imagery, aes(y = dbh_mean, x = tph, size = plot_area, 
   theme_bw(15) +
   scale_color_viridis_d(option = "magma", end = 0.9) +
   labs(size = "Plot area (ha)", x = "Trees per hectare", y = "Mean DBH (cm)")
-
+fig
 
 png(file.path(datadir_field, "field-plot-summaries", "field-plots_w-ht_w-imagery_structure-scatterplot.png"), width = 12, height = 8, units = "in", res = 300)
 fig
@@ -110,7 +113,7 @@ dev.off()
 ## Get a list of all the plots with imagery, along with their relevant details (including drone imagery params)
 
 field_plots_w_imagery_save = field_summ_w_imagery |>
-  select(field_plot_id, project_name, survey_year, plot_area, min_dbh, min_ht, tph, dbh_mean, dbh_cv, top_species, contributor_field_plot_id = contributor_plot_id)
+  select(field_plot_id, project_name, survey_year, plot_area, min_dbh, min_ht, min_ht_ohvis, num_ohvis_trees_excluded,  tph, dbh_mean, dbh_cv, top_species, contributor_field_plot_id = contributor_plot_id)
 
 # Bring in the drone imagery details
 field_drone_selected = field_drone |>
@@ -131,7 +134,7 @@ field_centers = st_centroid(field_bounds)
 
 field_plot_locs = inner_join(field_centers, field_summ_w_imagery, by = "field_plot_id")
 
-st_write(field_plot_locs, file.path(datadir_field, "field-plot-summaries", "field-plots _w-ht_w-imagery.gpkg"))
+st_write(field_plot_locs, file.path(datadir_field, "field-plot-summaries", "field-plots _w-ht_w-imagery.gpkg"), delete_dsn = TRUE)
 
 
 
