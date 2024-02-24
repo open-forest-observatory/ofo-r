@@ -87,6 +87,7 @@ fig = ggplot(field_summ, aes(y = dbh_mean, x = tph, size = plot_area, color = pr
   geom_point(data = field_summ_w_imagery, color = "black", pch = 1) +
   scale_size_continuous(range = c(1.5, 6)) +
   theme_bw(15) +
+  scale_color_viridis_d(option = "magma", end = 0.9) +
   labs(size = "Plot area (ha)", x = "Trees per hectare", y = "Mean DBH (cm)")
 fig
 png(file.path(datadir_field, "field-plot-summaries", "field-plots_structure-scatterplot.png"), width = 12, height = 8, units = "in", res = 300)
