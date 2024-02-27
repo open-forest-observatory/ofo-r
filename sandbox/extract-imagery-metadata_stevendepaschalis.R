@@ -9,75 +9,96 @@ devtools::load_all()
 # Define the root of the local data directory
 datadir = readLines(file.path("sandbox", "data-dirs", "steven-metadata-laptop.txt"))
 
-
-# --- 1. Workflow for running metadata extraction ---
-
-# Get a list of the files containing the test EXIF data (one file per image dataset). These files
-# have already been created and saved into the project data folder.
-exif_files = list.files(file.path(datadir, "exif-examples"), pattern = "^exif.+\\.csv$", full.names = TRUE)
-
-# Define which test EXIF file to run the functions on
-exif_file = exif_files[1]
-
-# Run for that one EXIF file.
-extract_metadata_dy(exif_file, plot_flightpath = TRUE)
-# ^ If you want to inspect the definition of this function, it is at the bottom of
-# 'R/imagery-metadata-extraction_dy.R'.
-
-# Run extraction on all EXIF files
-metadata = purrr::map_dfr(exif_files, extract_metadata_dy, plot_flightpath = TRUE)
-metadata
-
-# Write results to file (creating directory if it doesn't exist)
-out_dir = file.path(datadir, "extracted-metadata", "dataset-level-tabular")
-if (!dir.exists(out_dir)) dir.create(out_dir, recursive = TRUE)
-write.csv(metadata, file.path(out_dir, "dataset-metadata_dy.csv"), row.names = FALSE)
-
-
-# --- 2. Example of how to use this sandbox script to write a metadata extraction function ---
-
-# Select an EXIF file to test on, and prep the EXIF data by loading it as a geospatial data frame
-# using the 'prep_exif' function. The 'prep_exif' function is defined in
-# 'R/imagery-metadata-extraction_general.R'            # nolint
 exif_file = exif_files[1]
 exif = prep_exif(exif_file)
-# Note that the 'prep_exif' function returns the EXIF data as a geospatial data frame (an 'sf'
-# object) with point geometry. So any geospatial operations you attempt on it should use functions
-# from the 'sf' package. If you are more familiar with 'terra' objects and would rather work with
-# them, let Derek know and we can create an option to return 'terra::vect' objects.
 
-# Between the BEGIN and END comments below, write code to extract the metadata attribute you're
-# working on. When you're done, you can wrap it in a function definition, taking only one parameter,
-# 'exif'. Here is an example of developing code to extract the number of images in an imagery
-# dataset.
+# Load necessary packages
+library(sf)
 
-# BEGIN FUNCTION CODE
+# Define the function to extract metadata including resolution, aspect ratio, image file format, and mean image frequency
+extract_metadata = function(exif) {
+  # Check if DateTimeOriginal is present
+  if (!"DateTimeOriginal" %in% colnames(exif)) {
+    stop("DateTimeOriginal attribute is not present in the data.")
+  }
 
-# Get the number of images in the dataset by counting the rows of the EXIF data frame
-image_count = nrow(exif)
+  # Check for missing or NA values in DateTimeOriginal
+  if (any(is.na(exif$DateTimeOriginal))) {
+    stop("DateTimeOriginal contains NA values.")
+  }
 
-# END FUNCTION CODE
+  # Convert DateTimeOriginal to datetime object
+  exif$DateTimeOriginal <- as.POSIXct(exif$DateTimeOriginal, format = "%Y:%m:%d %H:%M:%S", tz = "UTC")
 
+  # Identify invalid datetime values
+  invalid_datetime <- is.na(exif$DateTimeOriginal)
 
-# Now here is an example of turning that code into a function
+  # Print out invalid datetime values
+  if (any(invalid_datetime)) {
+    print("Invalid datetime values detected:")
+    print(exif$DateTimeOriginal[invalid_datetime])
+    stop("Please correct the invalid datetime values.")
+  }
 
-extract_image_count = function(exif) {
+  # Calculate time difference between consecutive images
+  time_diff <- diff(exif$DateTimeOriginal)
 
-  # Get the number of images in the dataset by counting the rows of the EXIF data frame
-  image_count = nrow(exif)
+  # Calculate time difference in seconds
+  time_diff_seconds <- as.numeric(time_diff, units = "secs")
 
-  return(image_count)
+  # Remove NA and infinity values
+  time_diff_seconds <- time_diff_seconds[is.finite(time_diff_seconds)]
 
+  # Calculate image frequency (images per second)
+  image_frequency <- 1 / time_diff_seconds
+
+  # Check if there are any non-finite image frequencies
+  if (any(!is.finite(image_frequency))) {
+    stop("Invalid image frequencies detected.")
+  }
+
+  # Calculate mean image frequency
+  mean_image_frequency <- mean(image_frequency, na.rm = TRUE)
+
+  # Get Xresolution and Yresolution from the EXIF data
+  resolution_x <- unique(exif$Xresolution)
+  resolution_y <- unique(exif$Yresolution)
+
+  # Get aspect ratio
+  aspect_ratio <- unique(exif$imagewidth / exif$imageheight)
+
+  # Get image file format
+  image_file_format <- unique(exif$FileType)
+
+  # Check if resolution attributes are identical across all images
+  if (length(resolution_x) > 1 | length(resolution_y) > 1) {
+    # If not identical, compute average
+    avg_resolution_x <- mean(resolution_x)
+    avg_resolution_y <- mean(resolution_y)
+
+    # Record a warning
+    warning("Resolution attributes are not identical across all images. Average resolution computed.")
+  } else {
+    # If identical, use the single values
+    avg_resolution_x <- resolution_x
+    avg_resolution_y <- resolution_y
+  }
+
+  # Check if image file format is consistent
+  if (length(image_file_format) > 1) {
+    # If not identical, return a warning
+    warning("Image file format varies across images.")
+  }
+
+  # Return metadata
+  return(list(resolution_x = avg_resolution_x,
+              resolution_y = avg_resolution_y,
+              aspect_ratio = aspect_ratio,
+              image_file_format = image_file_format,
+              mean_image_frequency = mean_image_frequency))
 }
 
+# Test the function
+metadata <- extract_metadata(exif)
+metadata
 
-# Now you can test the function on the EXIF data
-
-image_count = extract_image_count(exif)
-image_count
-
-# Once it is working right, you can move this function to your
-# 'R/imagery-metadata-extraction_<initials>.R' file and then add a call to this function from within
-# your 'extract_metadata_<initials>' function. Once it is in there, then you can run the top part of
-# this script again, and when it extracts the metadata for each EXIF dataset, your additional
-# metadata should be included.
