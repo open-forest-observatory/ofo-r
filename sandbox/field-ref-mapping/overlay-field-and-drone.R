@@ -67,8 +67,8 @@ field_drone = bind_cols(field_bounds, imagery_polys_flat[field_drone_idx, ] |> s
 plots_w_imagery = field_drone$field_plot_id[!is.na(field_drone$drone_dataset_id)]
 # Manually remove one plot that is just at the edge of imagery
 plots_w_imagery = plots_w_imagery[!plots_w_imagery %in% c(114)]
-# Manually remove the lamping plots
-plots_w_imagery = plots_w_imagery[!plots_w_imagery %in% c(82:87)]
+# # Manually remove the lamping plots
+# plots_w_imagery = plots_w_imagery[!plots_w_imagery %in% c(82:87)]
 # Manually add the SSI plot because we know it's good, we just didn't have the imagery in the right
 # place before
 plots_w_imagery = c(plots_w_imagery, 52)
@@ -87,7 +87,7 @@ fig = ggplot(field_summ, aes(y = dbh_mean, x = tph, size = plot_area, color = pr
   geom_point(data = field_summ_w_imagery, color = "black", pch = 1) +
   scale_size_continuous(range = c(1.5, 6)) +
   theme_bw(15) +
-  scale_color_viridis_d(option = "magma", end = 0.9) +
+  scale_color_viridis_d(option = "magma", begin = 0.3, end = 0.9) +
   labs(size = "Plot area (ha)", x = "Trees per hectare", y = "Mean DBH (cm)")
 fig
 png(file.path(datadir_field, "field-plot-summaries", "field-plots_structure-scatterplot.png"), width = 12, height = 8, units = "in", res = 300)
@@ -114,7 +114,7 @@ dev.off()
 ## Get a list of all the plots with imagery, along with their relevant details (including drone imagery params)
 
 field_plots_w_imagery_save = field_summ_w_imagery |>
-  select(field_plot_id, project_name, survey_year, plot_area, min_dbh, min_ht, min_ht_ohvis, num_ohvis_trees_excluded,  tph, dbh_mean, dbh_cv, top_species, contributor_field_plot_id = contributor_plot_id)
+  select(field_plot_id, project_name, survey_year, plot_area, min_dbh, min_ht, min_ht_ohvis, num_ohvis_trees_excluded,  tph, dbh_mean, dbh_cv, forest_type, top_species, contributor_field_plot_id = contributor_plot_id)
 
 # Bring in the drone imagery details
 field_drone_selected = field_drone |>
@@ -168,6 +168,6 @@ map = ggplot() +
   theme_bw(15)
 map
 
-png(file.path(datadir_field, "field-plot-summaries", "field-plots_w-ht_w-imagery_map.png"), width = 12, height = , units = "in", res = 300)
+png(file.path(datadir_field, "field-plot-summaries", "field-plots_w-ht_w-imagery_map.png"), width = 12, height = 8, units = "in", res = 300)
 map
 dev.off()

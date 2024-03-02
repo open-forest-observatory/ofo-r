@@ -73,13 +73,21 @@ plot_summ = trees_tabular |>
             n_trees = n(),
             height_measured = (sum(!is.na(height)) / n()) > 0.9)
 
+trees_tabular = left_join(plot_summ, trees_tabular, by = "plot_id") |>
+  rename(n_trees_plot = n_trees)
+
+
 top_species = trees_tabular |>
+  filter(!is.na(dbh) & dbh > 25.4) |>
   filter(!is.na(species)) |>
   mutate(species = as.character(species)) |>
   group_by(plot_id, species) |>
-  summarize(n_trees = n()) |>
+  summarize(n_trees_sp = n(),
+            n_trees_plot = median(n_trees_plot)) |>
+  mutate(prop_trees_sp = n_trees_sp / n_trees_plot) |>
+  mutate(prop_trees_sp = round(prop_trees_sp, 2) * 100) |>
   group_by(plot_id) |>
-  arrange(plot_id, desc(n_trees)) |>
+  arrange(plot_id, desc(n_trees_sp)) |>
   slice_head(n = 3)
 
 species = species |>
@@ -89,9 +97,12 @@ species = species |>
 top_species = top_species |>
   left_join(species, by = join_by(species == code_numeric))
 
+# Merge species USDA code and proportion
+
 top_species = top_species |>
+  mutate(sp_w_prop = paste0(prop_trees_sp, "-", sp_code)) |>
   group_by(plot_id) |>
-  summarize(top_species = paste(sp_code, collapse = ","))
+  summarize(top_species = paste(sp_w_prop, collapse = ","))
 
 plot_summ = left_join(plot_summ, top_species, by = "plot_id")
 
@@ -110,7 +121,7 @@ plot_summ = left_join(plot_summ, plots_foc, by = "plot_id")
 
 plot_summ = plot_summ |>
   mutate(tph = round(n_trees / plot_area)) |>
-  select(plot_id, project_name, contributor_plot_id, survey_year, plot_area, height_measured, includes_snags, min_dbh, min_ht, min_ht_ohvis, num_ohvis_trees_excluded, tph, dbh_mean, dbh_sd, dbh_cv, top_species)
+  select(plot_id, project_name, contributor_plot_id, survey_year, plot_area, height_measured, includes_snags, min_dbh, min_ht, min_ht_ohvis, num_ohvis_trees_excluded, tph, dbh_mean, dbh_sd, dbh_cv, forest_type, top_species)
 
 
 
