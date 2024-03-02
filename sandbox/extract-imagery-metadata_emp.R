@@ -406,11 +406,9 @@ extract_received_image_path = function(exif) {
 received_image_path = extract_received_image_path(exif)
 received_image_path
 
-#### altitude: returns altitude above ground level (agl) and above sea level (asl) in meters ####
+#### altitude: returns altitude above sea level (asl) in meters ####
 
 # BEGIN FUNCTION CODE
-
-altitude_agl = exif$RelativeAltitude
 
 altitude_asl = exif$AbsoluteAltitude
 
@@ -420,11 +418,9 @@ altitude_asl = exif$AbsoluteAltitude
 
 extract_altitude = function(exif) {
 
-  altitude_agl = exif$RelativeAltitude
-
   altitude_asl = exif$AbsoluteAltitude
 
-  altitude = data.frame (altitude_agl, altitude_asl)
+  altitude = data.frame (altitude_asl)
 
   return(altitude)
 }
