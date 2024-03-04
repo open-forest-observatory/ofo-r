@@ -1,5 +1,4 @@
-# This script has two purposes: 1. Demonstrate how to run functions to extract metadata from imagery
-# dataset EXIF data, and 2. Demonstrate how to write a new metadata extraction function.
+# This script defines image-level metadata extraction functions
 
 # --- Setup ---
 
@@ -21,34 +20,11 @@ exif_files = list.files(file.path(datadir, "exif-examples"), pattern = "^exif.+\
 # Define which test EXIF file to run the functions on
 exif_file = exif_files[1]
 
-# Run for that one EXIF file.
-extract_metadata_dy(exif_file, plot_flightpath = TRUE)
-# ^ If you want to inspect the definition of this function, it is at the bottom of
-# 'R/imagery-metadata-extraction_dy.R'.
-
-# Run extraction on all EXIF files
-metadata = purrr::map_dfr(exif_files, extract_metadata_dy, plot_flightpath = TRUE)
-metadata
-
-# Write results to file (creating directory if it doesn't exist)
-out_dir = file.path(datadir, "extracted-metadata", "dataset-level-tabular")
-if (!dir.exists(out_dir)) dir.create(out_dir, recursive = TRUE)
-# write.csv(metadata, file.path(out_dir, "dataset-metadata_dy.csv"), row.names = FALSE)
-
-write.csv(metadata, file.path(out_dir, "dataset-metadata_emp.csv"), row.names = FALSE)
-
-
-# --- 2. Example of how to use this sandbox script to write a metadata extraction function ---
 
 # Select an EXIF file to test on, and prep the EXIF data by loading it as a geospatial data frame
-# using the 'prep_exif' function. The 'prep_exif' function is defined in
-# 'R/imagery-metadata-extraction_general.R'            # nolint
+
 exif_file = exif_files[1]
 exif = prep_exif(exif_file)
-# Note that the 'prep_exif' function returns the EXIF data as a geospatial data frame (an 'sf'
-# object) with point geometry. So any geospatial operations you attempt on it should use functions
-# from the 'sf' package. If you are more familiar with 'terra' objects and would rather work with
-# them, let Derek know and we can create an option to return 'terra::vect' objects.
 
 # Between the BEGIN and END comments below, write code to extract the metadata attribute you're
 # working on. When you're done, you can wrap it in a function definition, taking only one parameter,
