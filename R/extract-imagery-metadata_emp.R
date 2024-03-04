@@ -1,79 +1,7 @@
 # This script defines image-level metadata extraction functions
+# Written by Emily Marie Purvis, March 4th 2024
 
-# --- Setup ---
-
-# Load all the functions (and package dependencies) of this R package
-devtools::load_all()
-
-# Define the root of the local data directory
-# datadir = readLines(file.path("sandbox", "data-dirs", "derek-metadata-laptop.txt"))
-
-datadir = readLines(file.path("sandbox", "data-dirs", "emp-metadata-laptop.txt"))
-
-
-# --- 1. Workflow for running metadata extraction ---
-
-# Get a list of the files containing the test EXIF data (one file per image dataset). These files
-# have already been created and saved into the project data folder.
-exif_files = list.files(file.path(datadir, "exif-examples"), pattern = "^exif.+\\.csv$", full.names = TRUE)
-
-# Define which test EXIF file to run the functions on
-exif_file = exif_files[1]
-
-
-# Select an EXIF file to test on, and prep the EXIF data by loading it as a geospatial data frame
-
-exif_file = exif_files[1]
-exif = prep_exif(exif_file)
-
-# Between the BEGIN and END comments below, write code to extract the metadata attribute you're
-# working on. When you're done, you can wrap it in a function definition, taking only one parameter,
-# 'exif'. Here is an example of developing code to extract the number of images in an imagery
-# dataset.
-
-# BEGIN FUNCTION CODE
-
-# Get the number of images in the dataset by counting the rows of the EXIF data frame
-image_count = nrow(exif)
-
-# END FUNCTION CODE
-
-
-# Now here is an example of turning that code into a function
-
-extract_image_count = function(exif) {
-
-  # Get the number of images in the dataset by counting the rows of the EXIF data frame
-  image_count = nrow(exif)
-
-  return(image_count)
-
-}
-
-
-# Now you can test the function on the EXIF data
-
-image_count = extract_image_count(exif)
-image_count
-
-# Once it is working right, you can move this function to your
-# 'R/imagery-metadata-extraction_<initials>.R' file and then add a call to this function from within
-# your 'extract_metadata_<initials>' function. Once it is in there, then you can run the top part of
-# this script again, and when it extracts the metadata for each EXIF dataset, your additional
-# metadata should be included.
-
-
-
-
-
-#### Image-level metadata CSV file (one file per dataset) ####
-
-# Output file: imagery-metadata-dev/extracted-metadata/image-level-metadata/image-metadata_<dataset_id>.csv
-
-exif_file = exif_files[1]
-exif = prep_exif(exif_file)
-
-#### First need to make sure each exif file has the right columns for the following functions. If column(s) are missing, need to add columns of blanks or NAs ####
+#### Step 1: Define image-level metadata extraction functions ####
 
 #### dataset ID ####
 
@@ -92,12 +20,6 @@ extract_dataset_id = function (exif) {
   return(dataset_id)
 
 }
-
-# test function on exif data
-
-dataset_id = extract_dataset_id (exif)
-
-dataset_id
 
 #### datatime_local (Format: YYYYMMDD HHMMSS (local time zone, 24 hr)) ####
 
@@ -120,12 +42,6 @@ extract_datatime_local = function (exif) {
   return(datatime_local)
 
 }
-
-# test function on exif data
-
-datatime_local = extract_datatime_local(exif)
-
-datatime_local
 
 #### lat and lon (Format: dd.dddddddd (EPSG:4326)) ####
 
@@ -154,11 +70,6 @@ extract_lat_lon = function (exif) {
   return(lat_lon)
 }
 
-# test function on exif data
-
-lat_lon = extract_lat_lon(exif)
-lat_lon
-
 #### rtk_fix (Format: True/False. Use EXIF RTKFlat) ####
 
 # goal: return TRUE if there is a RtkFlag value of 50, and FALSE otherwise (i.e. other RtkFlag value, or none). IMPORTANT NOTE!!!!!! THIS FUNCTION ASSUMES DJI DRONES WERE USED. OTHER DRONE MAKES WILL REQUIRE AN UPDATED FUNCTION.
@@ -176,19 +87,14 @@ rtk_fix = {
 
 extract_rtk_fix = function(exif) {
   if ("RtkFlag" %in% names(exif)) {
-  rtk_fix = exif$RtkFlag == 50
-  return(rtk_fix)
+    rtk_fix = exif$RtkFlag == 50
+    return(rtk_fix)
   }
   else {
-  rtk_fix = rep(FALSE, nrow(exif))
-  return(rtk_fix)
+    rtk_fix = rep(FALSE, nrow(exif))
+    return(rtk_fix)
   }
 }
-
-# test function on exif data
-
-rtk_fix = extract_rtk_fix(exif)
-rtk_fix
 
 #### accuracy_x (Units: m rmse) ####
 
@@ -225,11 +131,6 @@ extract_accuracy = function (exif) {
   return(accuracy)
 }
 
-# test function on exif data
-
-accuracy = extract_accuracy(exif)
-accuracy
-
 #### pitch_roll_yaw: camera_pitch (Units: deg, degrees up from nadir), camera_roll (Units: deg, degrees clockwise from up), camera_yaw (Units: deg, degrees right from true north) ####
 
 # BEGIN FUNCTION CODE
@@ -257,11 +158,6 @@ extract_pitch_roll_yaw = function(exif) {
   return(pitch_roll_yaw)
 }
 
-# test function on exif data
-
-pitch_roll_yaw = extract_pitch_roll_yaw(exif)
-pitch_roll_yaw
-
 #### exposure (Units: sec) ####
 
 # BEGIN FUNCTION CODE
@@ -276,11 +172,6 @@ extract_exposure = function (exif) {
   exposure = exif$ExposureTime
   return(exposure)
 }
-
-# test function on exif data
-
-exposure = extract_exposure(exif)
-exposure
 
 #### aperture (Format: xxxxx) ####
 
@@ -297,11 +188,6 @@ extract_aperture = function (exif) {
   return(aperture)
 }
 
-# test function on exif data
-
-aperture = extract_aperture (exif)
-aperture
-
 #### iso ####
 
 # BEGIN FUNCTION CODE
@@ -316,11 +202,6 @@ extract_iso = function(exif) {
   iso = exif$ISO
   return(iso)
 }
-
-# test function on exif data
-
-iso = extract_iso(exif)
-iso
 
 #### white_balance (Format: auto/sunny/cloudy/(others?)) ####
 
@@ -347,11 +228,6 @@ extract_white_balance = function(exif) {
   return(white_balance)
 }
 
-# test function on exif data
-
-white_balance = extract_white_balance(exif)
-white_balance
-
 #### received_image_path (Image path in as-received dataset, with the top level being the folder named with the dataset ID) ####
 
 # BEGIN FUNCTION CODE
@@ -377,11 +253,6 @@ extract_received_image_path = function(exif) {
   return(received_image_path)
 }
 
-# test function on exif data
-
-received_image_path = extract_received_image_path(exif)
-received_image_path
-
 #### altitude: returns altitude above sea level (asl) in meters ####
 
 # BEGIN FUNCTION CODE
@@ -401,24 +272,7 @@ extract_altitude = function(exif) {
   return(altitude)
 }
 
-# test function on exif data
-
-altitude = extract_altitude(exif)
-altitude
-
-#### standardized_image_path (Image path in standardized dataset) ####
-
-# Cannot complete until we also include the step of reorganizing the image files into a standardized naming/folder structure
-
-# BEGIN FUNCTION CODE
-
-# END FUNCTION CODE
-
-# turn code into a function
-
-# test function on exif data
-
-#### Create wrapper for metadata extraction functions. Preps the EXIF data for passing to the extraction functions, then calls all the individual extraction functions to extract the respective attributes. ####
+#### Step 2: Create wrapper for metadata extraction functions. Preps the EXIF data for passing to the extraction functions, then calls all the individual extraction functions to extract the respective attributes. ####
 
 extract_metadata_emp = function(exif_filepath) {
 
@@ -457,54 +311,3 @@ extract_metadata_emp = function(exif_filepath) {
   return(metadata)
 
 }
-
-#### Workflow for running metadata extraction ####
-
-exif_files = list.files(file.path(datadir, "exif-examples"), pattern = "^exif.+\\.csv$", full.names = TRUE)
-
-out_dir = file.path(datadir, "extracted-metadata", "image-level-metadata")
-
-if (!dir.exists(out_dir)) dir.create(out_dir, recursive = TRUE)
-
-# Extract metadata for one EXIF file at a time and save to csv
-
-exif_file = exif_files[1]
-
-metadata1 <- extract_metadata_emp(exif_file)
-
-write.csv(metadata1, file.path("C:\\Users\\emily\\Box\\imagery-metadata-dev\\extracted-metadata\\image-level-metadata\\image-metadata_20220630-0041.csv"), row.names = FALSE)
-
-
-exif_file = exif_files[2]
-
-metadata2 <- extract_metadata_emp(exif_file)
-
-write.csv(metadata2, file.path("C:\\Users\\emily\\Box\\imagery-metadata-dev\\extracted-metadata\\image-level-metadata\\image-metadata_20220730-0079.csv"), row.names = FALSE)
-
-
-exif_file = exif_files[3]
-
-metadata3 <- extract_metadata_emp(exif_file)
-
-write.csv(metadata3, file.path("C:\\Users\\emily\\Box\\imagery-metadata-dev\\extracted-metadata\\image-level-metadata\\image-metadata_20230528-0008.csv"), row.names = FALSE)
-
-
-exif_file = exif_files[4]
-
-metadata4 <- extract_metadata_emp(exif_file)
-
-write.csv(metadata4, file.path("C:\\Users\\emily\\Box\\imagery-metadata-dev\\extracted-metadata\\image-level-metadata\\image-metadata_20230528-0009.csv"), row.names = FALSE)
-
-
-exif_file = exif_files[5]
-
-metadata5 <- extract_metadata_emp(exif_file)
-
-write.csv(metadata5, file.path("C:\\Users\\emily\\Box\\imagery-metadata-dev\\extracted-metadata\\image-level-metadata\\image-metadata_20230706-0152.csv"), row.names = FALSE)
-
-
-exif_file = exif_files[6]
-
-metadata6 <- extract_metadata_emp(exif_file)
-
-write.csv(metadata6, file.path("C:\\Users\\emily\\Box\\imagery-metadata-dev\\extracted-metadata\\image-level-metadata\\image-metadata_20230706-0153.csv"), row.names = FALSE)
