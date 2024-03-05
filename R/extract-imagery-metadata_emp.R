@@ -5,8 +5,6 @@
 
 #### dataset ID ####
 
-dataset_id = exif$dataset_id
-
 extract_dataset_id = function (exif) {
 
   dataset_id = exif$dataset_id
@@ -16,10 +14,6 @@ extract_dataset_id = function (exif) {
 }
 
 #### datatime_local (Format: YYYYMMDD HHMMSS (local time zone, 24 hr)) ####
-
-exif$DateTimeOriginal_nocolon = stringr::str_replace_all(exif$DateTimeOriginal, ":", "")
-
-datatime_local = (exif$DateTimeOriginal_nocolon)
 
 extract_datatime_local = function (exif) {
 
@@ -32,12 +26,6 @@ extract_datatime_local = function (exif) {
 }
 
 #### lat and lon (Format: dd.dddddddd (EPSG:4326)) ####
-
-exif_coordinates <- data.frame(exif$X, sf::st_coordinates(exif[,1], st_coordinates(exif[,2])))
-
-lat = exif_coordinates$Y
-
-lon = exif_coordinates$X
 
 extract_lat_lon = function (exif) {
 
@@ -54,11 +42,6 @@ extract_lat_lon = function (exif) {
 
 #### rtk_fix (Format: True/False. Use EXIF RTKFlat) ####
 
-rtk_fix = {
-  if ("RtkFlag" %in% names(exif)) {rtk_fix = exif$RtkFlag == 50}
-  else {rtk_fix = rep(FALSE, nrow(exif))}
-}
-
 extract_rtk_fix = function(exif) {
   if ("RtkFlag" %in% names(exif)) {
     rtk_fix = exif$RtkFlag == 50
@@ -70,14 +53,7 @@ extract_rtk_fix = function(exif) {
   }
 }
 
-#### accuracy_x (Units: m rmse) ####
-
-accuracy_x = exif$RtkStdLon
-
-accuracy_y = exif$RtkStdLat
-
-accuracy_z = exif$RtkStdHgt
-
+#### accuracy_x (Units: m rmse) ####\
 
 extract_accuracy = function (exif) {
 
@@ -100,12 +76,6 @@ extract_accuracy = function (exif) {
 
 #### pitch_roll_yaw: camera_pitch (Units: deg, degrees up from nadir), camera_roll (Units: deg, degrees clockwise from up), camera_yaw (Units: deg, degrees right from true north) ####
 
-camera_pitch = exif$GimbalPitchDegree + 90
-
-camera_roll = exif$GimbalRollDegree
-
-camera_yaw = exif$GimbalYawDegree
-
 extract_pitch_roll_yaw = function(exif) {
 
   camera_pitch = exif$GimbalPitchDegree + 90
@@ -121,16 +91,12 @@ extract_pitch_roll_yaw = function(exif) {
 
 #### exposure (Units: sec) ####
 
-exposure = exif$ExposureTime
-
 extract_exposure = function (exif) {
   exposure = exif$ExposureTime
   return(exposure)
 }
 
 #### aperture (Format: xxxxx) ####
-
-aperture = (exif$Aperture)
 
 extract_aperture = function (exif) {
   aperture = (exif$Aperture)
@@ -139,19 +105,12 @@ extract_aperture = function (exif) {
 
 #### iso ####
 
-iso = exif$ISO
-
 extract_iso = function(exif) {
   iso = exif$ISO
   return(iso)
 }
 
 #### white_balance (Format: auto/sunny/cloudy/(others?)) ####
-
-white_balance = dplyr::case_when(
-  exif$WhiteBalance == 0 ~ "auto",
-  exif$WhiteBalance == 1 ~ "manual"
-)
 
 extract_white_balance = function(exif) {
 
@@ -165,12 +124,6 @@ extract_white_balance = function(exif) {
 
 #### received_image_path (Image path in as-received dataset, with the top level being the folder named with the dataset ID) ####
 
-received_image_path = stringr::str_split_fixed(exif$SourceFile, fixed(dataset_id), 2)
-
-received_image_path <- received_image_path[,2]
-
-received_image_path <- with(exif, paste0(dataset_id, received_image_path))
-
 extract_received_image_path = function(exif) {
 
   received_image_path = stringr::str_split_fixed(exif$SourceFile, fixed(dataset_id), 2)
@@ -183,8 +136,6 @@ extract_received_image_path = function(exif) {
 }
 
 #### altitude: returns altitude above sea level (asl) in meters ####
-
-altitude_asl = exif$AbsoluteAltitude
 
 extract_altitude = function(exif) {
 
