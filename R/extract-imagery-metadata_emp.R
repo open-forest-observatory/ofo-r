@@ -5,13 +5,7 @@
 
 #### dataset ID ####
 
-# BEGIN FUNCTION CODE
-
 dataset_id = exif$dataset_id
-
-# END FUNCTION CODE
-
-# turn code into a function
 
 extract_dataset_id = function (exif) {
 
@@ -23,15 +17,9 @@ extract_dataset_id = function (exif) {
 
 #### datatime_local (Format: YYYYMMDD HHMMSS (local time zone, 24 hr)) ####
 
-# BEGIN FUNCTION CODE
-
 exif$DateTimeOriginal_nocolon = stringr::str_replace_all(exif$DateTimeOriginal, ":", "")
 
 datatime_local = (exif$DateTimeOriginal_nocolon)
-
-# END FUNCTION CODE
-
-# turn code into a function
 
 extract_datatime_local = function (exif) {
 
@@ -45,17 +33,11 @@ extract_datatime_local = function (exif) {
 
 #### lat and lon (Format: dd.dddddddd (EPSG:4326)) ####
 
-# BEGIN FUNCTION CODE
-
 exif_coordinates <- data.frame(exif$X, sf::st_coordinates(exif[,1], st_coordinates(exif[,2])))
 
 lat = exif_coordinates$Y
 
 lon = exif_coordinates$X
-
-# END FUNCTION CODE
-
-# turn code into a function
 
 extract_lat_lon = function (exif) {
 
@@ -72,18 +54,10 @@ extract_lat_lon = function (exif) {
 
 #### rtk_fix (Format: True/False. Use EXIF RTKFlat) ####
 
-# goal: return TRUE if there is a RtkFlag value of 50, and FALSE otherwise (i.e. other RtkFlag value, or none). IMPORTANT NOTE!!!!!! THIS FUNCTION ASSUMES DJI DRONES WERE USED. OTHER DRONE MAKES WILL REQUIRE AN UPDATED FUNCTION.
-
-# BEGIN FUNCTION CODE
-
 rtk_fix = {
   if ("RtkFlag" %in% names(exif)) {rtk_fix = exif$RtkFlag == 50}
   else {rtk_fix = rep(FALSE, nrow(exif))}
 }
-
-# END FUNCTION CODE
-
-# turn code into a function
 
 extract_rtk_fix = function(exif) {
   if ("RtkFlag" %in% names(exif)) {
@@ -98,19 +72,12 @@ extract_rtk_fix = function(exif) {
 
 #### accuracy_x (Units: m rmse) ####
 
-# EXIF files have an RTK standard longitude deviation (RtkStdLon, the standard deviation (in meters) of the photo recording position in longitude direction), an RTK standard latitude deviation (RtkStdLat, the standard deviation (in meters) of the photo recording position in latitude direction), and an RTK standard altitude deviation (RtkStdHgt, the RTK positioning standard elevation deviation in meters).
-
-# BEGIN FUNCTION CODE
-
 accuracy_x = exif$RtkStdLon
 
 accuracy_y = exif$RtkStdLat
 
 accuracy_z = exif$RtkStdHgt
 
-# END FUNCTION CODE
-
-# turn code into a function
 
 extract_accuracy = function (exif) {
 
@@ -133,17 +100,11 @@ extract_accuracy = function (exif) {
 
 #### pitch_roll_yaw: camera_pitch (Units: deg, degrees up from nadir), camera_roll (Units: deg, degrees clockwise from up), camera_yaw (Units: deg, degrees right from true north) ####
 
-# BEGIN FUNCTION CODE
-
 camera_pitch = exif$GimbalPitchDegree + 90
 
 camera_roll = exif$GimbalRollDegree
 
 camera_yaw = exif$GimbalYawDegree
-
-# END FUNCTION CODE
-
-# turn code into a function
 
 extract_pitch_roll_yaw = function(exif) {
 
@@ -160,13 +121,7 @@ extract_pitch_roll_yaw = function(exif) {
 
 #### exposure (Units: sec) ####
 
-# BEGIN FUNCTION CODE
-
 exposure = exif$ExposureTime
-
-# END FUNCTION CODE
-
-# turn code into a function
 
 extract_exposure = function (exif) {
   exposure = exif$ExposureTime
@@ -175,13 +130,7 @@ extract_exposure = function (exif) {
 
 #### aperture (Format: xxxxx) ####
 
-# BEGIN FUNCTION CODE
-
 aperture = (exif$Aperture)
-
-# END FUNCTION CODE
-
-# turn code into a function
 
 extract_aperture = function (exif) {
   aperture = (exif$Aperture)
@@ -190,13 +139,7 @@ extract_aperture = function (exif) {
 
 #### iso ####
 
-# BEGIN FUNCTION CODE
-
 iso = exif$ISO
-
-# END FUNCTION CODE
-
-# turn code into a function
 
 extract_iso = function(exif) {
   iso = exif$ISO
@@ -205,18 +148,10 @@ extract_iso = function(exif) {
 
 #### white_balance (Format: auto/sunny/cloudy/(others?)) ####
 
-# Some example exifs have all photos with white balance 0, others have all photos with white balance 1
-
-# BEGIN FUNCTION CODE
-
 white_balance = dplyr::case_when(
   exif$WhiteBalance == 0 ~ "auto",
   exif$WhiteBalance == 1 ~ "manual"
 )
-
-# END FUNCTION CODE
-
-# turn code into a function
 
 extract_white_balance = function(exif) {
 
@@ -230,17 +165,11 @@ extract_white_balance = function(exif) {
 
 #### received_image_path (Image path in as-received dataset, with the top level being the folder named with the dataset ID) ####
 
-# BEGIN FUNCTION CODE
-
 received_image_path = stringr::str_split_fixed(exif$SourceFile, fixed(dataset_id), 2)
 
 received_image_path <- received_image_path[,2]
 
 received_image_path <- with(exif, paste0(dataset_id, received_image_path))
-
-# END FUNCTION CODE
-
-# turn code into a function
 
 extract_received_image_path = function(exif) {
 
@@ -255,13 +184,7 @@ extract_received_image_path = function(exif) {
 
 #### altitude: returns altitude above sea level (asl) in meters ####
 
-# BEGIN FUNCTION CODE
-
 altitude_asl = exif$AbsoluteAltitude
-
-# END FUNCTION CODE
-
-# turn code into a function
 
 extract_altitude = function(exif) {
 
@@ -276,10 +199,8 @@ extract_altitude = function(exif) {
 
 extract_metadata_emp = function(exif_filepath) {
 
-  # Prep the EXIF data for extraction of metadata attributes
   exif = prep_exif(exif_filepath)
 
-  # Extract/compute metadata attributes
   dataset_id = extract_dataset_id (exif)
   datatime_local = extract_datatime_local(exif)
   lat_lon = extract_lat_lon(exif)
@@ -293,7 +214,6 @@ extract_metadata_emp = function(exif_filepath) {
   received_image_path = extract_received_image_path(exif)
   altitude = extract_altitude(exif)
 
-  # Return extracted/computed metadata as a data frame row
   metadata = data.frame(dataset_id = dataset_id,
                         datatime_local = datatime_local,
                         lat_lon,
