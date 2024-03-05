@@ -9,6 +9,7 @@ library(tidyverse)
 # ---- Simulate a "predicted" and "observed" tree map
 sim = simulate_tree_maps(trees_per_ha = 300, trees_per_clust = 5, cluster_radius = 5,
                          obs_extent = 60,
+                         pred_extent = 300,
                          horiz_jitter = 3,
                          vert_jitter = 5, # max of 5
                          false_pos = 0.25,

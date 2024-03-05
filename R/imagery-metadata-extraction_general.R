@@ -11,6 +11,14 @@ prep_exif = function(exif_filepath, plot_flightpath = FALSE) {
   # Alternatively, if we wanted to match the convention for the dataset_id, it would be
   # "(([0-9]){8}-([0-9]){4})"   # nolint
 
+  # Remove any rows with missing GPS data
+  missing_gps_rows = is.na(exif$GPSLongitude) | is.na(exif$GPSLatitude)
+  n_missing_gps_rows = sum(missing_gps_rows)
+  if(n_missing_gps_rows > 0) {
+    warning("Removing ", n_missing_gps_rows, " rows with missing GPS data from dataset", exif$dataset_id[1])
+    exif = exif[!missing_gps_rows, ]
+  }
+
   # Convert the data frame into a geospatial 'sf' object (you could alternatively use a
   # 'terra::vect' object)
   exif = sf::st_as_sf(exif, crs = 4326, coords = c("GPSLongitude", "GPSLatitude"))

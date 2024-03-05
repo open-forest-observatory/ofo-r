@@ -4,3 +4,6 @@
 .httr-oauth
 .DS_Store
 .quarto
+
+sandbox/metashape-tuning/configs/**/*cfg*.yml
+sandbox/metashape-tuning/configs/**/config_batch.sh
