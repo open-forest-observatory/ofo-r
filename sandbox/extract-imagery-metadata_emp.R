@@ -190,7 +190,7 @@ extract_rtk_fix = function(exif) {
 rtk_fix = extract_rtk_fix(exif)
 rtk_fix
 
-#### accuracy_x (Units: m rmse) ####
+#### accuracy (Units: m) ####
 
 # EXIF files have an RTK standard longitude deviation (RtkStdLon, the standard deviation (in meters) of the photo recording position in longitude direction), an RTK standard latitude deviation (RtkStdLat, the standard deviation (in meters) of the photo recording position in latitude direction), and an RTK standard altitude deviation (RtkStdHgt, the RTK positioning standard elevation deviation in meters).
 
