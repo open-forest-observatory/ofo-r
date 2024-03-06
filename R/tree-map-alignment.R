@@ -10,7 +10,7 @@
 # reasonably have a field stem map (to represent the drone-based tree predictions). Interpret the
 # x-y coords as meters.
 simulate_tree_maps = function(trees_per_ha = 250, trees_per_clust = 5, cluster_radius = 25,
-                              pred_extent = 400,
+                              pred_extent = 300,
                               obs_extent = 100,
                               horiz_jitter = 1,
                               vert_jitter = 5, # max of 5
