@@ -192,15 +192,13 @@ rtk_fix
 
 #### accuracy (Units: m) ####
 
-# EXIF files have an RTK standard longitude deviation (RtkStdLon, the standard deviation (in meters) of the photo recording position in longitude direction), an RTK standard latitude deviation (RtkStdLat, the standard deviation (in meters) of the photo recording position in latitude direction), and an RTK standard altitude deviation (RtkStdHgt, the RTK positioning standard elevation deviation in meters).
+# EXIF files have an RTK standard longitude deviation (RtkStdLon, the standard deviation (in meters) of the photo recording position in longitude direction) and an RTK standard latitude deviation (RtkStdLat, the standard deviation (in meters) of the photo recording position in latitude direction)
 
 # BEGIN FUNCTION CODE
 
 accuracy_x = exif$RtkStdLon
 
 accuracy_y = exif$RtkStdLat
-
-accuracy_z = exif$RtkStdHgt
 
 # END FUNCTION CODE
 
@@ -216,11 +214,7 @@ extract_accuracy = function (exif) {
 
   accuracy_y = exif$RtkStdLat
 
-  exif["RtkStdHgt"[!("RtkStdHgt" %in% colnames(exif))]] = NA
-
-  accuracy_z = exif$RtkStdHgt
-
-  accuracy = data.frame (accuracy_x, accuracy_y, accuracy_z)
+  accuracy = data.frame (accuracy_x, accuracy_y)
 
   return(accuracy)
 }
@@ -382,7 +376,7 @@ extract_received_image_path = function(exif) {
 received_image_path = extract_received_image_path(exif)
 received_image_path
 
-#### altitude: returns altitude above sea level (asl) in meters ####
+#### altitude_asl: returns altitude above sea level (asl) in meters ####
 
 # BEGIN FUNCTION CODE
 

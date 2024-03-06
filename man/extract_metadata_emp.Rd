@@ -17,7 +17,7 @@ extract_metadata_emp(exif_filepath)
 
 \item{rtk_fix}{if a column for "RtkFlag" is in the exif data, rtk_fix is true if the column value is 50 and false for any other value. If there isn't an "RtkFlag" column, rtk_fix is false.}
 
-\item{accuracy}{a data.frame of the accuracy_x (longitude accuracy standard deviation in meters), accuracy_x (latitude standard deviation in meters), and accuracy_z (height standard deviation in meters) values for each image}
+\item{accuracy}{a data.frame of the accuracy_x (longitude accuracy standard deviation in meters) and accuracy_y (latitude standard deviation in meters) values for each image}
 
 \item{pitch_roll_yaw}{a data.frame of the camera_pitch (degrees up from nadir), camera_roll (degrees clockwise from up), and camera_yaw (degrees right from true north) values for each image}
 
@@ -36,7 +36,7 @@ extract_metadata_emp(exif_filepath)
 \item{metadata}{a data.frame of dataset_id, datatime_local, lat, lon, rtk_fix, accuracy_x, accuracy_y, accuracy_z, camera_pitch, camera_roll, camera_yaw, exposure, aperture, iso, white_balance, received_image_path, and altitude_asl}
 }
 \value{
-a data.frame of dataset_id, datatime_local, lat, lon, rtk_fix, accuracy_x, accuracy_y, accuracy_z, camera_pitch, camera_roll, camera_yaw, exposure, aperture, iso, white_balance, received_image_path, and altitude_asl
+a data.frame of dataset_id, datatime_local, lat, lon, rtk_fix, accuracy_x, accuracy_y, camera_pitch, camera_roll, camera_yaw, exposure, aperture, iso, white_balance, received_image_path, and altitude_asl
 }
 \description{
 Returns altitude above sea level (asl) in meters to include in image-level metadata collation.

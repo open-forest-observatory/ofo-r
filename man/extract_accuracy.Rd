@@ -11,15 +11,13 @@ extract_accuracy(exif)
 
 \item{accuracy_y}{returns the RTK standard latitude deviation in meters, and returns NA if the RtkStdLat column does not exist}
 
-\item{accuracy_z}{returns the RTK standard height deviation in meters, and returns NA if the RtkStdHgt column does not exist}
-
 \item{accuracy}{returns a data.frame of the accuracy_x, accuracy_x, and accuracy_z values for each image}
 }
 \value{
 accuracy of latitude, longitude, and height of each image. Standard deviation. Units: meters.
 }
 \description{
-DJI EXIF files have an RTK standard longitude deviation (RtkStdLon, the standard deviation (in meters) of the photo recording position in longitude direction), an RTK standard latitude deviation (RtkStdLat, the standard deviation (in meters) of the photo recording position in latitude direction), and an RTK standard altitude deviation (RtkStdHgt, the RTK positioning standard elevation deviation in meters). This function pulls those three values to include in image-level metadata collation.
+DJI EXIF files have an RTK standard longitude deviation (RtkStdLon, the standard deviation (in meters) of the photo recording position in longitude direction) and an RTK standard latitude deviation (RtkStdLat, the standard deviation (in meters) of the photo recording position in latitude direction). This function pulls those three values to include in image-level metadata collation.
 }
 \examples{
 extract_accuracy(exif)

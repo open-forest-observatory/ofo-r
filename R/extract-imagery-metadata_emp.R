@@ -117,15 +117,13 @@ extract_rtk_fix = function(exif) {
 
 #### accuracy (Units: m) ####
 
-#' Returns accuracy of latitude, longitude, and height. Standard deviation. Units: meters.
+#' Returns accuracy of latitude and longitude. Standard deviation. Units: meters.
 #'
-#' DJI EXIF files have an RTK standard longitude deviation (RtkStdLon, the standard deviation (in meters) of the photo recording position in longitude direction), an RTK standard latitude deviation (RtkStdLat, the standard deviation (in meters) of the photo recording position in latitude direction), and an RTK standard altitude deviation (RtkStdHgt, the RTK positioning standard elevation deviation in meters). This function pulls those three values to include in image-level metadata collation.
+#' DJI EXIF files have an RTK standard longitude deviation (RtkStdLon, the standard deviation (in meters) of the photo recording position in longitude direction) and an RTK standard latitude deviation (RtkStdLat, the standard deviation (in meters) of the photo recording position in latitude direction). This function pulls those three values to include in image-level metadata collation.
 #'
 #' @param accuracy_x returns the RTK standard longitude deviation in meters, and returns NA if the RtkStdLon column does not exist
 #'
 #' @param accuracy_y returns the RTK standard latitude deviation in meters, and returns NA if the RtkStdLat column does not exist
-#'
-#' @param accuracy_z returns the RTK standard height deviation in meters, and returns NA if the RtkStdHgt column does not exist
 #'
 #' @param accuracy returns a data.frame of the accuracy_x, accuracy_x, and accuracy_z values for each image
 #'
@@ -146,11 +144,7 @@ extract_accuracy = function (exif) {
 
   accuracy_y = exif$RtkStdLat
 
-  exif["RtkStdHgt"[!("RtkStdHgt" %in% colnames(exif))]] = NA
-
-  accuracy_z = exif$RtkStdHgt
-
-  accuracy = data.frame (accuracy_x, accuracy_y, accuracy_z)
+  accuracy = data.frame (accuracy_x, accuracy_y)
 
   return(accuracy)
 }
@@ -333,7 +327,7 @@ extract_altitude_asl = function(exif) {
 #' @param datatime_local local date and time of image collection
 #' @param lat_lon a data.frame of latitude and longitude of image collection
 #' @param rtk_fix if a column for "RtkFlag" is in the exif data, rtk_fix is true if the column value is 50 and false for any other value. If there isn't an "RtkFlag" column, rtk_fix is false.
-#' @param accuracy a data.frame of the accuracy_x (longitude accuracy standard deviation in meters), accuracy_x (latitude standard deviation in meters), and accuracy_z (height standard deviation in meters) values for each image
+#' @param accuracy a data.frame of the accuracy_x (longitude accuracy standard deviation in meters) and accuracy_y (latitude standard deviation in meters) values for each image
 #' @param pitch_roll_yaw a data.frame of the camera_pitch (degrees up from nadir), camera_roll (degrees clockwise from up), and camera_yaw (degrees right from true north) values for each image
 #' @param exposure exposure time in seconds
 #' @param aperture aperture (format: xxxxx)
@@ -343,7 +337,7 @@ extract_altitude_asl = function(exif) {
 #' @param altitude_asl altitude above sea level in meters
 #' @param metadata a data.frame of dataset_id, datatime_local, lat, lon, rtk_fix, accuracy_x, accuracy_y, accuracy_z, camera_pitch, camera_roll, camera_yaw, exposure, aperture, iso, white_balance, received_image_path, and altitude_asl
 #'
-#' @return a data.frame of dataset_id, datatime_local, lat, lon, rtk_fix, accuracy_x, accuracy_y, accuracy_z, camera_pitch, camera_roll, camera_yaw, exposure, aperture, iso, white_balance, received_image_path, and altitude_asl
+#' @return a data.frame of dataset_id, datatime_local, lat, lon, rtk_fix, accuracy_x, accuracy_y, camera_pitch, camera_roll, camera_yaw, exposure, aperture, iso, white_balance, received_image_path, and altitude_asl
 #'
 #' @examples
 #' extract_metadata_emp(exif)
