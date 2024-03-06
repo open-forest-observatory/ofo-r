@@ -322,7 +322,7 @@ extract_iso = function(exif) {
 iso = extract_iso(exif)
 iso
 
-#### white_balance (Format: auto/sunny/cloudy/(others?)) ####
+#### white_balance (Format: auto/manual) ####
 
 # Some example exifs have all photos with white balance 0, others have all photos with white balance 1
 
@@ -392,18 +392,16 @@ altitude_asl = exif$AbsoluteAltitude
 
 # turn code into a function
 
-extract_altitude = function(exif) {
+extract_altitude_asl = function(exif) {
 
   altitude_asl = exif$AbsoluteAltitude
 
-  altitude = data.frame (altitude_asl)
-
-  return(altitude)
+  return(altitude_asl)
 }
 
 # test function on exif data
 
-altitude = extract_altitude(exif)
+altitude = extract_altitude_asl(exif)
 altitude
 
 #### standardized_image_path (Image path in standardized dataset) ####
@@ -437,7 +435,7 @@ extract_metadata_emp = function(exif_filepath) {
   iso = extract_iso(exif)
   white_balance = extract_white_balance(exif)
   received_image_path = extract_received_image_path(exif)
-  altitude = extract_altitude(exif)
+  altitude_asl = extract_altitude_asl(exif)
 
   # Return extracted/computed metadata as a data frame row
   metadata = data.frame(dataset_id = dataset_id,
@@ -451,7 +449,7 @@ extract_metadata_emp = function(exif_filepath) {
                         iso = iso,
                         white_balance = white_balance,
                         received_image_path = received_image_path,
-                        altitude
+                        altitude_asl = altitude_asl
   )
 
   return(metadata)
