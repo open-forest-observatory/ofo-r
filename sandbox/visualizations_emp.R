@@ -57,6 +57,12 @@ exif = prep_exif(exif_file)
 
 metadata1 <- extract_metadata_emp(exif_file)
 
+
+imagepath1 <- extract_received_image_path(exif)
+
+
+
+
 datasetid1 <- extract_dataset_id(exif)
 
 datatimelocal1 <- extract_datatime_local(exif)

@@ -307,11 +307,11 @@ extract_white_balance = function(exif) {
 
 extract_received_image_path = function(exif) {
 
-  received_image_path = stringr::str_split_fixed(exif$SourceFile, fixed(dataset_id), 2)
+  received_image_path = stringr::str_split_fixed(exif$SourceFile, fixed(exif$dataset_id), 2)
 
   received_image_path <- received_image_path[,2]
 
-  received_image_path <- with(exif, paste0(dataset_id, received_image_path))
+  received_image_path <- with(exif, paste0(exif$dataset_id, received_image_path))
 
   return(received_image_path)
 }
