@@ -7,6 +7,8 @@
 extract_white_balance(exif)
 }
 \arguments{
+\item{exif}{the exif metadata file}
+
 \item{white_balance}{either auto or manual white balance}
 }
 \value{

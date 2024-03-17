@@ -7,6 +7,8 @@
 extract_lat_lon(exif)
 }
 \arguments{
+\item{exif}{the exif metadata file}
+
 \item{exif_coordinates}{creates data.frame with coordinates for each image}
 
 \item{lat}{latitude of image collection}

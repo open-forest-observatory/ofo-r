@@ -7,6 +7,8 @@
 extract_aperture(exif)
 }
 \arguments{
+\item{exif}{the exif metadata file}
+
 \item{aperture}{aperture (format: xxxxx)}
 }
 \value{

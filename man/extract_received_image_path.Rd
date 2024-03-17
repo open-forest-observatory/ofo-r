@@ -7,6 +7,8 @@
 extract_received_image_path(exif)
 }
 \arguments{
+\item{exif}{the exif metadata file}
+
 \item{received_image_path}{the received image path}
 }
 \value{

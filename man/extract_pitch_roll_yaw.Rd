@@ -7,6 +7,8 @@
 extract_pitch_roll_yaw(exif)
 }
 \arguments{
+\item{exif}{the exif metadata file}
+
 \item{camera_pitch}{returns the camera pitch in degrees (degrees up from nadir)}
 
 \item{camera_roll}{returns the camera roll in degrees (degrees clockwise from up)}

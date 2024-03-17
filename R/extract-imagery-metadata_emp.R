@@ -13,6 +13,8 @@ library(devtools)
 #'
 #' @param dataset_id dataset id
 #'
+#' @param exif the exif metadata file
+#'
 #' @return dataset id
 #'
 #' @examples
@@ -37,6 +39,8 @@ extract_dataset_id = function (exif) {
 #' @param exif$DateTimeOriginal_nocolon local date and time of image collection
 #'
 #' @param datatime_local local date and time of image collection
+#'
+#' @param exif the exif metadata file
 #'
 #' @return local date and time of image collection
 #'
@@ -69,6 +73,8 @@ extract_datatime_local = function (exif) {
 #'
 #' @param lat_lon data.frame of latitude and longitude of image collection
 #'
+#' @param exif the exif metadata file
+#'
 #' @return latitude and longitude of image collection location
 #'
 #' @examples
@@ -96,6 +102,8 @@ extract_lat_lon = function (exif) {
 #' Pulls the rtk fix to include in image-level metadata collation. Return TRUE if there is a RtkFlag value of 50, and FALSE otherwise, i.e. other RtkFlag value, or none. IMPORTANT NOTE!!!!!! THIS FUNCTION ASSUMES DJI DRONES WERE USED. OTHER DRONE MAKES WILL REQUIRE AN UPDATED FUNCTION.
 #'
 #' @param rtk_fix if a column for "RtkFlag" is in the exif data, rtk_fix is true if the column value is 50 and false for any other value. If there isn't an "RtkFlag" column, rtk_fix is false.
+#'
+#' @param exif the exif metadata file
 #'
 #' @return rtk fix of image, true/false
 #'
@@ -126,6 +134,8 @@ extract_rtk_fix = function(exif) {
 #' @param accuracy_y returns the RTK standard latitude deviation in meters, and returns NA if the RtkStdLat column does not exist
 #'
 #' @param accuracy returns a data.frame of the accuracy_x, accuracy_x, and accuracy_z values for each image
+#'
+#' @param exif the exif metadata file
 #'
 #' @return accuracy of latitude, longitude, and height of each image. Standard deviation. Units: meters.
 #'
@@ -163,6 +173,8 @@ extract_accuracy = function (exif) {
 #'
 #' @param pitch_roll_yaw returns a data.frame of the camera_pitch, camera_roll, and camera_yaw values for each image
 #'
+#' @param exif the exif metadata file
+#'
 #' @return camera pitch, camera roll, and camera yaw. Units: degrees.
 #'
 #' @examples
@@ -191,6 +203,8 @@ extract_pitch_roll_yaw = function(exif) {
 #'
 #' @param exposure exposure time in seconds
 #'
+#' @param exif the exif metadata file
+#'
 #' @return exposure (units: seconds)
 #'
 #' @examples
@@ -210,6 +224,8 @@ extract_exposure = function (exif) {
 #' Returns aperture to include in image-level metadata collation.
 #'
 #' @param aperture aperture (format: xxxxx)
+#'
+#' @param exif the exif metadata file
 #'
 #' @return aperture (format: xxxxx)
 #'
@@ -231,6 +247,8 @@ extract_aperture = function (exif) {
 #'
 #' @param iso ISO
 #'
+#' @param exif the exif metadata file
+#'
 #' @return ISO
 #'
 #' @examples
@@ -250,6 +268,8 @@ extract_iso = function(exif) {
 #' Returns white balance (auto vs. manual) to include in image-level metadata collation.
 #'
 #' @param white_balance either auto or manual white balance
+#'
+#' @param exif the exif metadata file
 #'
 #' @return white balance
 #'
@@ -276,6 +296,8 @@ extract_white_balance = function(exif) {
 #'
 #' @param received_image_path the received image path
 #'
+#' @param exif the exif metadata file
+#'
 #' @return received image path
 #'
 #' @examples
@@ -301,6 +323,8 @@ extract_received_image_path = function(exif) {
 #' Returns altitude above sea level (asl) in meters to include in image-level metadata collation.
 #'
 #' @param altitude_asl altitude above sea level in meters
+#'
+#' @param exif the exif metadata file
 #'
 #' @return altitude above sea level in meters
 #'
@@ -336,6 +360,8 @@ extract_altitude_asl = function(exif) {
 #' @param received_image_path the received image path
 #' @param altitude_asl altitude above sea level in meters
 #' @param metadata a data.frame of dataset_id, datatime_local, lat, lon, rtk_fix, accuracy_x, accuracy_y, accuracy_z, camera_pitch, camera_roll, camera_yaw, exposure, aperture, iso, white_balance, received_image_path, and altitude_asl
+#' @param exif the exif metadata file
+#' @param exif_file the exif filepath (before being prepared to pass to the functions in the wrapper)
 #'
 #' @return a data.frame of dataset_id, datatime_local, lat, lon, rtk_fix, accuracy_x, accuracy_y, camera_pitch, camera_roll, camera_yaw, exposure, aperture, iso, white_balance, received_image_path, and altitude_asl
 #'
@@ -344,9 +370,9 @@ extract_altitude_asl = function(exif) {
 #'
 #' @export
 
-extract_metadata_emp = function(exif_filepath) {
+extract_metadata_emp = function(exif_file) {
 
-  exif = prep_exif(exif_filepath)
+  exif = prep_exif(exif_file)
 
   dataset_id = extract_dataset_id (exif)
   datatime_local = extract_datatime_local(exif)

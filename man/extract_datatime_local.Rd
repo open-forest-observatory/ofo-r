@@ -7,6 +7,8 @@
 extract_datatime_local(exif)
 }
 \arguments{
+\item{exif}{the exif metadata file}
+
 \item{exif$DateTimeOriginal_nocolon}{local date and time of image collection}
 
 \item{datatime_local}{local date and time of image collection}

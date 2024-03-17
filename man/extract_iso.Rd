@@ -7,6 +7,8 @@
 extract_iso(exif)
 }
 \arguments{
+\item{exif}{the exif metadata file}
+
 \item{iso}{ISO}
 }
 \value{

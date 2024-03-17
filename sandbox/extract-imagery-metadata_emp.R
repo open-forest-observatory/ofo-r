@@ -17,54 +17,10 @@ datadir = readLines(file.path("sandbox", "data-dirs", "emp-metadata-laptop.txt")
 # have already been created and saved into the project data folder.
 exif_files = list.files(file.path(datadir, "exif-examples"), pattern = "^exif.+\\.csv$", full.names = TRUE)
 
-# Define which test EXIF file to run the functions on
-exif_file = exif_files[1]
-
-
 # Select an EXIF file to test on, and prep the EXIF data by loading it as a geospatial data frame
 
 exif_file = exif_files[1]
 exif = prep_exif(exif_file)
-
-# Between the BEGIN and END comments below, write code to extract the metadata attribute you're
-# working on. When you're done, you can wrap it in a function definition, taking only one parameter,
-# 'exif'. Here is an example of developing code to extract the number of images in an imagery
-# dataset.
-
-# BEGIN FUNCTION CODE
-
-# Get the number of images in the dataset by counting the rows of the EXIF data frame
-image_count = nrow(exif)
-
-# END FUNCTION CODE
-
-
-# Now here is an example of turning that code into a function
-
-extract_image_count = function(exif) {
-
-  # Get the number of images in the dataset by counting the rows of the EXIF data frame
-  image_count = nrow(exif)
-
-  return(image_count)
-
-}
-
-
-# Now you can test the function on the EXIF data
-
-image_count = extract_image_count(exif)
-image_count
-
-# Once it is working right, you can move this function to your
-# 'R/imagery-metadata-extraction_<initials>.R' file and then add a call to this function from within
-# your 'extract_metadata_<initials>' function. Once it is in there, then you can run the top part of
-# this script again, and when it extracts the metadata for each EXIF dataset, your additional
-# metadata should be included.
-
-
-
-
 
 #### Image-level metadata CSV file (one file per dataset) ####
 

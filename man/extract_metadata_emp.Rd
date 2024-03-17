@@ -4,10 +4,10 @@
 \alias{extract_metadata_emp}
 \title{Returns a collection of image-level metadata parameters}
 \usage{
-extract_metadata_emp(exif_filepath)
+extract_metadata_emp(exif_file)
 }
 \arguments{
-\item{exif}{the exif file being processed}
+\item{exif_file}{the exif filepath (before being prepared to pass to the functions in the wrapper)}
 
 \item{dataset_id}{dataset id}
 
@@ -34,6 +34,8 @@ extract_metadata_emp(exif_filepath)
 \item{altitude_asl}{altitude above sea level in meters}
 
 \item{metadata}{a data.frame of dataset_id, datatime_local, lat, lon, rtk_fix, accuracy_x, accuracy_y, accuracy_z, camera_pitch, camera_roll, camera_yaw, exposure, aperture, iso, white_balance, received_image_path, and altitude_asl}
+
+\item{exif}{the exif metadata file}
 }
 \value{
 a data.frame of dataset_id, datatime_local, lat, lon, rtk_fix, accuracy_x, accuracy_y, camera_pitch, camera_roll, camera_yaw, exposure, aperture, iso, white_balance, received_image_path, and altitude_asl

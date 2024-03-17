@@ -2,11 +2,13 @@
 % Please edit documentation in R/extract-imagery-metadata_emp.R
 \name{extract_accuracy}
 \alias{extract_accuracy}
-\title{Returns accuracy of latitude, longitude, and height. Standard deviation. Units: meters.}
+\title{Returns accuracy of latitude and longitude. Standard deviation. Units: meters.}
 \usage{
 extract_accuracy(exif)
 }
 \arguments{
+\item{exif}{the exif metadata file}
+
 \item{accuracy_x}{returns the RTK standard longitude deviation in meters, and returns NA if the RtkStdLon column does not exist}
 
 \item{accuracy_y}{returns the RTK standard latitude deviation in meters, and returns NA if the RtkStdLat column does not exist}

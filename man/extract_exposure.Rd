@@ -7,6 +7,8 @@
 extract_exposure(exif)
 }
 \arguments{
+\item{exif}{the exif metadata file}
+
 \item{exposure}{exposure time in seconds}
 }
 \value{

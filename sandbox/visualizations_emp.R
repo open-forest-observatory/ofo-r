@@ -11,6 +11,7 @@ library(leaflet.providers)
 library(tidyverse)
 library(lubridate)
 library(RColorBrewer)
+library(stringr)
 
 ## the map base we want to use with the leaflet package is Jawg.terrain. In order to use Jawg Maps, you must register (https://www.jawg.io/lab). Once registered, your access token will be located here (https://www.jawg.io/lab/access-tokens) and you will access to all Jawg default maps (variants) and your own customized maps. See the leaflet providers github for more info (https://github.com/leaflet-extras/leaflet-providers/blob/master/README.md)
 
@@ -50,16 +51,17 @@ exif_files = list.files(file.path(datadir, "exif-examples"), pattern = "^exif.+\
 #extract_metadata_emp(exif_file)
 
 # Run extraction on all EXIF files
-image_metadata <- purrr::map_dfr(exif_files, extract_metadata_emp)
-
 
 exif_file = exif_files[1]
+exif = prep_exif(exif_file)
 
-metadata1 <- ofo::extract_metadata_emp(exif_file)
+metadata1 <- extract_metadata_emp(exif_file)
 
+datasetid1 <- extract_dataset_id(exif)
 
+datatimelocal1 <- extract_datatime_local(exif)
 
-
+aperture1 <- extract_aperture(exif)
 
 
 
