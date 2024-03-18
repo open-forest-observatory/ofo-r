@@ -12,23 +12,11 @@ library(tidyverse)
 library(lubridate)
 library(RColorBrewer)
 library(stringr)
+library(htmlwidgets)
 
 ## the map base we want to use with the leaflet package is Jawg.terrain. In order to use Jawg Maps, you must register (https://www.jawg.io/lab). Once registered, your access token will be located here (https://www.jawg.io/lab/access-tokens) and you will access to all Jawg default maps (variants) and your own customized maps. See the leaflet providers github for more info (https://github.com/leaflet-extras/leaflet-providers/blob/master/README.md)
 
-#### Set working directory ####
-
-setwd ("C:\\Users\\emily\\Box\\imagery-metadata-dev\\")
-
-
-
-
-
-
-
-
-
-
-#### load ofo-r package ####
+#### set working directory and load ofo-r package ####
 
 setwd("C:\\Users\\emily\\OneDrive\\Desktop\\FOCAL\\ofo-r")
 
@@ -38,133 +26,121 @@ devtools::load_all()
 # Define the root of the local data directory
 datadir = readLines(file.path("sandbox", "data-dirs", "emp-metadata-laptop.txt"))
 
-#### run image-level metadata extraction for the example exif files ####
+#### run image-level metadata extraction for the example EXIF files ####
 
 # Get a list of the files containing the test EXIF data (one file per image dataset). These files
 # have already been created and saved into the project data folder.
 exif_files = list.files(file.path(datadir, "exif-examples"), pattern = "^exif.+\\.csv$", full.names = TRUE)
 
-# Define which test EXIF file to run the functions on
-#exif_file = exif_files[1]
+# run extraction on test EXIF file
 
-# Run for test EXIF file.
-#extract_metadata_emp(exif_file)
+exif_file1 = exif_files[1]
+exif1 = prep_exif(exif_file1)
+
+metadata1 <- extract_metadata_emp(exif_file1)
 
 # Run extraction on all EXIF files
 
-exif_file = exif_files[1]
-exif = prep_exif(exif_file)
+exif_file2 = exif_files[2]
+exif2 = prep_exif(exif_file2)
+metadata2 <- extract_metadata_emp(exif_file2)
 
-metadata1 <- extract_metadata_emp(exif_file)
+exif_file3 = exif_files[3]
+exif3 = prep_exif(exif_file3)
+metadata3 <- extract_metadata_emp(exif_file3)
 
+exif_file4 = exif_files[4]
+exif4 = prep_exif(exif_file4)
+metadata4 <- extract_metadata_emp(exif_file4)
 
-imagepath1 <- extract_received_image_path(exif)
+exif_file5 = exif_files[5]
+exif5 = prep_exif(exif_file5)
+metadata5 <- extract_metadata_emp(exif_file5)
 
+exif_file6 = exif_files[6]
+exif6 = prep_exif(exif_file6)
+metadata6 <- extract_metadata_emp(exif_file6)
 
+#### merge metadata to original EXIF files-- later in the map creation process we need the DateTimeOriginal column instead of the new one we created in the metadata ####
 
+# first we need to create a column in the exif data.frames that can be used to match each row of data with the correct image metadata. let's choose the image path because we know each image has a unique file pathway
 
-datasetid1 <- extract_dataset_id(exif)
+exif1$received_image_path <- extract_received_image_path(exif1)
 
-datatimelocal1 <- extract_datatime_local(exif)
+exif2$received_image_path <- extract_received_image_path(exif2)
 
-aperture1 <- extract_aperture(exif)
+exif3$received_image_path <- extract_received_image_path(exif3)
 
+exif4$received_image_path <- extract_received_image_path(exif4)
 
+exif5$received_image_path <- extract_received_image_path(exif5)
 
-#### Load data ####
+exif6$received_image_path <- extract_received_image_path(exif6)
 
-## original data
+# now let's merge the exif files with the metadata files
 
-exif_20220630_0041_original <- read.csv ("exif-examples\\exif_20220630-0041.csv")
+totalexif1 <- full_join(exif1, metadata1, by="received_image_path")
 
-exif_20220730_0079_original <- read.csv ("exif-examples\\exif_20220730-0079.csv")
+totalexif2 <- full_join(exif2, metadata2, by="received_image_path")
 
-exif_20230528_0008_original <- read.csv ("exif-examples\\exif_20230528-0008.csv")
+totalexif3 <- full_join(exif3, metadata3, by="received_image_path")
 
-exif_20230528_0009_original <- read.csv ("exif-examples\\exif_20230528-0009.csv")
+totalexif4 <- full_join(exif4, metadata4, by="received_image_path")
 
-exif_20230706_0152_original <- read.csv ("exif-examples\\exif_20230706-0152.csv")
+totalexif5 <- full_join(exif5, metadata5, by="received_image_path")
 
-exif_20230706_0153_original <- read.csv ("exif-examples\\exif_20230706-0153.csv")
+totalexif6 <- full_join(exif6, metadata6, by="received_image_path")
 
-## compiled image-level metadata. after loading each metadata file, add a row index ("X") identical to the row index in the original data files-- this will allow us to easily merge the two types of files in the next step.
+#### Now we're going to create an intelligible "time of collection" value that leaflet knows how to work with for each exif file ####
 
-exif_20220630_0041_metadata <- read.csv ("extracted-metadata\\image-level-metadata\\image-metadata_20220630-0041.csv")
+# creating new datetime column
 
-exif_20220630_0041_metadata$X <- 1:nrow(exif_20220630_0041_metadata)
+totalexif1$datetime <- ymd_hms(totalexif1$DateTimeOriginal)
 
-exif_20220730_0079_metadata <- read.csv ("extracted-metadata\\image-level-metadata\\image-metadata_20220730-0079.csv")
+totalexif2$datetime <- ymd_hms(totalexif2$DateTimeOriginal)
 
-exif_20220730_0079_metadata$X <- 1:nrow(exif_20220730_0079_metadata)
+totalexif3$datetime <- ymd_hms(totalexif3$DateTimeOriginal)
 
-exif_20230528_0008_metadata <- read.csv ("extracted-metadata\\image-level-metadata\\image-metadata_20230528-0008.csv")
+totalexif4$datetime <- ymd_hms(totalexif4$DateTimeOriginal)
 
-exif_20230528_0008_metadata$X <- 1:nrow(exif_20230528_0008_metadata)
+totalexif5$datetime <- ymd_hms(totalexif5$DateTimeOriginal)
 
-exif_20230528_0009_metadata <- read.csv ("extracted-metadata\\image-level-metadata\\image-metadata_20230528-0009.csv")
+totalexif6$datetime <- ymd_hms(totalexif6$DateTimeOriginal)
 
-exif_20230528_0009_metadata$X <- 1:nrow(exif_20230528_0009_metadata)
+# creating "duration in seconds from beginning of image to collection to time of [i] image" column. the number in brackets is the index position of the image that was collected first.
 
-exif_20230706_0152_metadata <- read.csv ("extracted-metadata\\image-level-metadata\\image-metadata_20230706-0152.csv")
+totalexif1$duration <- as.duration(totalexif1$datetime[1] %--% totalexif1$datetime)
 
-exif_20230706_0152_metadata$X <- 1:nrow(exif_20230706_0152_metadata)
+totalexif2$duration <- as.duration(totalexif2$datetime[1] %--% totalexif2$datetime)
 
-exif_20230706_0153_metadata <- read.csv ("extracted-metadata\\image-level-metadata\\image-metadata_20230706-0153.csv")
+totalexif3$duration <- as.duration(totalexif3$datetime[1] %--% totalexif3$datetime)
 
-exif_20230706_0153_metadata$X <- 1:nrow(exif_20230706_0153_metadata)
+totalexif4$duration <- as.duration(totalexif4$datetime[1] %--% totalexif4$datetime)
 
-## merge original data and image level metadata
+totalexif5$duration <- as.duration(totalexif5$datetime[1] %--% totalexif5$datetime)
 
-exif_20220630_0041 <- full_join(exif_20220630_0041_original, exif_20220630_0041_metadata, by="X")
+totalexif6$duration <- as.duration(totalexif6$datetime[1] %--% totalexif6$datetime)
 
-exif_20220730_0079 <- full_join(exif_20220730_0079_original, exif_20220730_0079_metadata, by="X")
-
-exif_20230528_0008 <- full_join(exif_20230528_0008_original, exif_20230528_0008_metadata, by="X")
-
-exif_20230528_0009 <- full_join(exif_20230528_0009_original, exif_20230528_0009_metadata, by="X")
-
-exif_20230706_0152 <- full_join(exif_20230706_0152_original, exif_20230706_0152_metadata, by="X")
-
-exif_20230706_0153 <- full_join(exif_20230706_0153_original, exif_20230706_0153_metadata, by="X")
-
-#### exif_20220630-0041 interactive map ####
-
-## create an intelligible "time of collection" value
-
-# creating datetime column
-exif_20220630_0041_datetime <- data.frame(datetime = ymd_hms(exif_20220630_0041$DateTimeOriginal))
-
-# extracting time from the datetime column
-# exif_20220630_0041_datetime$time <- format(as.POSIXct(
-#  exif_20220630_0041_datetime$datetime),format = "%H:%M:%S")
-
-# creating "duration in seconds from beginning of image to collection to time of [i] image" column
-exif_20220630_0041_datetime$duration <- as.duration(exif_20220630_0041_datetime$datetime[739] %--% exif_20220630_0041_datetime$datetime)
-
-# assigning X to this new dataframe to allow it to be merged into the pre-existing one
-exif_20220630_0041_datetime$X <- 1:nrow(exif_20220630_0041_datetime)
-
-# merging
-exif_20220630_0041 <- full_join(exif_20220630_0041, exif_20220630_0041_datetime, by="X")
+#### exif1 interactive map ####
 
 ## define functions for continuous coloring
 
-paletteNumASL <- colorNumeric('YlOrRd', domain = exif_20220630_0041$altitude_asl)
+paletteNumASL1 <- colorNumeric('YlOrRd', domain = totalexif1$altitude_asl)
 
-paletteNumDateTime <- colorNumeric('BuPu', domain = exif_20220630_0041$duration)
+paletteNumDateTime1 <- colorNumeric('BuPu', domain = totalexif1$duration)
 
 ## the map
 
-exif_20220630_0041_MAP <-
+exif1_MAP <-
   # create leaflet function using data specific to this map
-  leaflet(exif_20220630_0041) %>%
+  leaflet(totalexif1) %>%
   # use the jawg.terrain basemap
   addTiles(
     'https://tile.jawg.io/jawg-terrain/{z}/{x}/{y}{r}.png?access-token=cN5iUzB2bL1QMdeVwMJlflwXQweOoNTDOadGfoCbPf1rRM9FGPb4i1m4f2k5MaJP') %>%
   # set the center of the map to be the center ish of the flight footprint
   setView(
-    lng=(exif_20220630_0041$lon[888]),
-    lat=(exif_20220630_0041$lat[888]),
+    lng=(totalexif1$lon[888]),
+    lat=(totalexif1$lat[888]),
     zoom = 16
     ) %>%
   # add circles at each image location
@@ -172,9 +148,9 @@ exif_20220630_0041_MAP <-
     ~lon,
     ~lat,
     popup = paste(
-    "Image filepath:", exif_20220630_0041$received_image_path, "<br>",
-    "Collection date and time:", exif_20220630_0041$DateTimeOriginal, "<br>",
-    "Drone altitude above sea level:", exif_20220630_0041$altitude_asl, " meters",        "<br>"),
+    "Image filepath:", totalexif1$received_image_path, "<br>",
+    "Collection date and time:", totalexif1$DateTimeOriginal, "<br>",
+    "Drone altitude above sea level:", totalexif1$altitude_asl, " meters",        "<br>"),
     radius = 2,
     weight = 1,
     stroke = TRUE,
@@ -186,9 +162,9 @@ exif_20220630_0041_MAP <-
     ~lon,
     ~lat,
     popup = paste(
-      "Image filepath:", exif_20220630_0041$received_image_path, "<br>",
-      "Collection date and time:", exif_20220630_0041$DateTimeOriginal, "<br>",
-      "Drone altitude above sea level:", exif_20220630_0041$altitude_asl, " meters",        "<br>"),
+      "Image filepath:", totalexif1$received_image_path, "<br>",
+      "Collection date and time:", totalexif1$DateTimeOriginal, "<br>",
+      "Drone altitude above sea level:", totalexif1$altitude_asl, " meters",        "<br>"),
     radius = 5,
     weight = 1,
     stroke = FALSE,
@@ -199,18 +175,18 @@ exif_20220630_0041_MAP <-
     ~lon,
     ~lat,
     popup = paste(
-      "Image filepath:", exif_20220630_0041$received_image_path, "<br>",
-      "Drone altitude above sea level:", exif_20220630_0041$altitude_asl, " meters",        "<br>"),
+      "Image filepath:", totalexif1$received_image_path, "<br>",
+      "Drone altitude above sea level:", totalexif1$altitude_asl, " meters",        "<br>"),
     radius = 2,
     weight = 1,
     stroke = FALSE,
     fillOpacity = 1,
-    fillColor = ~paletteNumASL(exif_20220630_0041$altitude_asl),
+    fillColor = ~paletteNumASL1(totalexif1$altitude_asl),
     group = "Altitude above sea level") %>%
   # add a legend for the ASL data
   addLegend(
-    pal = paletteNumASL,
-    values = exif_20220630_0041$altitude_asl,
+    pal = paletteNumASL1,
+    values = totalexif1$altitude_asl,
     title = '<small>Altitude Above <br> Sea Level (meters)</small>',
     opacity = 1,
     position = "bottomright",
@@ -221,19 +197,19 @@ exif_20220630_0041_MAP <-
     ~lon,
     ~lat,
     popup = paste(
-      "Image filepath:", exif_20220630_0041$received_image_path, "<br>",
-      "Collection date and time:", exif_20220630_0041$DateTimeOriginal, "<br>",
-      "Collection time after image acquisition initiation",                                 exif_20220630_0041$duration,"<br>"),
+      "Image filepath:", totalexif1$received_image_path, "<br>",
+      "Collection date and time:", totalexif1$DateTimeOriginal, "<br>",
+      "Collection time after image acquisition initiation",                                 totalexif1$duration,"<br>"),
     radius = 2,
     weight = 1,
     stroke = FALSE,
     fillOpacity = 1,
-    fillColor = ~paletteNumDateTime(exif_20220630_0041$duration),
+    fillColor = ~paletteNumDateTime1(totalexif1$duration),
     group = "Collection date and time") %>%
   # add a legend for the collection time data
   addLegend(
-    pal = paletteNumDateTime,
-    values = exif_20220630_0041$duration,
+    pal = paletteNumDateTime1,
+    values = totalexif1$duration,
     title = '<small>Collection time after <br> image acquisition <br> initiation (seconds)</small>',
     opacity = 1,
     position = "bottomleft",
@@ -241,35 +217,578 @@ exif_20220630_0041_MAP <-
   ) %>%
   # add layer control to toggle the overlay groups on and off
   addLayersControl(
-    overlayGroups=c("Altitude above sea level", "Collection date and time"), options=layersControlOptions(collapsed=FALSE))
+    overlayGroups=c("Altitude above sea level", "Collection date and time"), options=layersControlOptions(collapsed=FALSE)) %>%
+# add a legend for the base map
+  addLegend(
+    colors = "#008080",
+    labels = "image locations",
+    title = paste ("exif", totalexif1$dataset_id.x[1]),
+    opacity = 1,
+    position = "topleft"
+  )
 
-exif_20220630_0041_MAP
-
-
-
-
-
-
+exif1_MAP
 
 # save as html
-install.packages("htmlwidgets")
-install.packages("leaflet")
-library(htmlwidgets)
-saveWidget(exif_20220630_0041_MAP, file="C:\\Users\\emily\\OneDrive\\Desktop\\draft_visualization.html")
 
+saveWidget(exif1_MAP, file="C:\\Users\\emily\\Box\\imagery-metadata-dev\\extracted-metadata\\visualizations\\image-map_20220630-0041.html")
 
+#### exif2 interactive map ####
 
+## define functions for continuous coloring
 
-# add a legend for the base map
-addLegend(
-  colors = "#008080",
-  labels = "image locations",
-  title = "exif_20220630_0041",
-  opacity = 1,
-  position = "bottomright"
-)
+paletteNumASL2 <- colorNumeric('YlOrRd', domain = totalexif2$altitude_asl)
 
+paletteNumDateTime2 <- colorNumeric('BuPu', domain = totalexif2$duration)
 
+## the map
 
+exif2_MAP <-
+  # create leaflet function using data specific to this map
+  leaflet(totalexif2) %>%
+  # use the jawg.terrain basemap
+  addTiles(
+    'https://tile.jawg.io/jawg-terrain/{z}/{x}/{y}{r}.png?access-token=cN5iUzB2bL1QMdeVwMJlflwXQweOoNTDOadGfoCbPf1rRM9FGPb4i1m4f2k5MaJP') %>%
+  # set the center of the map to be the center ish of the flight footprint
+  setView(
+    lng=(totalexif2$lon[2121]),
+    lat=(totalexif2$lat[1470]),
+    zoom = 15
+  ) %>%
+  # add circles at each image location
+  addCircleMarkers(
+    ~lon,
+    ~lat,
+    popup = paste(
+      "Image filepath:", totalexif2$received_image_path, "<br>",
+      "Collection date and time:", totalexif2$DateTimeOriginal, "<br>",
+      "Drone altitude above sea level:", totalexif2$altitude_asl, " meters",        "<br>"),
+    radius = 2,
+    weight = 1,
+    stroke = TRUE,
+    fillOpacity = 1,
+    color = "#008080"
+  ) %>%
+  # add secret invisible circles at each image location with a bigger radius so they're actually clickable
+  addCircleMarkers(
+    ~lon,
+    ~lat,
+    popup = paste(
+      "Image filepath:", totalexif2$received_image_path, "<br>",
+      "Collection date and time:", totalexif2$DateTimeOriginal, "<br>",
+      "Drone altitude above sea level:", totalexif2$altitude_asl, " meters",        "<br>"),
+    radius = 5,
+    weight = 1,
+    stroke = FALSE,
+    fillOpacity = 0
+  ) %>%
+  # add an interactive layer for ASL
+  addCircleMarkers(
+    ~lon,
+    ~lat,
+    popup = paste(
+      "Image filepath:", totalexif2$received_image_path, "<br>",
+      "Drone altitude above sea level:", totalexif2$altitude_asl, " meters",        "<br>"),
+    radius = 2,
+    weight = 1,
+    stroke = FALSE,
+    fillOpacity = 1,
+    fillColor = ~paletteNumASL2(totalexif2$altitude_asl),
+    group = "Altitude above sea level") %>%
+  # add a legend for the ASL data
+  addLegend(
+    pal = paletteNumASL2,
+    values = totalexif2$altitude_asl,
+    title = '<small>Altitude Above <br> Sea Level (meters)</small>',
+    opacity = 1,
+    position = "bottomright",
+    group = "Altitude above sea level"
+  ) %>%
+  # add an interactive layer for collection time
+  addCircleMarkers(
+    ~lon,
+    ~lat,
+    popup = paste(
+      "Image filepath:", totalexif2$received_image_path, "<br>",
+      "Collection date and time:", totalexif2$DateTimeOriginal, "<br>",
+      "Collection time after image acquisition initiation",                                 totalexif2$duration,"<br>"),
+    radius = 2,
+    weight = 1,
+    stroke = FALSE,
+    fillOpacity = 1,
+    fillColor = ~paletteNumDateTime2(totalexif2$duration),
+    group = "Collection date and time") %>%
+  # add a legend for the collection time data
+  addLegend(
+    pal = paletteNumDateTime2,
+    values = totalexif2$duration,
+    title = '<small>Collection time after <br> image acquisition <br> initiation (seconds)</small>',
+    opacity = 1,
+    position = "bottomleft",
+    group = "Collection date and time"
+  ) %>%
+  # add layer control to toggle the overlay groups on and off
+  addLayersControl(
+    overlayGroups=c("Altitude above sea level", "Collection date and time"), options=layersControlOptions(collapsed=FALSE)) %>%
+  # add a legend for the base map
+  addLegend(
+    colors = "#008080",
+    labels = "image locations",
+    title = paste ("exif", totalexif2$dataset_id.x[1]),
+    opacity = 1,
+    position = "topleft"
+  )
 
+exif2_MAP
 
+# save as html
+
+saveWidget(exif2_MAP, file="C:\\Users\\emily\\Box\\imagery-metadata-dev\\extracted-metadata\\visualizations\\image-map_20220730-0079.html")
+
+#### exif3 interactive map ####
+
+## define functions for continuous coloring
+
+paletteNumASL3 <- colorNumeric('YlOrRd', domain = totalexif3$altitude_asl)
+
+paletteNumDateTime3 <- colorNumeric('BuPu', domain = totalexif3$duration)
+
+## the map
+
+exif3_MAP <-
+  # create leaflet function using data specific to this map
+  leaflet(totalexif3) %>%
+  # use the jawg.terrain basemap
+  addTiles(
+    'https://tile.jawg.io/jawg-terrain/{z}/{x}/{y}{r}.png?access-token=cN5iUzB2bL1QMdeVwMJlflwXQweOoNTDOadGfoCbPf1rRM9FGPb4i1m4f2k5MaJP') %>%
+  # set the center of the map to be the center ish of the flight footprint
+  setView(
+    lng=(totalexif3$lon[119]),
+    lat=(totalexif3$lat[202]),
+    zoom = 17
+  ) %>%
+  # add circles at each image location
+  addCircleMarkers(
+    ~lon,
+    ~lat,
+    popup = paste(
+      "Image filepath:", totalexif3$received_image_path, "<br>",
+      "Collection date and time:", totalexif3$DateTimeOriginal, "<br>",
+      "Drone altitude above sea level:", totalexif3$altitude_asl, " meters",        "<br>"),
+    radius = 2,
+    weight = 1,
+    stroke = TRUE,
+    fillOpacity = 1,
+    color = "#008080"
+  ) %>%
+  # add secret invisible circles at each image location with a bigger radius so they're actually clickable
+  addCircleMarkers(
+    ~lon,
+    ~lat,
+    popup = paste(
+      "Image filepath:", totalexif3$received_image_path, "<br>",
+      "Collection date and time:", totalexif3$DateTimeOriginal, "<br>",
+      "Drone altitude above sea level:", totalexif3$altitude_asl, " meters",        "<br>"),
+    radius = 5,
+    weight = 1,
+    stroke = FALSE,
+    fillOpacity = 0
+  ) %>%
+  # add an interactive layer for ASL
+  addCircleMarkers(
+    ~lon,
+    ~lat,
+    popup = paste(
+      "Image filepath:", totalexif3$received_image_path, "<br>",
+      "Drone altitude above sea level:", totalexif3$altitude_asl, " meters",        "<br>"),
+    radius = 2,
+    weight = 1,
+    stroke = FALSE,
+    fillOpacity = 1,
+    fillColor = ~paletteNumASL3(totalexif3$altitude_asl),
+    group = "Altitude above sea level") %>%
+  # add a legend for the ASL data
+  addLegend(
+    pal = paletteNumASL3,
+    values = totalexif3$altitude_asl,
+    title = '<small>Altitude Above <br> Sea Level (meters)</small>',
+    opacity = 1,
+    position = "bottomright",
+    group = "Altitude above sea level"
+  ) %>%
+  # add an interactive layer for collection time
+  addCircleMarkers(
+    ~lon,
+    ~lat,
+    popup = paste(
+      "Image filepath:", totalexif3$received_image_path, "<br>",
+      "Collection date and time:", totalexif3$DateTimeOriginal, "<br>",
+      "Collection time after image acquisition initiation",                                 totalexif3$duration,"<br>"),
+    radius = 2,
+    weight = 1,
+    stroke = FALSE,
+    fillOpacity = 1,
+    fillColor = ~paletteNumDateTime3(totalexif3$duration),
+    group = "Collection date and time") %>%
+  # add a legend for the collection time data
+  addLegend(
+    pal = paletteNumDateTime3,
+    values = totalexif3$duration,
+    title = '<small>Collection time after <br> image acquisition <br> initiation (seconds)</small>',
+    opacity = 1,
+    position = "bottomleft",
+    group = "Collection date and time"
+  ) %>%
+  # add layer control to toggle the overlay groups on and off
+  addLayersControl(
+    overlayGroups=c("Altitude above sea level", "Collection date and time"), options=layersControlOptions(collapsed=FALSE)) %>%
+  # add a legend for the base map
+  addLegend(
+    colors = "#008080",
+    labels = "image locations",
+    title = paste ("exif", totalexif3$dataset_id.x[1]),
+    opacity = 1,
+    position = "topleft"
+  )
+
+exif3_MAP
+
+# save as html
+
+saveWidget(exif3_MAP, file="C:\\Users\\emily\\Box\\imagery-metadata-dev\\extracted-metadata\\visualizations\\image-map_20230528-0008.html")
+
+#### exif4 interactive map ####
+
+## define functions for continuous coloring
+
+paletteNumASL4 <- colorNumeric('YlOrRd', domain = totalexif4$altitude_asl)
+
+paletteNumDateTime4 <- colorNumeric('BuPu', domain = totalexif4$duration)
+
+## the map
+
+exif4_MAP <-
+  # create leaflet function using data specific to this map
+  leaflet(totalexif4) %>%
+  # use the jawg.terrain basemap
+  addTiles(
+    'https://tile.jawg.io/jawg-terrain/{z}/{x}/{y}{r}.png?access-token=cN5iUzB2bL1QMdeVwMJlflwXQweOoNTDOadGfoCbPf1rRM9FGPb4i1m4f2k5MaJP') %>%
+  # set the center of the map to be the center ish of the flight footprint
+  setView(
+    lng=(totalexif4$lon[66]),
+    lat=(totalexif4$lat[54]),
+    zoom = 17
+  ) %>%
+  # add circles at each image location
+  addCircleMarkers(
+    ~lon,
+    ~lat,
+    popup = paste(
+      "Image filepath:", totalexif4$received_image_path, "<br>",
+      "Collection date and time:", totalexif4$DateTimeOriginal, "<br>",
+      "Drone altitude above sea level:", totalexif4$altitude_asl, " meters",        "<br>"),
+    radius = 2,
+    weight = 1,
+    stroke = TRUE,
+    fillOpacity = 1,
+    color = "#008080"
+  ) %>%
+  # add secret invisible circles at each image location with a bigger radius so they're actually clickable
+  addCircleMarkers(
+    ~lon,
+    ~lat,
+    popup = paste(
+      "Image filepath:", totalexif4$received_image_path, "<br>",
+      "Collection date and time:", totalexif4$DateTimeOriginal, "<br>",
+      "Drone altitude above sea level:", totalexif4$altitude_asl, " meters",        "<br>"),
+    radius = 5,
+    weight = 1,
+    stroke = FALSE,
+    fillOpacity = 0
+  ) %>%
+  # add an interactive layer for ASL
+  addCircleMarkers(
+    ~lon,
+    ~lat,
+    popup = paste(
+      "Image filepath:", totalexif4$received_image_path, "<br>",
+      "Drone altitude above sea level:", totalexif4$altitude_asl, " meters",        "<br>"),
+    radius = 2,
+    weight = 1,
+    stroke = FALSE,
+    fillOpacity = 1,
+    fillColor = ~paletteNumASL4(totalexif4$altitude_asl),
+    group = "Altitude above sea level") %>%
+  # add a legend for the ASL data
+  addLegend(
+    pal = paletteNumASL4,
+    values = totalexif4$altitude_asl,
+    title = '<small>Altitude Above <br> Sea Level (meters)</small>',
+    opacity = 1,
+    position = "bottomright",
+    group = "Altitude above sea level"
+  ) %>%
+  # add an interactive layer for collection time
+  addCircleMarkers(
+    ~lon,
+    ~lat,
+    popup = paste(
+      "Image filepath:", totalexif4$received_image_path, "<br>",
+      "Collection date and time:", totalexif4$DateTimeOriginal, "<br>",
+      "Collection time after image acquisition initiation",                                 totalexif4$duration,"<br>"),
+    radius = 2,
+    weight = 1,
+    stroke = FALSE,
+    fillOpacity = 1,
+    fillColor = ~paletteNumDateTime4(totalexif4$duration),
+    group = "Collection date and time") %>%
+  # add a legend for the collection time data
+  addLegend(
+    pal = paletteNumDateTime4,
+    values = totalexif4$duration,
+    title = '<small>Collection time after <br> image acquisition <br> initiation (seconds)</small>',
+    opacity = 1,
+    position = "bottomleft",
+    group = "Collection date and time"
+  ) %>%
+  # add layer control to toggle the overlay groups on and off
+  addLayersControl(
+    overlayGroups=c("Altitude above sea level", "Collection date and time"), options=layersControlOptions(collapsed=FALSE)) %>%
+  # add a legend for the base map
+  addLegend(
+    colors = "#008080",
+    labels = "image locations",
+    title = paste ("exif", totalexif4$dataset_id.x[1]),
+    opacity = 1,
+    position = "topleft"
+  )
+
+exif4_MAP
+
+# save as html
+
+saveWidget(exif4_MAP, file="C:\\Users\\emily\\Box\\imagery-metadata-dev\\extracted-metadata\\visualizations\\image-map_20230528-0009.html")
+
+#### exif5 interactive map ####
+
+## define functions for continuous coloring
+
+paletteNumASL5 <- colorNumeric('YlOrRd', domain = totalexif5$altitude_asl)
+
+paletteNumDateTime5 <- colorNumeric('BuPu', domain = totalexif5$duration)
+
+## the map
+
+exif5_MAP <-
+  # create leaflet function using data specific to this map
+  leaflet(totalexif5) %>%
+  # use the jawg.terrain basemap
+  addTiles(
+    'https://tile.jawg.io/jawg-terrain/{z}/{x}/{y}{r}.png?access-token=cN5iUzB2bL1QMdeVwMJlflwXQweOoNTDOadGfoCbPf1rRM9FGPb4i1m4f2k5MaJP') %>%
+  # set the center of the map to be the center ish of the flight footprint
+  setView(
+    lng=(totalexif5$lon[505]),
+    lat=(totalexif5$lat[805]),
+    zoom = 17
+  ) %>%
+  # add circles at each image location
+  addCircleMarkers(
+    ~lon,
+    ~lat,
+    popup = paste(
+      "Image filepath:", totalexif5$received_image_path, "<br>",
+      "Collection date and time:", totalexif5$DateTimeOriginal, "<br>",
+      "Drone altitude above sea level:", totalexif5$altitude_asl, " meters",        "<br>"),
+    radius = 2,
+    weight = 1,
+    stroke = TRUE,
+    fillOpacity = 1,
+    color = "#008080"
+  ) %>%
+  # add secret invisible circles at each image location with a bigger radius so they're actually clickable
+  addCircleMarkers(
+    ~lon,
+    ~lat,
+    popup = paste(
+      "Image filepath:", totalexif5$received_image_path, "<br>",
+      "Collection date and time:", totalexif5$DateTimeOriginal, "<br>",
+      "Drone altitude above sea level:", totalexif5$altitude_asl, " meters",        "<br>"),
+    radius = 5,
+    weight = 1,
+    stroke = FALSE,
+    fillOpacity = 0
+  ) %>%
+  # add an interactive layer for ASL
+  addCircleMarkers(
+    ~lon,
+    ~lat,
+    popup = paste(
+      "Image filepath:", totalexif5$received_image_path, "<br>",
+      "Drone altitude above sea level:", totalexif5$altitude_asl, " meters",        "<br>"),
+    radius = 2,
+    weight = 1,
+    stroke = FALSE,
+    fillOpacity = 1,
+    fillColor = ~paletteNumASL5(totalexif5$altitude_asl),
+    group = "Altitude above sea level") %>%
+  # add a legend for the ASL data
+  addLegend(
+    pal = paletteNumASL5,
+    values = totalexif5$altitude_asl,
+    title = '<small>Altitude Above <br> Sea Level (meters)</small>',
+    opacity = 1,
+    position = "bottomright",
+    group = "Altitude above sea level"
+  ) %>%
+  # add an interactive layer for collection time
+  addCircleMarkers(
+    ~lon,
+    ~lat,
+    popup = paste(
+      "Image filepath:", totalexif5$received_image_path, "<br>",
+      "Collection date and time:", totalexif5$DateTimeOriginal, "<br>",
+      "Collection time after image acquisition initiation",                                 totalexif5$duration,"<br>"),
+    radius = 2,
+    weight = 1,
+    stroke = FALSE,
+    fillOpacity = 1,
+    fillColor = ~paletteNumDateTime5(totalexif5$duration),
+    group = "Collection date and time") %>%
+  # add a legend for the collection time data
+  addLegend(
+    pal = paletteNumDateTime5,
+    values = totalexif5$duration,
+    title = '<small>Collection time after <br> image acquisition <br> initiation (seconds)</small>',
+    opacity = 1,
+    position = "bottomleft",
+    group = "Collection date and time"
+  ) %>%
+  # add layer control to toggle the overlay groups on and off
+  addLayersControl(
+    overlayGroups=c("Altitude above sea level", "Collection date and time"), options=layersControlOptions(collapsed=FALSE)) %>%
+  # add a legend for the base map
+  addLegend(
+    colors = "#008080",
+    labels = "image locations",
+    title = paste ("exif", totalexif5$dataset_id.x[1]),
+    opacity = 1,
+    position = "topleft"
+  )
+
+exif5_MAP
+
+# save as html
+
+saveWidget(exif5_MAP, file="C:\\Users\\emily\\Box\\imagery-metadata-dev\\extracted-metadata\\visualizations\\image-map_20230706-0152.html")
+
+#### exif6 interactive map ####
+
+## define functions for continuous coloring
+
+paletteNumASL6 <- colorNumeric('YlOrRd', domain = totalexif6$altitude_asl)
+
+paletteNumDateTime6 <- colorNumeric('BuPu', domain = totalexif6$duration)
+
+## the map
+
+exif6_MAP <-
+  # create leaflet function using data specific to this map
+  leaflet(totalexif6) %>%
+  # use the jawg.terrain basemap
+  addTiles(
+    'https://tile.jawg.io/jawg-terrain/{z}/{x}/{y}{r}.png?access-token=cN5iUzB2bL1QMdeVwMJlflwXQweOoNTDOadGfoCbPf1rRM9FGPb4i1m4f2k5MaJP') %>%
+  # set the center of the map to be the center ish of the flight footprint
+  setView(
+    lng=(totalexif6$lon[1570]),
+    lat=(totalexif6$lat[45]),
+    zoom = 16.5
+  ) %>%
+  # add circles at each image location
+  addCircleMarkers(
+    ~lon,
+    ~lat,
+    popup = paste(
+      "Image filepath:", totalexif6$received_image_path, "<br>",
+      "Collection date and time:", totalexif6$DateTimeOriginal, "<br>",
+      "Drone altitude above sea level:", totalexif6$altitude_asl, " meters",        "<br>"),
+    radius = 2,
+    weight = 1,
+    stroke = TRUE,
+    fillOpacity = 1,
+    color = "#008080"
+  ) %>%
+  # add secret invisible circles at each image location with a bigger radius so they're actually clickable
+  addCircleMarkers(
+    ~lon,
+    ~lat,
+    popup = paste(
+      "Image filepath:", totalexif6$received_image_path, "<br>",
+      "Collection date and time:", totalexif6$DateTimeOriginal, "<br>",
+      "Drone altitude above sea level:", totalexif6$altitude_asl, " meters",        "<br>"),
+    radius = 5,
+    weight = 1,
+    stroke = FALSE,
+    fillOpacity = 0
+  ) %>%
+  # add an interactive layer for ASL
+  addCircleMarkers(
+    ~lon,
+    ~lat,
+    popup = paste(
+      "Image filepath:", totalexif6$received_image_path, "<br>",
+      "Drone altitude above sea level:", totalexif6$altitude_asl, " meters",        "<br>"),
+    radius = 2,
+    weight = 1,
+    stroke = FALSE,
+    fillOpacity = 1,
+    fillColor = ~paletteNumASL6(totalexif6$altitude_asl),
+    group = "Altitude above sea level") %>%
+  # add a legend for the ASL data
+  addLegend(
+    pal = paletteNumASL6,
+    values = totalexif6$altitude_asl,
+    title = '<small>Altitude Above <br> Sea Level (meters)</small>',
+    opacity = 1,
+    position = "bottomright",
+    group = "Altitude above sea level"
+  ) %>%
+  # add an interactive layer for collection time
+  addCircleMarkers(
+    ~lon,
+    ~lat,
+    popup = paste(
+      "Image filepath:", totalexif6$received_image_path, "<br>",
+      "Collection date and time:", totalexif6$DateTimeOriginal, "<br>",
+      "Collection time after image acquisition initiation",                                 totalexif6$duration,"<br>"),
+    radius = 2,
+    weight = 1,
+    stroke = FALSE,
+    fillOpacity = 1,
+    fillColor = ~paletteNumDateTime6(totalexif6$duration),
+    group = "Collection date and time") %>%
+  # add a legend for the collection time data
+  addLegend(
+    pal = paletteNumDateTime6,
+    values = totalexif6$duration,
+    title = '<small>Collection time after <br> image acquisition <br> initiation (seconds)</small>',
+    opacity = 1,
+    position = "bottomleft",
+    group = "Collection date and time"
+  ) %>%
+  # add layer control to toggle the overlay groups on and off
+  addLayersControl(
+    overlayGroups=c("Altitude above sea level", "Collection date and time"), options=layersControlOptions(collapsed=FALSE)) %>%
+  # add a legend for the base map
+  addLegend(
+    colors = "#008080",
+    labels = "image locations",
+    title = paste ("exif", totalexif6$dataset_id.x[1]),
+    opacity = 1,
+    position = "topleft"
+  )
+
+exif6_MAP
+
+# save as html
+
+saveWidget(exif6_MAP, file="C:\\Users\\emily\\Box\\imagery-metadata-dev\\extracted-metadata\\visualizations\\image-map_20230706-0153.html")
