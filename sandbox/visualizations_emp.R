@@ -217,15 +217,7 @@ exif1_MAP <-
   ) %>%
   # add layer control to toggle the overlay groups on and off
   addLayersControl(
-    overlayGroups=c("Altitude above sea level", "Collection date and time"), options=layersControlOptions(collapsed=FALSE)) %>%
-# add a legend for the base map
-  addLegend(
-    colors = "#008080",
-    labels = "image locations",
-    title = paste ("exif", totalexif1$dataset_id.x[1]),
-    opacity = 1,
-    position = "topleft"
-  )
+    overlayGroups=c("Altitude above sea level", "Collection date and time"), options=layersControlOptions(collapsed=FALSE))
 
 exif1_MAP
 
@@ -329,15 +321,7 @@ exif2_MAP <-
   ) %>%
   # add layer control to toggle the overlay groups on and off
   addLayersControl(
-    overlayGroups=c("Altitude above sea level", "Collection date and time"), options=layersControlOptions(collapsed=FALSE)) %>%
-  # add a legend for the base map
-  addLegend(
-    colors = "#008080",
-    labels = "image locations",
-    title = paste ("exif", totalexif2$dataset_id.x[1]),
-    opacity = 1,
-    position = "topleft"
-  )
+    overlayGroups=c("Altitude above sea level", "Collection date and time"), options=layersControlOptions(collapsed=FALSE))
 
 exif2_MAP
 
@@ -441,15 +425,7 @@ exif3_MAP <-
   ) %>%
   # add layer control to toggle the overlay groups on and off
   addLayersControl(
-    overlayGroups=c("Altitude above sea level", "Collection date and time"), options=layersControlOptions(collapsed=FALSE)) %>%
-  # add a legend for the base map
-  addLegend(
-    colors = "#008080",
-    labels = "image locations",
-    title = paste ("exif", totalexif3$dataset_id.x[1]),
-    opacity = 1,
-    position = "topleft"
-  )
+    overlayGroups=c("Altitude above sea level", "Collection date and time"), options=layersControlOptions(collapsed=FALSE))
 
 exif3_MAP
 
@@ -553,15 +529,7 @@ exif4_MAP <-
   ) %>%
   # add layer control to toggle the overlay groups on and off
   addLayersControl(
-    overlayGroups=c("Altitude above sea level", "Collection date and time"), options=layersControlOptions(collapsed=FALSE)) %>%
-  # add a legend for the base map
-  addLegend(
-    colors = "#008080",
-    labels = "image locations",
-    title = paste ("exif", totalexif4$dataset_id.x[1]),
-    opacity = 1,
-    position = "topleft"
-  )
+    overlayGroups=c("Altitude above sea level", "Collection date and time"), options=layersControlOptions(collapsed=FALSE))
 
 exif4_MAP
 
@@ -665,15 +633,7 @@ exif5_MAP <-
   ) %>%
   # add layer control to toggle the overlay groups on and off
   addLayersControl(
-    overlayGroups=c("Altitude above sea level", "Collection date and time"), options=layersControlOptions(collapsed=FALSE)) %>%
-  # add a legend for the base map
-  addLegend(
-    colors = "#008080",
-    labels = "image locations",
-    title = paste ("exif", totalexif5$dataset_id.x[1]),
-    opacity = 1,
-    position = "topleft"
-  )
+    overlayGroups=c("Altitude above sea level", "Collection date and time"), options=layersControlOptions(collapsed=FALSE))
 
 exif5_MAP
 
@@ -777,15 +737,7 @@ exif6_MAP <-
   ) %>%
   # add layer control to toggle the overlay groups on and off
   addLayersControl(
-    overlayGroups=c("Altitude above sea level", "Collection date and time"), options=layersControlOptions(collapsed=FALSE)) %>%
-  # add a legend for the base map
-  addLegend(
-    colors = "#008080",
-    labels = "image locations",
-    title = paste ("exif", totalexif6$dataset_id.x[1]),
-    opacity = 1,
-    position = "topleft"
-  )
+    overlayGroups=c("Altitude above sea level", "Collection date and time"), options=layersControlOptions(collapsed=FALSE))
 
 exif6_MAP
 
