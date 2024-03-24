@@ -6,6 +6,10 @@ library(elevatr)
 library(xml2)
 
 d = read_xml("/ofo-share/str-disp_drone-data-partial/imagery-processed/outputs/120m-01/Lassic-120m_20240213T0503_cameras.xml")
+
+# TODO: get chunk transform matrix
+
+# Get each camera's position vector (rightmost 4x1 column of the camera 4x4 transform matrix)
 cams = xml_find_all(d, ".//camera")
 l = as_list(cams)
 
@@ -28,3 +32,6 @@ x
 y
 z
 
+
+# TODO: Multiply the chunk transform by the camera position to get cam pos in ECEF
+# TODO: Transform ECEF to 3310 or other appropriate CRS.
