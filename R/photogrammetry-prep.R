@@ -58,7 +58,7 @@ make_derived_configs = function(base_yaml_filepath,
 
   config_files_created = NULL
 
-  for(i in 1:nrow(scenarios)) {
+  for (i in 1:nrow(scenarios)) {
 
     scenario = scenarios[i, ]
 
@@ -69,7 +69,7 @@ make_derived_configs = function(base_yaml_filepath,
 
   }
 
-  if(metashape_path != "") {
+  if(automate_metashape_path != "") {
     ## make a shell script to run all the config files
     shell_lines = paste0("python3 ", automate_metashape_path, "python", "metashape_workflow.py",
                          " ", config_files_created)
