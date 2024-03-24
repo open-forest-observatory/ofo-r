@@ -71,7 +71,7 @@ make_derived_configs = function(base_yaml_filepath,
 
   if(automate_metashape_path != "") {
     ## make a shell script to run all the config files
-    shell_lines = paste0("python3 ", automate_metashape_path, "python", "metashape_workflow.py",
+    shell_lines = paste0("python3 ", file.path(automate_metashape_path, "python", "metashape_workflow.py"),
                          " ", config_files_created)
 
     writeLines(shell_lines,
