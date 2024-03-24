@@ -106,7 +106,7 @@ classifyGroundPoints: # (Metashape: classifyGroundPoints) # classify points, IF 
     cell_size: 50.0
 
 buildModel:
-    enabled: False
+    enabled: True
     face_count: "Metashape.MediumFaceCount" # How many faces to use, Metashape.LowFaceCount, MediumFaceCount, HighFaceCount, CustomFaceCount
     face_count_custom: 100000 # Only used if custom number of faces set (above).
     export_local: True # Export the model in local coordinates

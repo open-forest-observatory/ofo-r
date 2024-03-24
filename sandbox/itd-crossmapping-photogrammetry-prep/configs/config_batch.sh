@@ -24,4 +24,4 @@ python3 /ofo-share/utils/automate-metashape/python/metashape_workflow.py /ofo-sh
 python3 /ofo-share/utils/automate-metashape/python/metashape_workflow.py /ofo-share/repos-derek/ofo-r/sandbox/itd-crossmapping-photogrammetry-prep/configs/20230803-0295.yml
 python3 /ofo-share/utils/automate-metashape/python/metashape_workflow.py /ofo-share/repos-derek/ofo-r/sandbox/itd-crossmapping-photogrammetry-prep/configs/20230804-0294.yml
 python3 /ofo-share/utils/automate-metashape/python/metashape_workflow.py /ofo-share/repos-derek/ofo-r/sandbox/itd-crossmapping-photogrammetry-prep/configs/20230804-0302.yml
-python3 /ofo-share/utils/automate-metashape/python/metashape_workflow.py /ofo-share/repos-derek/ofo-r/sandbox/itd-crossmapping-photogrammetry-prep/configs/set14thin22.yml
+python3 /ofo-share/utils/automate-metashape/python/metashape_workflow.py /ofo-share/repos-derek/ofo-r/sandbox/itd-crossmapping-photogrammetry-prep/configs/set14_thin22.yml

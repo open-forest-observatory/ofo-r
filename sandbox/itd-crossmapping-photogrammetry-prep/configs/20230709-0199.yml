@@ -62,7 +62,7 @@ classifyGroundPoints:
   max_distance: 1.0
   cell_size: 50.0
 buildModel:
-  enabled: no
+  enabled: yes
   face_count: Metashape.MediumFaceCount
   face_count_custom: 100000
   export_local: yes
