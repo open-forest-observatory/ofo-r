@@ -8,40 +8,12 @@ extract_metadata_emp(exif_file)
 }
 \arguments{
 \item{exif_file}{the exif filepath (before being prepared to pass to the functions in the wrapper)}
-
-\item{dataset_id}{dataset id}
-
-\item{datatime_local}{local date and time of image collection}
-
-\item{lat_lon}{a data.frame of latitude and longitude of image collection}
-
-\item{rtk_fix}{if a column for "RtkFlag" is in the exif data, rtk_fix is true if the column value is 50 and false for any other value. If there isn't an "RtkFlag" column, rtk_fix is false.}
-
-\item{accuracy}{a data.frame of the accuracy_x (longitude accuracy standard deviation in meters) and accuracy_y (latitude standard deviation in meters) values for each image}
-
-\item{pitch_roll_yaw}{a data.frame of the camera_pitch (degrees up from nadir), camera_roll (degrees clockwise from up), and camera_yaw (degrees right from true north) values for each image}
-
-\item{exposure}{exposure time in seconds}
-
-\item{aperture}{aperture (format: xxxxx)}
-
-\item{iso}{ISO}
-
-\item{white_balance}{either auto or manual white balance}
-
-\item{received_image_path}{the received image path}
-
-\item{altitude_asl}{altitude above sea level in meters}
-
-\item{metadata}{a data.frame of dataset_id, datatime_local, lat, lon, rtk_fix, accuracy_x, accuracy_y, accuracy_z, camera_pitch, camera_roll, camera_yaw, exposure, aperture, iso, white_balance, received_image_path, and altitude_asl}
-
-\item{exif}{the exif metadata file}
 }
 \value{
 a data.frame of dataset_id, datatime_local, lat, lon, rtk_fix, accuracy_x, accuracy_y, camera_pitch, camera_roll, camera_yaw, exposure, aperture, iso, white_balance, received_image_path, and altitude_asl
 }
 \description{
-Returns altitude above sea level (asl) in meters to include in image-level metadata collation.
+Returns a collection of image-level metadata parameters
 }
 \examples{
 extract_metadata_emp(exif)

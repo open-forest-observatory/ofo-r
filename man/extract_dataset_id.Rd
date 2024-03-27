@@ -8,8 +8,6 @@ extract_dataset_id(exif)
 }
 \arguments{
 \item{exif}{the exif metadata file}
-
-\item{dataset_id}{dataset id}
 }
 \value{
 dataset id

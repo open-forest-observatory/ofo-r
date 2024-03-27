@@ -8,8 +8,6 @@ extract_altitude_asl(exif)
 }
 \arguments{
 \item{exif}{the exif metadata file}
-
-\item{altitude_asl}{altitude above sea level in meters}
 }
 \value{
 altitude above sea level in meters

@@ -8,8 +8,6 @@ extract_rtk_fix(exif)
 }
 \arguments{
 \item{exif}{the exif metadata file}
-
-\item{rtk_fix}{if a column for "RtkFlag" is in the exif data, rtk_fix is true if the column value is 50 and false for any other value. If there isn't an "RtkFlag" column, rtk_fix is false.}
 }
 \value{
 rtk fix of image, true/false
