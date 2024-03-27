@@ -26,9 +26,6 @@ exif = prep_exif(exif_file)
 
 # Output file: imagery-metadata-dev/extracted-metadata/image-level-metadata/image-metadata_<dataset_id>.csv
 
-exif_file = exif_files[1]
-exif = prep_exif(exif_file)
-
 #### First need to make sure each exif file has the right columns for the following functions. If column(s) are missing, need to add columns of blanks or NAs ####
 
 #### dataset ID ####
@@ -132,12 +129,12 @@ rtk_fix = {
 
 extract_rtk_fix = function(exif) {
   if ("RtkFlag" %in% names(exif)) {
-  rtk_fix = exif$RtkFlag == 50
-  return(rtk_fix)
+    rtk_fix = exif$RtkFlag == 50
+    return(rtk_fix)
   }
   else {
-  rtk_fix = rep(FALSE, nrow(exif))
-  return(rtk_fix)
+    rtk_fix = rep(FALSE, nrow(exif))
+    return(rtk_fix)
   }
 }
 
@@ -351,8 +348,8 @@ extract_altitude_asl = function(exif) {
 
 # test function on exif data
 
-altitude = extract_altitude_asl(exif)
-altitude
+altitude_asl = extract_altitude_asl(exif)
+altitude_asl
 
 #### standardized_image_path (Image path in standardized dataset) ####
 
