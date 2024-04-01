@@ -17,61 +17,14 @@ datadir = readLines(file.path("sandbox", "data-dirs", "emp-metadata-laptop.txt")
 # have already been created and saved into the project data folder.
 exif_files = list.files(file.path(datadir, "exif-examples"), pattern = "^exif.+\\.csv$", full.names = TRUE)
 
-# Define which test EXIF file to run the functions on
-exif_file = exif_files[1]
-
-
 # Select an EXIF file to test on, and prep the EXIF data by loading it as a geospatial data frame
 
 exif_file = exif_files[1]
 exif = prep_exif(exif_file)
 
-# Between the BEGIN and END comments below, write code to extract the metadata attribute you're
-# working on. When you're done, you can wrap it in a function definition, taking only one parameter,
-# 'exif'. Here is an example of developing code to extract the number of images in an imagery
-# dataset.
-
-# BEGIN FUNCTION CODE
-
-# Get the number of images in the dataset by counting the rows of the EXIF data frame
-image_count = nrow(exif)
-
-# END FUNCTION CODE
-
-
-# Now here is an example of turning that code into a function
-
-extract_image_count = function(exif) {
-
-  # Get the number of images in the dataset by counting the rows of the EXIF data frame
-  image_count = nrow(exif)
-
-  return(image_count)
-
-}
-
-
-# Now you can test the function on the EXIF data
-
-image_count = extract_image_count(exif)
-image_count
-
-# Once it is working right, you can move this function to your
-# 'R/imagery-metadata-extraction_<initials>.R' file and then add a call to this function from within
-# your 'extract_metadata_<initials>' function. Once it is in there, then you can run the top part of
-# this script again, and when it extracts the metadata for each EXIF dataset, your additional
-# metadata should be included.
-
-
-
-
-
 #### Image-level metadata CSV file (one file per dataset) ####
 
 # Output file: imagery-metadata-dev/extracted-metadata/image-level-metadata/image-metadata_<dataset_id>.csv
-
-exif_file = exif_files[1]
-exif = prep_exif(exif_file)
 
 #### First need to make sure each exif file has the right columns for the following functions. If column(s) are missing, need to add columns of blanks or NAs ####
 
@@ -176,12 +129,12 @@ rtk_fix = {
 
 extract_rtk_fix = function(exif) {
   if ("RtkFlag" %in% names(exif)) {
-  rtk_fix = exif$RtkFlag == 50
-  return(rtk_fix)
+    rtk_fix = exif$RtkFlag == 50
+    return(rtk_fix)
   }
   else {
-  rtk_fix = rep(FALSE, nrow(exif))
-  return(rtk_fix)
+    rtk_fix = rep(FALSE, nrow(exif))
+    return(rtk_fix)
   }
 }
 
@@ -190,17 +143,15 @@ extract_rtk_fix = function(exif) {
 rtk_fix = extract_rtk_fix(exif)
 rtk_fix
 
-#### accuracy_x (Units: m rmse) ####
+#### accuracy (Units: m) ####
 
-# EXIF files have an RTK standard longitude deviation (RtkStdLon, the standard deviation (in meters) of the photo recording position in longitude direction), an RTK standard latitude deviation (RtkStdLat, the standard deviation (in meters) of the photo recording position in latitude direction), and an RTK standard altitude deviation (RtkStdHgt, the RTK positioning standard elevation deviation in meters).
+# EXIF files have an RTK standard longitude deviation (RtkStdLon, the standard deviation (in meters) of the photo recording position in longitude direction) and an RTK standard latitude deviation (RtkStdLat, the standard deviation (in meters) of the photo recording position in latitude direction)
 
 # BEGIN FUNCTION CODE
 
 accuracy_x = exif$RtkStdLon
 
 accuracy_y = exif$RtkStdLat
-
-accuracy_z = exif$RtkStdHgt
 
 # END FUNCTION CODE
 
@@ -216,11 +167,7 @@ extract_accuracy = function (exif) {
 
   accuracy_y = exif$RtkStdLat
 
-  exif["RtkStdHgt"[!("RtkStdHgt" %in% colnames(exif))]] = NA
-
-  accuracy_z = exif$RtkStdHgt
-
-  accuracy = data.frame (accuracy_x, accuracy_y, accuracy_z)
+  accuracy = data.frame (accuracy_x, accuracy_y)
 
   return(accuracy)
 }
@@ -322,7 +269,7 @@ extract_iso = function(exif) {
 iso = extract_iso(exif)
 iso
 
-#### white_balance (Format: auto/sunny/cloudy/(others?)) ####
+#### white_balance (Format: auto/manual) ####
 
 # Some example exifs have all photos with white balance 0, others have all photos with white balance 1
 
@@ -382,7 +329,7 @@ extract_received_image_path = function(exif) {
 received_image_path = extract_received_image_path(exif)
 received_image_path
 
-#### altitude: returns altitude above sea level (asl) in meters ####
+#### altitude_asl: returns altitude above sea level (asl) in meters ####
 
 # BEGIN FUNCTION CODE
 
@@ -392,19 +339,17 @@ altitude_asl = exif$AbsoluteAltitude
 
 # turn code into a function
 
-extract_altitude = function(exif) {
+extract_altitude_asl = function(exif) {
 
   altitude_asl = exif$AbsoluteAltitude
 
-  altitude = data.frame (altitude_asl)
-
-  return(altitude)
+  return(altitude_asl)
 }
 
 # test function on exif data
 
-altitude = extract_altitude(exif)
-altitude
+altitude_asl = extract_altitude_asl(exif)
+altitude_asl
 
 #### standardized_image_path (Image path in standardized dataset) ####
 
@@ -437,7 +382,7 @@ extract_metadata_emp = function(exif_filepath) {
   iso = extract_iso(exif)
   white_balance = extract_white_balance(exif)
   received_image_path = extract_received_image_path(exif)
-  altitude = extract_altitude(exif)
+  altitude_asl = extract_altitude_asl(exif)
 
   # Return extracted/computed metadata as a data frame row
   metadata = data.frame(dataset_id = dataset_id,
@@ -451,7 +396,7 @@ extract_metadata_emp = function(exif_filepath) {
                         iso = iso,
                         white_balance = white_balance,
                         received_image_path = received_image_path,
-                        altitude
+                        altitude_asl = altitude_asl
   )
 
   return(metadata)
