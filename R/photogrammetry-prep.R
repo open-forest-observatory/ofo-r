@@ -47,7 +47,9 @@ make_derived_yaml = function(cfg_base, replacements, derived_yaml_dir) {
 # Take a base yaml file and a set of scenarios (value replacements for specific keys) and write them
 # all
 # 'base_yaml_filepath' must be an absolute filepath if the batch shell script creation is to work
-make_derived_configs = function(base_yaml_filepath, scenarios, derived_yaml_out_folder = "", metashape_path = "") {
+make_derived_configs = function(base_yaml_filepath,
+                                scenarios, derived_yaml_out_folder = "",
+                                automate_metashape_path = "") {
 
   # if not specified, write derived yamls in same dir as the base
   if(derived_yaml_out_folder == "") {
@@ -56,7 +58,7 @@ make_derived_configs = function(base_yaml_filepath, scenarios, derived_yaml_out_
 
   config_files_created = NULL
 
-  for(i in 1:nrow(scenarios)) {
+  for (i in 1:nrow(scenarios)) {
 
     scenario = scenarios[i, ]
 
@@ -67,12 +69,13 @@ make_derived_configs = function(base_yaml_filepath, scenarios, derived_yaml_out_
 
   }
 
-  if(metashape_path != "") {
+  if(automate_metashape_path != "") {
     ## make a shell script to run all the config files
-    shell_lines = paste0("python3 ", metashape_path, " ", config_files_created)
+    shell_lines = paste0("python3 ", file.path(automate_metashape_path, "python", "metashape_workflow.py"),
+                         " ", config_files_created)
 
     writeLines(shell_lines,
-                con = paste0(derived_yaml_out_folder,"/config_batch.sh"), sep="\n")
+               con = paste0(derived_yaml_out_folder,"/config_batch.sh"), sep="\n")
   }
 
 }
