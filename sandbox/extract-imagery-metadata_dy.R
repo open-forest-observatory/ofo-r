@@ -8,7 +8,7 @@ devtools::load_all()
 
 # Define the root of the local data directory
 datadir = readLines(file.path("sandbox", "data-dirs", "derek-metadata-laptop.txt"))
-
+datadir = "/ofo-share/str-disp_drone-data-partial/str-disp_drone-data_imagery-missions/Lassic/Lassic_120m"
 
 # --- 1. Workflow for running metadata extraction ---
 

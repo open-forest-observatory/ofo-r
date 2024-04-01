@@ -87,6 +87,36 @@ extract_flight_terrain_correlation = function(exif) {
 
 }
 
+#NOTE this is mostly redundant with the above and should be combined if keeping elev extraction
+extract_flight_elev_agl = function(exif) {
+  # Define the AOI as a polygon
+  aoi = sf::st_convex_hull(sf::st_union(exif)) |> sf::st_as_sf()
+
+  # Get an elev raster for this AOI
+  dem = elevatr::get_elev_raster(aoi, z = 14, prj = 4326, src = "aws")
+
+  # Get the ground elevation beneath all the photo points
+  ground_elev = terra::extract(dem, exif, method = "bilinear")
+
+  # Get the difference between the drone's altitude and the ground elevation
+  agl = exif$GPSAltitude - ground_elev
+
+  # Get the middle 80% of AGL (to exclude outliers like landscape shots in mission)
+  agl_lwr = quantile(agl, 0.1)
+  agl_upr = quantile(agl, 0.9)
+
+  agl_core = agl[agl > agl_lwr & agl < agl_upr]
+  exif_elev_core = exif$GPSAltitude[agl > agl_lwr & agl < agl_upr]
+  ground_elev_core = ground_elev[agl > agl_lwr & agl < agl_upr]
+
+  # Get the correlation between the altitude of the drone and the ground elevation (i.e. trerrain
+  # follow tightness)
+  flight_elev_agl = exif_elev_core - ground_elev_core
+
+  return(flight_elev_agl)
+
+}
+
 # Wrapper for Derek's metadata extraction functions. Preps the EXIF data for passing to the
 # extraction functions, then calls all the individual extraction functions to extract the respecive attributes.
 # crop_to_contiguous: Keeps only the images within the largest contiguoug patch of images (which is
@@ -111,11 +141,13 @@ extract_metadata_dy = function(exif_filepath, plot_flightpath = FALSE, crop_to_c
   # Extract/compute metadata attributes
   flight_speed_derived = extract_flight_speed(exif)
   flight_terrain_correlation = extract_flight_terrain_correlation(exif)
+  flight_elev_agl = extract_flight_elev_agl(exif)
 
   # Return extracted/computed metadata as a data frame row
   metadata = data.frame(dataset_id = exif$dataset_id[1],
                         flight_speed_derived = flight_speed_derived,
-                        flight_terrain_correlation = flight_terrain_correlation
+                        flight_terrain_correlation = flight_terrain_correlation,
+                        flight_elev_agl = flight_elev_agl
                         # Add more metadata variables here
                         )
 
