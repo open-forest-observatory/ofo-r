@@ -6,37 +6,26 @@ make_4x4_transform <- function(rotation_str, translation_str, scale_str = "1") {
   rotation_np = as.numeric(strsplit(rotation_str, " ")[[1]])
   translation_np = as.numeric(strsplit(translation_str, " ")[[1]])
   scale = as.numeric(scale_str)
-  
+
   # Reshape rotation vector into a 3x3 matrix
   rotation_np = matrix(rotation_np, nrow = 3, byrow = TRUE)
-  
+
   # Check if the determinant of the rotation matrix is close to 1
   if (abs(det(rotation_np) - 1) > 1e-8) {
     stop(paste("Improper rotation matrix with determinant", det(rotation_np)))
   }
-  
+
   # Create a 4x4 identity matrix
   transform = diag(4)
-  
+
   # Update the rotation and translation components of the transform matrix
   transform[1:3, 1:3] = rotation_np * scale
   transform[1:3, 4] = translation_np
-  
+
   return(transform)
 }
 
-
-
-library(tidyverse)
-library(elevatr)
-library(xml2)
-library(sf)
-library(terra)
-
-d = read_xml("/ofo-share/str-disp_drone-data-partial/imagery-processed/outputs/120m-01/Lassic-120m_20240213T0503_cameras.xml")
-
 # Get chunk transform matrix
-
 get_chunk_trans_mat = function(project_xml) {
 
   chunks = xml_find_all(project_xml, "chunk")
@@ -52,7 +41,7 @@ get_chunk_trans_mat = function(project_xml) {
   return(chunk_tmat)
 }
 
-
+# Get camera positions in geographic coordinates
 get_cams_pos_geo = function(project_xml) {
 
   # Get the chunk transform matrix
@@ -94,36 +83,85 @@ get_cams_pos_geo = function(project_xml) {
 
   }
 
-
-  # Make the list of one-row data frames into a single data frame
-  cam_df = bind_rows(cam_df_list)
+  # Make the list of one-row data frames into a single multi-row data frame
+  cam_df = dplyr::bind_rows(cam_df_list)
 
   # Convert this to a sf object with CRS EPSG:4978
-  ecef = st_as_sf(cam_df, coords = c("x", "y", "z"), crs = 4978)
-  geo = st_transform(ecef, 4326)
+  ecef = sf::st_as_sf(cam_df, coords = c("x", "y", "z"), crs = 4978)
+  # Project to geographic
+  geo = sf::st_transform(ecef, 4326)
 
   return(geo)
 
 }
 
-cams_pos_geo = get_cams_pos_geo(d)
+# Extract camera positions and compare against DTM to get altitude AGL. Note that the photogrammetry
+# run must include output of a cameras XML (named '{project_name}_cameras.xml') and a DTM (named
+# '{project_name}_tem-ptcloud.tif')
+get_mission_agl = function(run_name,
+                           photogrammetry_outputs_path) {
+  cameras_xml_path = file.path(photogrammetry_outputs_path, paste0(run_name, "_cameras.xml"))
+  dtm_path = file.path(photogrammetry_outputs_path, paste0(run_name, "_dtm-ptcloud.tif"))
+
+  cameras_xml = read_xml(cameras_xml_path)
+
+  cams_pos_geo = get_cams_pos_geo(cameras_xml)
+
+  # Get number of total cameras and number of aligned cameras
+  n_cams_tot = xml_find_all(cameras_xml, ".//camera") |> as_list() |> length()
+  n_cams_aligned = nrow(cams_pos_geo)
+  prop_cams_aligned = n_cams_aligned / n_cams_tot
+
+  # Read in DTM, compare alt of cameras to DTM
+
+  dtm = rast(dtm_path)
+
+  cams_pos_dtmproj = st_transform(cams_pos_geo, st_crs(dtm))
+  dtm_elev = terra::extract(dtm, cams_pos_geo |> st_transform(st_crs(dtm)))
+
+  cams_pos_geo$dtm_elev = dtm_elev[, 2]
+  cams_pos_geo$camera_elev = st_coordinates(cams_pos_geo)[, 3]
+  cams_pos_geo$camera_agl = cams_pos_geo$camera_elev - cams_pos_geo$dtm_elev
+
+  hist(cams_pos_geo$camera_agl)
+
+  mission_agl = median(cams_pos_geo$camera_agl, na.rm = TRUE)
+
+  ret = data.frame(
+    run_name = run_name,
+    n_cams_tot = n_cams_tot,
+    n_cams_aligned = n_cams_aligned,
+    prop_cams_aligned = prop_cams_aligned,
+    mission_agl = mission_agl
+  )
+
+  return(ret)
+
+}
 
 
-# Get number of total cameras and number of aligned cameras
-n_cams_tot = xml_find_all(d, ".//camera") |> as_list() |> length()
-n_cams_aligned = nrow(cams_pos_geo)
-prop_cams_aligned = n_cams_aligned / n_cams_tot
+library(tidyverse)
+library(elevatr)
+library(xml2)
+library(sf)
+library(terra)
 
-# Read in DTM, compare alt of cameras to DTM
+datadir = readLines("sandbox/data-dirs/js2-itd-crossmapping.txt")
 
-dtm = rast("/ofo-share/str-disp_drone-data-partial/imagery-processed/outputs/120m-01/Lassic-120m_20240213T0503_dtm-ptcloud.tif")
+photogrammetry_outputs_path = file.path(datadir, "photogrammetry", "outputs")
 
-dtm_elev = terra::extract(dtm, cams_pos_geo |> st_transform(st_crs(dtm)))
+# Get a list of the projects
+projects = list.files(photogrammetry_outputs_path,
+                      pattern = "_cameras.xml$") |>
+  basename() |>
+  str_replace("_cameras.xml", "")
 
-cams_pos_geo$dtm_elev = dtm_elev[, 2]
-cams_pos_geo$camera_elev = st_coordinates(cams_pos_geo)[, 3]
-cams_pos_geo$camera_agl = cams_pos_geo$camera_elev - cams_pos_geo$dtm_elev
+project = projects[1]
 
-hist(cams_pos_geo$camera_agl)
+missions_agl = map(projects,
+                   get_mission_agl,
+                   photogrammetry_outputs_path = photogrammetry_outputs_path)
 
-mission_agl = median(cams_pos_geo$camera_agl, na.rm = TRUE)
+missions_agl = bind_rows(missions_agl)
+
+missions_agl
