@@ -31,6 +31,7 @@ library(tidyverse)
 library(elevatr)
 library(xml2)
 library(sf)
+library(terra)
 
 d = read_xml("/ofo-share/str-disp_drone-data-partial/imagery-processed/outputs/120m-01/Lassic-120m_20240213T0503_cameras.xml")
 
@@ -55,7 +56,7 @@ get_chunk_trans_mat = function(project_xml) {
 get_cams_pos_geo = function(project_xml) {
 
   # Get the chunk transform matrix
-  tmat = get_chunk_trans_mat(project_xml)
+  chunk_tmat = get_chunk_trans_mat(project_xml)
 
   # Get each camera's position vector (rightmost 4x1 column of the camera 4x4 transform matrix) and
   # multiply by the chunk transform matrix to get the camera position in ECEF coordinates
@@ -94,16 +95,35 @@ get_cams_pos_geo = function(project_xml) {
   }
 
 
-  # Make list of one-row data frams into a single data frame
+  # Make the list of one-row data frames into a single data frame
   cam_df = bind_rows(cam_df_list)
 
   # Convert this to a sf object with CRS EPSG:4978
   ecef = st_as_sf(cam_df, coords = c("x", "y", "z"), crs = 4978)
   geo = st_transform(ecef, 4326)
 
+  return(geo)
+
 }
 
 cams_pos_geo = get_cams_pos_geo(d)
 
 
-# TODO: read in DEM, compare alt
+# Get number of total cameras and number of aligned cameras
+n_cams_tot = xml_find_all(d, ".//camera") |> as_list() |> length()
+n_cams_aligned = nrow(cams_pos_geo)
+prop_cams_aligned = n_cams_aligned / n_cams_tot
+
+# Read in DTM, compare alt of cameras to DTM
+
+dtm = rast("/ofo-share/str-disp_drone-data-partial/imagery-processed/outputs/120m-01/Lassic-120m_20240213T0503_dtm-ptcloud.tif")
+
+dtm_elev = terra::extract(dtm, cams_pos_geo |> st_transform(st_crs(dtm)))
+
+cams_pos_geo$dtm_elev = dtm_elev[, 2]
+cams_pos_geo$camera_elev = st_coordinates(cams_pos_geo)[, 3]
+cams_pos_geo$camera_agl = cams_pos_geo$camera_elev - cams_pos_geo$dtm_elev
+
+hist(cams_pos_geo$camera_agl)
+
+mission_agl = median(cams_pos_geo$camera_agl, na.rm = TRUE)
