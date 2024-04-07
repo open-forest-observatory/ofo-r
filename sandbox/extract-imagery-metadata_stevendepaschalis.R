@@ -15,7 +15,6 @@ exif = prep_exif(exif_file)
 
 # Define the function to extract image frequency
 extract_image_frequency <- function(exif) {
-
   # Convert DateTimeOriginal to datetime object
   exif$DateTimeOriginal <- as.POSIXct(exif$DateTimeOriginal, format = "%Y:%m:%d %H:%M:%S", tz = "UTC")
 
@@ -28,15 +27,15 @@ extract_image_frequency <- function(exif) {
   # Remove NA and infinity values
   time_diff_seconds <- time_diff_seconds[is.finite(time_diff_seconds)]
 
-  # Calculate median and median absolute deviation (MAD)
+  # Calculate median time difference
   median_time_diff <- median(time_diff_seconds)
-  mad_time_diff <- mad(time_diff_seconds)
 
-  # Set threshold as median + 3 * MAD
-  threshold <- median_time_diff + 3 * mad_time_diff
+  # Calculate 10th and 90th percentiles for outlier detection
+  time_diff_10th <- quantile(time_diff_seconds, 0.1)
+  time_diff_90th <- quantile(time_diff_seconds, 0.9)
 
-  # Exclude outliers
-  filtered_time_diff <- time_diff_seconds[time_diff_seconds <= threshold]
+  # Exclude outliers based on quantiles
+  filtered_time_diff <- time_diff_seconds[time_diff_seconds >= time_diff_10th & time_diff_seconds <= time_diff_90th]
 
   # Calculate image frequency (images per second) from filtered values
   image_frequency <- 1 / filtered_time_diff
@@ -87,6 +86,12 @@ extract_metadata_sd <- function(exif) {
   # Extract image file type
   image_file_format <- extract_file_type(exif)
 
+  # Check if image file format is consistent
+  if (length(unique(image_file_format)) > 1) {
+    # If not identical, return a warning
+    warning("Image file format varies across images.")
+  }
+
   # Return metadata
   return(list(resolution_x = resolution_aspect_ratio$resolution_x,
               resolution_y = resolution_aspect_ratio$resolution_y,
@@ -98,3 +103,4 @@ extract_metadata_sd <- function(exif) {
 # Test the function
 metadata <- extract_metadata_sd(exif)
 metadata
+
