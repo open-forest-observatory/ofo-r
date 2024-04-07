@@ -113,3 +113,43 @@ match_obs_to_pred = function(obs, pred, search_distance_fun_intercept, search_di
   return(obs)
 
 }
+
+# TODO: Clean up formatting of below function
+
+# Function that takes a table of observed trees with an indication of whether they were matched to a
+# predicted tree, a table of predicted trees with an indication of whether they were matched to an
+# observed tree, and a minimum tree height to consider for mapping, and returns the number of
+# predicted trees, number of observed trees, the number of predicted matched to observed, and number
+# of observed matched to predicted. Purpose is that this can be re-run for different minimum
+# heights. It is necessary to pass these two separate tables because when assessing sensitivity
+# (recall), we need to check how many of the observed trees *within the internal negative buffered
+# area* match to predicted trees *regardless of whether they're in the internal negative buffered
+# area*, and similarly for precision, we need to check how many of the predicted trees *within the
+# internal negative buffered area* match to observed trees *regardless of whether they're in the
+# internal negative buffered area*, so the sets of trees used for each is different.
+count_total_and_matched_trees = function(obs_pred_match, pred_obs_match, min_height) {
+  
+  obs_pred_match_counts <- obs_pred_match %>%
+    filter(observed_tree_height >= min_height,
+           observed_tree_core_area == TRUE) %>%
+    summarize(
+      n_observed_matched_predicted =
+        sum(!is.na(predicted_tree_id) & !is.na(observed_tree_id)),
+      n_observed = n()
+    )
+  
+  pred_obs_match_counts <- pred_obs_match %>%
+    filter(predicted_tree_height >= min_height,
+           predicted_tree_core_area == TRUE) %>%
+    summarize(
+      n_predicted_matched_observed =
+        sum(!is.na(predicted_tree_id) & !is.na(observed_tree_id)),
+      n_predicted = n()
+    )
+  
+  matched_counts = cbind(obs_pred_match_counts, pred_obs_match_counts)
+  matched_counts$height_cat = paste0(min_height, "+")
+  
+  return(matched_counts)
+  
+}

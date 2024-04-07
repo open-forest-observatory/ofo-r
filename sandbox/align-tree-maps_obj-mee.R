@@ -47,7 +47,7 @@ pred_simple <- pred |>
   dplyr::select(predicted_tree_id,
                 predicted_tree_height = z,
                 predicted_tree_core_area = core_area) |>
-  mutate(predicted_tree_core = as.vector(predicted_tree_core_area))
+  mutate(predicted_tree_core_area = as.vector(predicted_tree_core_area))
 
 # For each predicted tree, get the attributes of the observed tree it was matched to. Same for
 # observed trees matched to predicted trees (two separate tables). It is necessary to have these two
@@ -64,38 +64,22 @@ sf::st_geometry(obs_simple) <- NULL
 sf::st_geometry(pred_simple) <- NULL
 
 pred_obs_match <- left_join(pred_simple,
-                                      obs_simple,
-                                      by = c("predicted_tree_id" = "matched_predicted_tree_id")
+                            obs_simple,
+                            by = c("predicted_tree_id" = "matched_predicted_tree_id")
 )
 
 obs_pred_match <- right_join(pred_simple,
-                                        obs_simple,
-                                        by = c("predicted_tree_id" = "matched_predicted_tree_id")
+                             obs_simple,
+                             by = c("predicted_tree_id" = "matched_predicted_tree_id")
 )
 
 
-# Sum the tree counts (number of predicted trees, number of predicted trees matched, number of observed trees, and number of observed trees matched)
-# across height classes
+# Sum the tree counts (number of predicted trees, number of predicted trees matched, number of
+# observed trees, and number of observed trees matched) across height classes
 
-over10_match = count_total_and_matched_trees(observed_predicted_match, predicted_observed_match, min_height = 10)
-over20_match = count_total_and_matched_trees(observed_predicted_match, predicted_observed_match, min_height = 20)
+over10_match = count_total_and_matched_trees(obs_pred_match, pred_obs_match, min_height = 10)
 
-##!!! resume here
-
-match_stats = bind_rows(over10_match, over20_match)
-
-# get the height difference of the matched trees
-trees_matched <- observed_predicted_match %>%
-  filter(!is.na(predicted_tree_id)) %>%
-  mutate(height_err = predicted_tree_height - observed_tree_height)
-
-output_dir = paste0(output_dir, "/matched_tree_lists/")
-output_file = paste0("trees_matched_",predicted_tree_dataset_name,"_",canopy_position,".csv")
-
-write_csv_to_dir(dataframe = trees_matched,
-                  output_dir = output_dir,
-                  output_file = output_file)
-
+## RESUME HERE. Can prob remove most of height accuracy metrics.
 
 # Get height accuracy metrics based on a table of heights of the observed trees and the heights of the matched predicted trees
 height_metrics_over10 <- height_accuracy_metrics(trees_matched = trees_matched %>% filter(observed_tree_internal_area == TRUE), min_height = 10)
