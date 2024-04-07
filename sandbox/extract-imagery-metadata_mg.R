@@ -82,4 +82,72 @@ image_count
 # this script again, and when it extracts the metadata for each EXIF dataset, your additional
 # metadata should be included.
 
-R/imagery-metadata-extraction_mg.R
+##########################
+
+#Working now to get the centroid latitude and longitude
+
+GPSLocation = exif$GPSPosition
+
+#splitting the list (was this step really necessary for my dataset? I'm not really sure this actually helped?)
+coordinates <- strsplit(GPSLocation, split = ";")
+
+# Separating the GPS from the whole exif file
+almostdone <- strsplit(unlist(coordinates), split = ",")
+
+#Creating a seperate dataframe with just the coordinates to call upon later
+isolatedcoordinates <- as.data.frame(do.call(rbind, almostdone))
+
+library(stringr)
+#Need to download this package as it will help with the following functions
+separator(df)
+install.packages("tidyverse")
+library(tidyverse)
+
+df2 = separate(exif,
+        col = GPSPosition,
+        into = c("lat", "long"),
+        sep = " " )
+#Here this worked, instead of doing by number of characters, did it by seperating at
+#the space in between the two (since the number of characters differed from row to row).
+
+print(df2)
+#printed out the new df that includes the "lat" and "long"
+
+#Now just need to find the centroid lat/long, which would be one set of lat/long
+#per flight/ per plot
+
+#when looking online, it says that the way to find the centroid lat/long is to
+#just use the average of the lat and the average of the long
+
+str(df2$lat)
+str(df2$long)
+
+#here checking what type of character the lat and long are within the
+#dataset, if it is not numeric, will need to change it.
+df2$lat = as.numeric(df2$lat)
+df2$long = as.numeric(df2$long)
+#had to convert to numeric numbers since it was thinking that the column was a
+#character.
+
+xcoordinate = mean(df2$lat, na.rm=TRUE)
+ycoordinate = mean(df2$long, na.rm= TRUE)
+#finding the mean of the lat and long, since this is all one mission,
+#it should give us the centroid lat/long, at least from what I researched.
+
+print(ycoordinate)
+print(xcoordinate)
+
+#Plan for the other categories moving forward:
+
+#Now that we have the centroid's coordinates (x,y), we can find the solar noon
+#using the solar noon calculator from NOAA, looks like based on this centroid,
+#the solar noon should be around: 13:01:18, keep this in mind and use to double
+#check results from my own calculations
+
+#Ok, I am very confused on what equation to use for the solar noon? There seems to be no
+#straight up equation out there.
+
+#For the earliest time and latest time, I am just finding the start (or restart times) for each mission
+# whereas the start times is the start for the mission overall (the first time flown for that plot)
+
+
