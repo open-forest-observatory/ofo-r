@@ -69,6 +69,12 @@ extract_file_type <- function(exif) {
   # Get image file format
   image_file_format <- unique(exif$FileType)
 
+  # Check if image file format is consistent
+  if (length(unique(image_file_format)) > 1) {
+    # If not identical, return a warning
+    warning("Image file format varies across images.")
+  }
+
   # Calculate mode file format
   mode_image_file_format <- names(sort(table(image_file_format), decreasing = TRUE)[1])
 
@@ -86,12 +92,6 @@ extract_metadata_sd <- function(exif) {
   # Extract image file type
   image_file_format <- extract_file_type(exif)
 
-  # Check if image file format is consistent
-  if (length(unique(image_file_format)) > 1) {
-    # If not identical, return a warning
-    warning("Image file format varies across images.")
-  }
-
   # Return metadata
   return(list(resolution_x = resolution_aspect_ratio$resolution_x,
               resolution_y = resolution_aspect_ratio$resolution_y,
@@ -103,4 +103,3 @@ extract_metadata_sd <- function(exif) {
 # Test the function
 metadata <- extract_metadata_sd(exif)
 metadata
-
