@@ -36,18 +36,18 @@ obs_matched = match_obs_to_pred(obs, pred,
 ### Compute match stats
 
 obs_simple = obs_matched |>
-  dplyr::select(observed_tree_id,
-                matched_predicted_tree_id,
-                observed_tree_height = z,
-                observed_tree_core_area = core_area) |>
-  mutate(observed_tree_core_area = as.vector(observed_tree_core_area)) |>
-  mutate(matched_predicted_tree_id = as.numeric(matched_predicted_tree_id)) #TODO: fix this type inconsistency further upstream. Where is ID getting stored as a character?
+  dplyr::select(obs_tree_id,
+                matched_pred_tree_id,
+                obs_tree_height = z,
+                obs_tree_core_area = core_area) |>
+  mutate(obs_tree_core_area = as.vector(obs_tree_core_area)) |>
+  mutate(matched_pred_tree_id = as.numeric(matched_pred_tree_id)) #TODO: fix this type inconsistency further upstream. Where is ID getting stored as a character?
 
 pred_simple <- pred |>
-  dplyr::select(predicted_tree_id,
-                predicted_tree_height = z,
-                predicted_tree_core_area = core_area) |>
-  mutate(predicted_tree_core_area = as.vector(predicted_tree_core_area))
+  dplyr::select(pred_tree_id,
+                pred_tree_height = z,
+                pred_tree_core_area = core_area) |>
+  mutate(pred_tree_core_area = as.vector(pred_tree_core_area))
 
 # For each predicted tree, get the attributes of the observed tree it was matched to. Same for
 # observed trees matched to predicted trees (two separate tables). It is necessary to have these two
@@ -65,12 +65,12 @@ sf::st_geometry(pred_simple) <- NULL
 
 pred_obs_match <- left_join(pred_simple,
                             obs_simple,
-                            by = c("predicted_tree_id" = "matched_predicted_tree_id")
+                            by = c("pred_tree_id" = "matched_pred_tree_id")
 )
 
 obs_pred_match <- right_join(pred_simple,
                              obs_simple,
-                             by = c("predicted_tree_id" = "matched_predicted_tree_id")
+                             by = c("pred_tree_id" = "matched_pred_tree_id")
 )
 
 
@@ -79,21 +79,12 @@ obs_pred_match <- right_join(pred_simple,
 
 over10_match = count_total_and_matched_trees(obs_pred_match, pred_obs_match, min_height = 10)
 
-## RESUME HERE. Can prob remove most of height accuracy metrics.
-
-# Get height accuracy metrics based on a table of heights of the observed trees and the heights of the matched predicted trees
-height_metrics_over10 <- height_accuracy_metrics(trees_matched = trees_matched %>% filter(observed_tree_internal_area == TRUE), min_height = 10)
-height_metrics_over20 <- height_accuracy_metrics(trees_matched = trees_matched %>% filter(observed_tree_internal_area == TRUE), min_height = 20)
-
-# Bind the two height categories and compute height MAE for both
-height_stats <- bind_rows(height_metrics_over10, height_metrics_over20) %>%
-  mutate(height_mae_percent = height_mae / height_mean_observed)
 
 # Compute sensitivity, precision, f_score for individual tree detection
-match_stats <- match_stats %>%
-  mutate(sensitivity = n_observed_matched_predicted / n_observed,
-          precision = n_predicted_matched_observed / n_predicted) %>%
-  mutate(f_score = 2 * sensitivity * precision / (sensitivity + precision))
+match_stats <- over10_match %>%
+  mutate(recall = n_obs_match_pred / n_obs,
+         precision = n_pred_match_obs / n_pred) %>%
+  mutate(f_score = 2 * recall * precision / (recall + precision))
 
 # Combine individual tree detection and height accuracy
 match_stats <- full_join(match_stats, height_stats, by = "height_cat")

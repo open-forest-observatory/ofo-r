@@ -10,13 +10,13 @@ prep_obs_map = function(obs, obs_bound, edge_buffer) {
   obs_bound_internal$core_area = TRUE
 
   # Assign an incremental unique ID to each observed tree
-  obs$observed_tree_id = 1:nrow(obs)
+  obs$obs_tree_id = 1:nrow(obs)
 
   # Assign the trees an attribute that designates whether they are within the internally-buffered region
   obs$core_area = sf::st_intersects(obs, obs_bound_internal, sparse = FALSE) |> as.vector()
 
   # Add an (empty for now) attribute that will store which predicted tree the observed tree is matched to
-  obs$matched_predicted_tree_id = NA
+  obs$matched_pred_tree_id = NA
 
   return(obs)
 
@@ -37,7 +37,7 @@ prep_pred_map = function(pred, obs_bound, edge_buffer) {
   pred = sf::st_intersection(pred, obs_bound)
 
   # Assign an incremental unique ID to each observed tree
-  pred$predicted_tree_id = 1:nrow(pred)
+  pred$pred_tree_id = 1:nrow(pred)
 
   # Assign the trees an attribute that designates whether they are within the internally-buffered region
   pred$core_area = sf::st_intersects(pred, obs_bound_internal, sparse = FALSE) |> as.vector()
@@ -50,14 +50,14 @@ match_obs_to_pred = function(obs, pred, search_distance_fun_intercept, search_di
 
   dist_mat <- sf::st_distance(obs, pred)
 
-  colnames(dist_mat) = pred$predicted_tree_id
-  rownames(dist_mat) = obs$observed_tree_id
+  colnames(dist_mat) = pred$pred_tree_id
+  rownames(dist_mat) = obs$obs_tree_id
 
   dist_graph = as.data.frame(as.table(dist_mat)) |>
     dplyr::mutate(Var1 = as.numeric(as.character(Var1)),
             Var2 = as.numeric(as.character(Var2))) %>%
-    dplyr::rename("observed_tree_id" = "Var1",
-            "predicted_tree_id" = "Var2",
+    dplyr::rename("obs_tree_id" = "Var1",
+            "pred_tree_id" = "Var2",
             "dist" = "Freq") %>%
     dplyr::mutate(dist = as.numeric(dist))
 
@@ -69,15 +69,15 @@ match_obs_to_pred = function(obs, pred, search_distance_fun_intercept, search_di
 
   # pull in each tree's height
   pred_height = pred |>
-    dplyr::select(predicted_tree_id, predicted_height = z)
+    dplyr::select(pred_tree_id, predicted_height = z)
   sf::st_geometry(pred_height) = NULL
 
   obs_height = obs %>%
-    select(observed_tree_id, observed_height = z)
+    select(obs_tree_id, observed_height = z)
   sf::st_geometry(obs_height) = NULL
 
-  dist_graph = left_join(dist_graph,obs_height)
-  dist_graph = left_join(dist_graph,pred_height)
+  dist_graph = left_join(dist_graph, obs_height)
+  dist_graph = left_join(dist_graph, pred_height)
 
   # Take every possible pairing of trees, filter to those within matching distance (horiz and vert)
   dist_graph = dist_graph |>
@@ -92,20 +92,20 @@ match_obs_to_pred = function(obs, pred, search_distance_fun_intercept, search_di
   # there are multiple potential matches, the shortest distance match is chosen, and the rest remain
   # eligible for matching
 
-  predicted_ids_matched = NULL
-  observed_ids_matched = NULL
+  pred_ids_matched = NULL
+  obs_ids_matched = NULL
 
   for (i in 1:nrow(dist_graph)) {
 
     row = dist_graph[i,]
-    if (row$predicted_tree_id %in% predicted_ids_matched || row$observed_tree_id %in% observed_ids_matched) {
+    if (row$pred_tree_id %in% pred_ids_matched || row$obs_tree_id %in% obs_ids_matched) {
       #already matched, no longer eligible
       next()
     } else {
       #this is a new match; record it
-      predicted_ids_matched = c(predicted_ids_matched, row$predicted_tree_id)
-      observed_ids_matched = c(observed_ids_matched, row$observed_tree_id)
-      obs[obs$observed_tree_id == row$observed_tree_id, "matched_predicted_tree_id"] = row$predicted_tree_id
+      pred_ids_matched = c(pred_ids_matched, row$pred_tree_id)
+      obs_ids_matched = c(obs_ids_matched, row$obs_tree_id)
+      obs[obs$obs_tree_id == row$obs_tree_id, "matched_pred_tree_id"] = row$pred_tree_id
     }
 
   }
@@ -129,22 +129,22 @@ match_obs_to_pred = function(obs, pred, search_distance_fun_intercept, search_di
 # internal negative buffered area*, so the sets of trees used for each is different.
 count_total_and_matched_trees = function(obs_pred_match, pred_obs_match, min_height) {
   
-  obs_pred_match_counts <- obs_pred_match %>%
-    filter(observed_tree_height >= min_height,
-           observed_tree_core_area == TRUE) %>%
+  obs_pred_match_counts <- obs_pred_match |>
+    filter(obs_tree_height >= min_height,
+           obs_tree_core_area == TRUE) %>%
     summarize(
-      n_observed_matched_predicted =
-        sum(!is.na(predicted_tree_id) & !is.na(observed_tree_id)),
-      n_observed = n()
+      n_obs_match_pred =
+        sum(!is.na(pred_tree_id) & !is.na(obs_tree_id)),
+      n_obs = n()
     )
   
   pred_obs_match_counts <- pred_obs_match %>%
-    filter(predicted_tree_height >= min_height,
-           predicted_tree_core_area == TRUE) %>%
+    filter(pred_tree_height >= min_height,
+           pred_tree_core_area == TRUE) %>%
     summarize(
-      n_predicted_matched_observed =
-        sum(!is.na(predicted_tree_id) & !is.na(observed_tree_id)),
-      n_predicted = n()
+      n_pred_match_obs =
+        sum(!is.na(pred_tree_id) & !is.na(obs_tree_id)),
+      n_pred = n()
     )
   
   matched_counts = cbind(obs_pred_match_counts, pred_obs_match_counts)
