@@ -1,5 +1,5 @@
-# Purpose: Prepare functions for tree map alignment using an objective function using MEE_based
-# alignemnt
+# Purpose: Prepare functions for tree map alignment using an objective function based on MEE-based
+# matching
 
 # Setup
 devtools::load_all()
@@ -24,68 +24,13 @@ vis2(sim$pred, sim$obs)
 obs = prep_obs_map(obs = sim$obs, obs_bound = sim$obs_bound, edge_buffer = 5)
 pred = prep_pred_map(pred = sim$pred, obs_bound = sim$obs_bound, edge_buffer = 5)
 
-# Match predicted and observed trees
+# Match predicted and observed trees, following logic in MEE paper
 
-obs_matched = match_obs_to_pred(obs, pred,
+obs_matched = match_obs_to_pred_mee(obs, pred,
                                 search_distance_fun_intercept = 1,
                                 search_distance_fun_slope = 0.1,
                                 search_height_proportion = 0.5)
 
 
-
-### Compute match stats
-
-obs_simple = obs_matched |>
-  dplyr::select(obs_tree_id,
-                matched_pred_tree_id,
-                obs_tree_height = z,
-                obs_tree_core_area = core_area) |>
-  mutate(obs_tree_core_area = as.vector(obs_tree_core_area)) |>
-  mutate(matched_pred_tree_id = as.numeric(matched_pred_tree_id)) #TODO: fix this type inconsistency further upstream. Where is ID getting stored as a character?
-
-pred_simple <- pred |>
-  dplyr::select(pred_tree_id,
-                pred_tree_height = z,
-                pred_tree_core_area = core_area) |>
-  mutate(pred_tree_core_area = as.vector(pred_tree_core_area))
-
-# For each predicted tree, get the attributes of the observed tree it was matched to. Same for
-# observed trees matched to predicted trees (two separate tables). It is necessary to have these two
-# separate tables because when assessing sensitivity (recall), we need to check how many of the
-# observed trees *within the internal negative buffered area* match to predicted trees *regardless
-# of whether they're in the internal negative buffered area*, and similarly for precision, we need
-# to check how many of the predicted trees *within the internal negative buffered area* match to
-# observed trees *regardless of whether they're in the internal negative buffered area*, so the sets
-# of trees used for each is different. Before joining observed and predicted trees, remove geometry
-# (convert to regular data frame) because coordinates are not necessary, and two spatial data frames
-# with different geometry cannot be left_joined as it is ambiguous which one to take the coordinates
-# from
-sf::st_geometry(obs_simple) <- NULL
-sf::st_geometry(pred_simple) <- NULL
-
-pred_obs_match <- left_join(pred_simple,
-                            obs_simple,
-                            by = c("pred_tree_id" = "matched_pred_tree_id")
-)
-
-obs_pred_match <- right_join(pred_simple,
-                             obs_simple,
-                             by = c("pred_tree_id" = "matched_pred_tree_id")
-)
-
-
-# Sum the tree counts (number of predicted trees, number of predicted trees matched, number of
-# observed trees, and number of observed trees matched) across height classes
-
-over10_match = count_total_and_matched_trees(obs_pred_match, pred_obs_match, min_height = 10)
-
-
-# Compute sensitivity, precision, f_score for individual tree detection
-match_stats <- over10_match %>%
-  mutate(recall = n_obs_match_pred / n_obs,
-         precision = n_pred_match_obs / n_pred) %>%
-  mutate(f_score = 2 * recall * precision / (recall + precision))
-
-# Combine individual tree detection and height accuracy
-match_stats <- full_join(match_stats, height_stats, by = "height_cat")
-match_stats$canopy_position <- canopy_position
+match_stats = compute_match_stats(pred, obs_matched)
+match_stats
