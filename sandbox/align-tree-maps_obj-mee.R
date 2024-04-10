@@ -27,9 +27,9 @@ pred = prep_pred_map(pred = sim$pred, obs_bound = sim$obs_bound, edge_buffer = 5
 # Match predicted and observed trees, following logic in MEE paper
 
 obs_matched = match_obs_to_pred_mee(obs, pred,
-                                search_distance_fun_intercept = 1,
-                                search_distance_fun_slope = 0.1,
-                                search_height_proportion = 0.5)
+                                    search_distance_fun_intercept = 1,
+                                    search_distance_fun_slope = 0.1,
+                                    search_height_proportion = 0.5)
 
 
 match_stats = compute_match_stats(pred, obs_matched)
