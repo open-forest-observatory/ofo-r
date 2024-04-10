@@ -22,6 +22,7 @@ print(nrow(sim$obs))
 vis2(sim$pred, sim$obs)
 
 obj_mean_dist_to_closest(sim$pred, sim$obs)
+obj_mee_matching(sim$pred, sim$obs)
 
 search_result = find_best_shift(sim$pred, sim$obs)
 

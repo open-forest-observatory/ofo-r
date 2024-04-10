@@ -162,7 +162,7 @@ compute_match_stats = function(pred, obs_matched, min_height = 10) {
   obs_simple = obs_matched |>
     dplyr::select(obs_tree_id, matched_pred_tree_id, obs_tree_height, obs_tree_core_area)
 
-  pred_simple <- pred |>
+  pred_simple = pred |>
     dplyr::select(pred_tree_id, pred_tree_height, pred_tree_core_area)
 
   # For each predicted tree, get the attributes of the observed tree it was matched to. Same for

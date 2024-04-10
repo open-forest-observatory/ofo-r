@@ -90,14 +90,9 @@ simulate_tree_maps = function(trees_per_ha = 250, trees_per_clust = 5, cluster_r
 
 }
 
-
-# Objective function: the mean x,y,z distance between each observed tree and its nearest predicted
-# tree
-obj_mean_dist_to_closest = function(pred, obs) {
-  # For each predicted point, get the closest observed point in x, y, z space
-
-  # Crop the predicted points to the x-y extent of the observed points +- 25%, so we don't waste
-  # time computing distances to points that are definitely not the closest
+# Crop the predicted points to the x-y extent of the observed points +- 25%, so we don't waste time
+# computing distances to points that are definitely not the closest
+crop_pred_to_obs = function(pred, obs) {
 
   xmin = min(obs$x)
   ymin = min(obs$y)
@@ -109,6 +104,15 @@ obj_mean_dist_to_closest = function(pred, obs) {
   pred_crop = pred |>
     dplyr::filter(dplyr::between(x, xmin - xrange / 4, xmax + xrange / 4) &
                     dplyr::between(y, ymin - yrange / 4, ymax + yrange / 4))
+}
+
+
+# Objective function: the mean x,y,z distance between each observed tree and its nearest predicted
+# tree
+obj_mean_dist_to_closest = function(pred, obs) {
+  # For each predicted point, get the closest observed point in x, y, z space
+
+  pred_crop = crop_pred_to_obs(pred, obs)
 
   # For each observed point, get the distance to every predicted point
   # TODO: Is it OK that multiple observed points may be matched to the same predicted point? Maybe
@@ -127,31 +131,29 @@ obj_mean_dist_to_closest = function(pred, obs) {
 }
 
 
-obj_mee_matching = function(pred, obs) {
+obj_mee_matching = function(pred, obs, obs_bound) {
 
-  # Crop the predicted points to the x-y extent of the observed points +- 25%, so we don't waste
-  # time computing distances to points that are definitely not the closest
+  pred_crop = crop_pred_to_obs(pred, obs)
 
-  xmin = min(obs$x)
-  ymin = min(obs$y)
-  xmax = max(obs$x)
-  ymax = max(obs$y)
-  xrange = xmax - xmin
-  yrange = ymax - ymin
+  # Prep predicted and observed tree maps for comparison
+  obs_prepped = prep_obs_map(obs, obs_bound = sim$obs_bound, edge_buffer = 5)
+  pred_prepped = prep_pred_map(pred_crop, obs_bound = sim$obs_bound, edge_buffer = 5)
 
-  pred_crop = pred |>
-    dplyr::filter(dplyr::between(x, xmin - xrange / 4, xmax + xrange / 4) &
-                    dplyr::between(y, ymin - yrange / 4, ymax + yrange / 4))
+  # Match predicted and observed trees, following logic in MEE paper, and compute the match stats
 
-  # TODO !! Perform observed tree map prep
+  obs_matched = match_obs_to_pred_mee(obs_prepped, pred_prepped,
+                                      search_distance_fun_intercept = 1,
+                                      search_distance_fun_slope = 0.1,
+                                      search_height_proportion = 0.5)
 
-  # TODO !! Determine matches
+  match_stats = compute_match_stats(pred_prepped, obs_matched)
+  match_stats
 
-  # TODO !! 
+  # Compute the objective function value as 1 - f_score
 
-
-
-
+  objective = 1 - match_stats$f_score
+  
+  return(objective)
 }
 
 
