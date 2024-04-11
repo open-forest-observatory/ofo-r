@@ -6,7 +6,7 @@ prep_obs_map = function(obs, obs_bound, edge_buffer) {
   obs = sf::st_as_sf(obs, coords = c("x", "y"))
 
   # Prep an internally buffered region (to accommodate edge uncertainty)
-  obs_bound_core = obs_bound |> sf::st_buffer(-edge_buffer)
+  obs_bound_core = sf::st_buffer(obs_bound, -edge_buffer)
   obs_bound_core$core_area = TRUE
 
   # Assign an incremental unique ID to each observed tree
@@ -104,7 +104,7 @@ match_obs_to_pred_mee = function(obs, pred, search_distance_fun_intercept, searc
   pred_ids_matched = NULL
   obs_ids_matched = NULL
 
-  for (i in 1:nrow(dist_graph)) {
+  for (i in seq_len(nrow(dist_graph))) {
 
     row = dist_graph[i,]
     if (row$pred_tree_id %in% pred_ids_matched || row$obs_tree_id %in% obs_ids_matched) {

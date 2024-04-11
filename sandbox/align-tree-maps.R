@@ -22,11 +22,24 @@ print(nrow(sim$obs))
 vis2(sim$pred, sim$obs)
 
 obj_mean_dist_to_closest(sim$pred, sim$obs)
-obj_mee_matching(sim$pred, sim$obs)
+obj_mee_matching(sim$pred, sim$obs, obs_bound = sim$obs_bound)
 
-search_result = find_best_shift(sim$pred, sim$obs)
-
+# Attempt to recover the best shift using "mean distance to closest" objective function
+search_result2 = find_best_shift(sim$pred, sim$obs,
+                                obs_bounds = NULL,
+                                #obs_bounds = sim$obs_bound,
+                                objective_fn = obj_mean_dist_to_closest,
+                                parallel = TRUE)
 print(search_result)
+
+# Attempt to recover the best shift using "MEE matching" objective function
+#library(profvis)
+#profvis({
+search_result = find_best_shift(sim$pred, sim$obs,
+                                obs_bounds = sim$obs_bound,
+                                objective_fn = obj_mee_matching,
+                                parallel = TRUE)
+#})
 
 
 # Try different random tree maps and see how often the shift is recovered
