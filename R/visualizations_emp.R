@@ -54,8 +54,7 @@ flightpath_visualization_emp = function (exif_file) {
 
     leaflet(totalexif) %>%
 
-    addTiles(
-      'https://tile.jawg.io/jawg-terrain/{z}/{x}/{y}{r}.png?access-token=cN5iUzB2bL1QMdeVwMJlflwXQweOoNTDOadGfoCbPf1rRM9FGPb4i1m4f2k5MaJP') %>%
+    addTiles() %>%
 
     setView(
       lng=(exif_centroid_lon),
