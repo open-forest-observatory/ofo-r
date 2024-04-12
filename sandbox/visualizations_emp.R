@@ -263,7 +263,7 @@ flightpath_visualization_emp = function (exif_file) {
 
   dataset_id = totalexif$dataset_id.x[1]
 
-  saveWidget(exif_MAP, file= paste0("C:\\Users\\emily\\Box\\imagery-metadata-dev\\extracted-metadata\\visualizations\\image-map_", dataset_id, ".html"))
+ saveWidget(exif_MAP, file= paste0("C:\\Users\\emily\\Box\\imagery-metadata-dev\\extracted-metadata\\visualizations\\image-map_", dataset_id, ".html"))
 
   return(exif_MAP)
 }
