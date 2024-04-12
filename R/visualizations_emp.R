@@ -1,27 +1,13 @@
 # This script defines image-level metadata extraction functions
 # Written by Emily Marie Purvis, last updated April 1 2024
 
-#### load necessary packages for running the function ####
-library(devtools)
-library(leaflet)
-library(leaflet.providers)
-library(tidyverse)
-library(lubridate)
-library(RColorBrewer)
-library(stringr)
-library(htmlwidgets)
-
 #### the visualization function ####
-
-# important note #1: the map base this function uses is from Jawg.terrain. In order to use Jawg Maps, you must register (https://www.jawg.io/lab). Once registered, your access token will be located here (https://www.jawg.io/lab/access-tokens) and you will access to all Jawg default maps (variants) and your own customized maps. See the leaflet providers github for more info (https://github.com/leaflet-extras/leaflet-providers/blob/master/README.md)
-
-# important note #2:
 
 #' Returns an interactive map that shows the drone flightpath with locations of images. Altitude above sea level and collection time color schemes can be toggled on and off.
 #'
 #' @param exif_file the exif filepath (before being prepared to pass to the functions in the wrapper)
 #'
-#' @return a data.frame of dataset_id, datatime_local, lat, lon, rtk_fix, accuracy_x, accuracy_y, camera_pitch, camera_roll, camera_yaw, exposure, aperture, iso, white_balance, received_image_path, and altitude_asl
+#' @return an interactive map that shows the drone flightpath with locations of images. Altitude above sea level and collection time color schemes can be toggled on and off.
 #'
 #' @examples
 #' flightpath_visualization_emp(exif_file)
@@ -125,10 +111,6 @@ flightpath_visualization_emp = function (exif_file) {
 
     addLayersControl(
       overlayGroups=c("Altitude above sea level", "Collection date and time"), options=layersControlOptions(collapsed=FALSE))
-
-  dataset_id = totalexif$dataset_id.x[1]
-
-  saveWidget(exif_MAP, file= paste0("C:\\Users\\emily\\Box\\imagery-metadata-dev\\extracted-metadata\\visualizations\\image-map_", dataset_id, ".html"))
 
   return(exif_MAP)
 }
