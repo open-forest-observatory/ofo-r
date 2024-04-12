@@ -27,7 +27,7 @@ extract_flight_speed = function(exif) {
 
 # Wrapper for Derek's metadata extraction functions. Preps the EXIF data for passing to the
 # extraction functions, then calls all the individual extraction functions to extract the respecive attributes.
-extract_metadata_dy = function(exif_filepath, plot_flightpath = FALSE) {
+extract_metadata_sd = function(exif_filepath, plot_flightpath = FALSE) {
 
   # Prep the EXIF data for extraction of metadata attributes
   exif = prep_exif(exif_filepath, plot_flightpath = plot_flightpath)
