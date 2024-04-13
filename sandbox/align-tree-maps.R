@@ -24,13 +24,21 @@ vis2(sim$pred, sim$obs)
 obj_mean_dist_to_closest(sim$pred, sim$obs)
 obj_mee_matching(sim$pred, sim$obs, obs_bound = sim$obs_bound)
 
-# Attempt to recover the best shift using "mean distance to closest" objective function
+# Attempt to recover the best shift using "mean distance to closest" objective function with grid
+# search
 search_result2 = find_best_shift(sim$pred, sim$obs,
                                 obs_bounds = NULL,
                                 #obs_bounds = sim$obs_bound,
                                 objective_fn = obj_mean_dist_to_closest,
                                 parallel = TRUE)
-print(search_result)
+print(search_result2)
+
+
+# Attempt to recover the best shift using PDAL ICP method
+icp_result = find_best_shift_icp(sim$pred, sim$obs)
+
+
+
 
 # Attempt to recover the best shift using "MEE matching" objective function
 #library(profvis)

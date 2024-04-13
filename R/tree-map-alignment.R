@@ -380,6 +380,89 @@ find_best_shift = function(pred, obs,
   }
 }
 
+
+# Find the overall best shift using PDAL's grid search
+find_best_shift_icp = function(pred, obs) {
+
+  # Keep track of execution time
+  tictoc::tic.clear()
+  tictoc::tic(quiet = TRUE)
+
+  # Business logic
+
+  coords_pred = pred |> select(X = x, Y = y, Z = z)
+  pred_las = lidR::LAS(coords_pred)
+
+  obs = sim$obs
+  coords_obs = obs |> select(X = x, Y = y, Z = z)
+  obs_unaligned_las = lidR::LAS(coords_obs)
+
+  # Write to temp dir
+  pred_file = tempfile(fileext = ".las")
+  obs_unaligned_file = tempfile(fileext = ".las")
+  obs_aligned_file = tempfile(fileext = ".las")
+  lidR::writeLAS(pred_las, pred_file)
+  lidR::writeLAS(obs_unaligned_las, obs_unaligned_file)
+
+  # Create PDAL pipeline for filter.icp algorithm
+  pipeline = c(
+    "[",
+      paste0('"', pred_file, '"', ","),
+      paste0('"', obs_unaligned_file, '"', ","),
+      "{",
+        '"type":"filters.icp"',
+        # '"method":"rigid"',
+        "},",
+      paste0('"', obs_aligned_file, '"'),
+    "]"
+  )
+
+  pipeline_file = tempfile(fileext = ".json")
+  writeLines(pipeline, pipeline_file)
+
+  cmd_call = paste0("pdal pipeline ", pipeline_file)
+  cmd_call
+  system(cmd_call)
+
+  obs_aligned_las = lidR::readLAS(obs_aligned_file)
+
+  # Get the xyz coords
+  obs_aligned_sf = sf::st_as_sf(obs_aligned_las)
+  obs_aligned_coords = sf::st_coordinates(obs_aligned_sf)
+
+  obs_aligned_coords_conformed = obs_aligned_coords |>
+    dplyr::as_tibble() |>
+    dplyr::select(x = X, y = Y, z = Z)
+
+  obs_unaligned_sf = obs_unaligned_las |>
+    sf::st_as_sf()
+
+  obs_unaligned_coords_conformed = obs_unaligned_sf |>
+    sf::st_coordinates() |>
+    dplyr::as_tibble() |>
+    dplyr::select(x = X, y = Y, z = Z)
+
+  shifts = obs_unaligned_coords_conformed - obs_aligned_coords_conformed
+
+  # Get the number of trees in the observed dataset
+  n_trees_obs = nrow(obs)
+  # Get the time taken
+  toc = tictoc::toc()
+  time_taken = toc$toc - toc$tic
+
+  # Return the best shift and the ancillary data
+  result = data.frame(shift_x = mean(shifts$x),
+                      shift_y = mean(shifts$y),
+                      n_trees_obs = n_trees_obs,
+                      time_taken = time_taken)
+
+  row.names(result) = NULL
+
+  # Return the best shift
+  return(result)
+
+}
+
 # Generate one pair of random tree maps (pred and observed) with observed shifted a known amt, test
 # alignment, and return the result
 make_map_and_align = function(method, ...) {
