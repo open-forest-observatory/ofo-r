@@ -82,9 +82,8 @@ image_count
 # this script again, and when it extracts the metadata for each EXIF dataset, your additional
 # metadata should be included.
 
-##########################
 
-#Working now to get the centroid latitude and longitude
+#START CODE FOR CENTROID LAT/LONG
 
 GPSLocation = exif$GPSPosition
 
@@ -100,6 +99,7 @@ isolatedcoordinates <- as.data.frame(do.call(rbind, almostdone))
 library(stringr)
 #Need to download this package as it will help with the following functions
 separator(df)
+
 install.packages("tidyverse")
 library(tidyverse)
 
@@ -113,9 +113,6 @@ df2 = separate(exif,
 print(df2)
 #printed out the new df that includes the "lat" and "long"
 
-#Now just need to find the centroid lat/long, which would be one set of lat/long
-#per flight/ per plot
-
 #when looking online, it says that the way to find the centroid lat/long is to
 #just use the average of the lat and the average of the long
 
@@ -124,30 +121,61 @@ str(df2$long)
 
 #here checking what type of character the lat and long are within the
 #dataset, if it is not numeric, will need to change it.
+
 df2$lat = as.numeric(df2$lat)
 df2$long = as.numeric(df2$long)
+
 #had to convert to numeric numbers since it was thinking that the column was a
 #character.
 
 xcoordinate = mean(df2$lat, na.rm=TRUE)
 ycoordinate = mean(df2$long, na.rm= TRUE)
+
 #finding the mean of the lat and long, since this is all one mission,
 #it should give us the centroid lat/long, at least from what I researched.
 
 print(ycoordinate)
 print(xcoordinate)
 
-#Plan for the other categories moving forward:
+#END CODE FOR CENTOID CALCULATIONS
 
-#Now that we have the centroid's coordinates (x,y), we can find the solar noon
-#using the solar noon calculator from NOAA, looks like based on this centroid,
-#the solar noon should be around: 13:01:18, keep this in mind and use to double
-#check results from my own calculations
 
-#Ok, I am very confused on what equation to use for the solar noon? There seems to be no
-#straight up equation out there.
 
-#For the earliest time and latest time, I am just finding the start (or restart times) for each mission
-# whereas the start times is the start for the mission overall (the first time flown for that plot)
-#
+#START CODE FOR SOLAR NOON CALCULATIONS
+
+#found the package suntools which will calculate the solar noon, this way we do not have to do
+#any crazy calculations, it is all included in the function and only needs lat/long and the time.
+
+install.packages("suntools")
+library("suntools")
+
+#Here we are seperating the date from the time, since we only need the date to run this function
+datetime <- df2[1, "capture_datetime"]
+datetime
+datetimedf = separate(exif,
+               col = capture_datetime,
+               into = c("date", "time"),
+               sep = " " )
+datetimedf
+date <- datetimedf[1, 143]$date
+date
+#now using the newly seperated date column and using the first row to get the date to be used in the function below
+
+#used the centroid calculated in the above code chunk for the lat/long
+solarnoon <- solarnoon(
+  matrix(c(xcoordinate, ycoordinate), nrow = 1),
+  as.POSIXct(date),
+  POSIXct.out=TRUE
+)
+
+solarnoon
+#This gives the solar noon as a fraction of the day as well as the datetime.
+
+#END CODE FOR SOLARNOON CALCULATION
+
+
+
+
+
+
 
