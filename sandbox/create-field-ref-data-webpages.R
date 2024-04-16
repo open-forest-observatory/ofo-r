@@ -14,6 +14,7 @@ datadir = readLines("sandbox/data-dirs/derek-fieldref-laptop.txt", n = 1)
 # ---- File path constants
 
 OVERVIEW_DATA_DIR = "~/repos/ofo-website-3/static/field-data-overviews/"
+BASE_OFO_URL = "https://openforestobservatory.netlify.app"
 
 
 
@@ -173,9 +174,13 @@ plotproj = plotproj |>
          ba_ha = round(ba_ha, 0),
          min_ht_ohvis = round(min_ht_ohvis, 2),
          min_dbh = round(min_dbh, 1))
-  
-# Select relevant columns to display
+
+# Create links to project and dataset pages
 d = plotproj |>
+  mutate(plot_id = paste0('<a href="', BASE_OFO_URL, "data/field/plot/", plot_id, ".html", '">', plot_id, "</a>"))
+
+# Select relevant columns to display
+d = d |>
   select("ID" = plot_id,
          "Area (ha)" = area_ha_sf,
          "N Trees" = n_trees,
@@ -189,14 +194,28 @@ d = plotproj |>
          "License" = license_short)
 d
 
-dt = datatable(d, rownames = FALSE, options = list(paging = FALSE, scrollY = "800px"))
+dt = datatable(d, rownames = FALSE, options = list(paging = FALSE, scrollY = "100%",
+                                                   escape = FALSE,
+                                                   initComplete = JS(
+    "function(settings, json) {",
+    "$('body').css({'font-family': 'Arial'});",
+    "}"
+  )
+)) |>
+  formatStyle(names(d), lineHeight = '100%',
+                        padding = '4px 15px 4px 15px')
+
+
+
 dt
 
 htmlwidgets::saveWidget(dt, file.path(OVERVIEW_DATA_DIR, "field-plot-data-table.html"))
 
 
 
-
+dt = datatable(d, rownames = FALSE, options = list(escape = FALSE))
+dt
+## Need to get links to work
 
 
 
