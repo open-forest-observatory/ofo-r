@@ -12,11 +12,29 @@
 
 
 
-detect_trees <- function(chm_true,ws) {
+detect_trees <- function(chm,ws) {
 
   algorithm = lmf(ws = ws)
 
-  lidR::find_trees(chm, algorithm)
+  function (chm, algorithm, uniqueness = "incremental")
+  {
+    res <- locate_trees(las, algorithm, uniqueness)
+    if (is(res, "sf")) {
+      if (nrow(res) == 0L) {
+        coords <- matrix(0, ncol = 2)
+        data <- data.frame(treeID = integer(1), Z = numeric(1))
+        res <- sp::SpatialPointsDataFrame(coords, data,
+                                          proj4string = as(st_crs(las), "CRS"))
+        res <- res[0, ]
+      }
+      else {
+        res <- sf::st_zm(res)
+        res <- sf::as_Spatial(res)
+      }
+    }
+    return(res)
+  }
+
 
 
 
