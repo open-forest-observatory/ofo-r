@@ -90,14 +90,9 @@ simulate_tree_maps = function(trees_per_ha = 250, trees_per_clust = 5, cluster_r
 
 }
 
-
-# Objective function: the mean x,y,z distance between each observed tree and its nearest predicted
-# tree
-obj_mean_dist_to_closest = function(pred, obs) {
-  # For each predicted point, get the closest observed point in x, y, z space
-
-  # Crop the predicted points to the x-y extent of the observed points +- 25%, so we don't waste
-  # time computing distances to points that are definitely not the closest
+# Crop the predicted points to the x-y extent of the observed points +- 25%, so we don't waste time
+# computing distances to points that are definitely not the closest
+crop_pred_to_obs = function(pred, obs) {
 
   xmin = min(obs$x)
   ymin = min(obs$y)
@@ -109,6 +104,15 @@ obj_mean_dist_to_closest = function(pred, obs) {
   pred_crop = pred |>
     dplyr::filter(dplyr::between(x, xmin - xrange / 4, xmax + xrange / 4) &
                     dplyr::between(y, ymin - yrange / 4, ymax + yrange / 4))
+}
+
+
+# Objective function: the mean x,y,z distance between each observed tree and its nearest predicted
+# tree. Note that obs_bound is not used by this objective function logic, but it needs to be included for compatibility with objective functions that do require it.
+obj_mean_dist_to_closest = function(pred, obs, obs_bound) {
+  # For each predicted point, get the closest observed point in x, y, z space
+
+  pred_crop = crop_pred_to_obs(pred, obs)
 
   # For each observed point, get the distance to every predicted point
   # TODO: Is it OK that multiple observed points may be matched to the same predicted point? Maybe
@@ -127,31 +131,31 @@ obj_mean_dist_to_closest = function(pred, obs) {
 }
 
 
-obj_mee_matching = function(pred, obs) {
+obj_mee_matching = function(pred, obs, obs_bound) {
 
-  # Crop the predicted points to the x-y extent of the observed points +- 25%, so we don't waste
-  # time computing distances to points that are definitely not the closest
+  pred_crop = crop_pred_to_obs(pred, obs)
 
-  xmin = min(obs$x)
-  ymin = min(obs$y)
-  xmax = max(obs$x)
-  ymax = max(obs$y)
-  xrange = xmax - xmin
-  yrange = ymax - ymin
+  # Prep predicted and observed tree maps for comparison
+  obs_prepped = prep_obs_map(obs, obs_bound = obs_bound, edge_buffer = 5)
+  pred_prepped = prep_pred_map(pred_crop, obs_bound = obs_bound, edge_buffer = 5)
 
-  pred_crop = pred |>
-    dplyr::filter(dplyr::between(x, xmin - xrange / 4, xmax + xrange / 4) &
-                    dplyr::between(y, ymin - yrange / 4, ymax + yrange / 4))
+  # Match predicted and observed trees, following logic in MEE paper, and compute the match stats
 
-  # TODO !! Perform observed tree map prep
+  obs_matched = match_obs_to_pred_mee(obs_prepped, pred_prepped,
+                                      search_distance_fun_intercept = 1,
+                                      search_distance_fun_slope = 0.1,
+                                      search_height_proportion = 0.5)
 
-  # TODO !! Determine matches
+  match_stats = compute_match_stats(pred_prepped, obs_matched)
+  f_score = match_stats$f_score
 
-  # TODO !! 
+  # If no trees match, return the worst possible score
+  if(is.nan(f_score) | is.na(f_score)) f_score = 0
 
+  # Compute the objective function value as 1 - f_score
+  objective = 1 - f_score
 
-
-
+  return(objective)
 }
 
 
@@ -159,12 +163,18 @@ obj_mee_matching = function(pred, obs) {
 # Test a given x-y shift and compute the objective function for it, using the objective
 # function supplied to it
 # transform_params: contains (in order): x_shift, y_shift
-eval_shift = function(transform_params, pred, obs, objective_fn) {
+eval_shift = function(transform_params, pred, obs, obs_bound, objective_fn) {
 
   obs_shifted = obs |>
     dplyr::mutate(x = obs$x + transform_params[[1]], y = obs$y + transform_params[[2]])
 
-  objective = objective_fn(pred, obs_shifted)
+  # Shift the obs bound by the same amount the obs tree map is being shifted
+  shift_df = data.frame(x = transform_params[[1]], y = transform_params[[2]])
+  shift_geom = sf::st_as_sf(shift_df, coords = c("x", "y"))
+  obs_bound_shifted = obs_bound + shift_geom
+  obs_bound_shifted = sf::st_as_sf(obs_bound_shifted, crs = sf::st_crs(obs_bound))
+
+  objective = objective_fn(pred, obs_shifted, obs_bound_shifted)
 
   return(objective)
 }
@@ -172,7 +182,9 @@ eval_shift = function(transform_params, pred, obs, objective_fn) {
 # Function to find the best shift, using a grid search
 # base_shift_x and base_shift_y: the x and y shifts to center the grid search around (e.g., if a
 # previous iteration of the search identified a set of coarse shifts)
-find_best_shift_grid = function(pred, obs, objective_fn,
+find_best_shift_grid = function(pred, obs,
+                                obs_bounds = NULL,
+                                objective_fn,
                                 search_window = 50,
                                 search_increment = 2,
                                 base_shift_x = 0,
@@ -183,16 +195,33 @@ find_best_shift_grid = function(pred, obs, objective_fn,
   # Make sure the observed tree map is within the predicted tree map
   # Approach: make predicted and observed tree maps into spatial 'sf' objects, get the bounds of
   # each as convex hulls, and then check if the observed tree map is fully within the bounds of the
-  # predicted.
+  # predicted. Note the the bounds here are different than the manually provided bounds associated with the specific stem map
 
   obs_w_base_shift = obs
   obs_w_base_shift$x = obs$x + base_shift_x
   obs_w_base_shift$y = obs$y + base_shift_y
 
-  obs_bounds = obs_w_base_shift |>
-    sf::st_as_sf(coords = c("x", "y")) |>
-    sf::st_union() |>
-    sf::st_convex_hull()
+  if (is.null(obs_bounds)) {
+    # If no obs_bound provided, compute one from the tree points
+    obs_bounds = obs_w_base_shift |>
+      sf::st_as_sf(coords = c("x", "y")) |>
+      sf::st_union() |>
+      sf::st_convex_hull() |>
+      sf::st_as_sf()
+  } else {
+
+    # If an observed bound is provided, shift it by the same amount as the trial shift being applied to the observed stem map, then make sure it's in the same CRS
+
+    shift_df = data.frame(x = base_shift_x, y = base_shift_y)
+    shift_geom = sf::st_as_sf(shift_df, coords = c("x", "y"))
+    obs_bounds_shifted = obs_bounds + shift_geom
+    obs_bounds_shifted = sf::st_as_sf(obs_bounds_shifted, crs = sf::st_crs(obs_bounds))
+
+    # Ensure in the same CRS, if relevant
+    if (!is.na(sf::st_crs(obs_bounds))) {
+      obs_bounds = sf::st_transform(obs_bounds, sf::st_crs(pred_bounds))
+    }
+  }
 
   pred_bounds = pred |>
     sf::st_as_sf(coords = c("x", "y")) |>
@@ -240,9 +269,6 @@ find_best_shift_grid = function(pred, obs, objective_fn,
   # projection, assign tree IDs, determine whether in internal buffer, etc)
 
 
-
-
-
   # Define the shifts to test
   shifts_x = seq(-search_window + base_shift_x, search_window + base_shift_x, search_increment)
   shifts_y = seq(-search_window + base_shift_y, search_window + base_shift_y, search_increment)
@@ -254,10 +280,12 @@ find_best_shift_grid = function(pred, obs, objective_fn,
 
   if (parallel) {
     future::plan(future::multicore, workers = parallelly::availableCores())
+    shifts$objective = furrr::future_map_dbl(transform_params, eval_shift, pred, obs, obs_bound = obs_bounds, objective_fn)
+    future::plan(future::sequential)
+  } else {
+    shifts$objective = purrr::map_dbl(transform_params, eval_shift, pred, obs, obs_bound = obs_bounds, objective_fn)
   }
 
-  shifts$objective = furrr::future_map_dbl(transform_params, eval_shift, pred, obs, objective_fn)
-  future::plan(future::sequential)
 
   # Get the shift that minimized the objective function
   best_shift = shifts[shifts$objective == min(shifts$objective), ]
@@ -273,6 +301,7 @@ find_best_shift_grid = function(pred, obs, objective_fn,
 # Find the overall best shift using the specified method.
 # Currently only works for grid search
 find_best_shift = function(pred, obs,
+                           obs_bounds,
                            objective_fn = obj_mean_dist_to_closest,
                            method = "grid",
                            parallel = TRUE) {
@@ -284,17 +313,21 @@ find_best_shift = function(pred, obs,
     tictoc::tic(quiet = TRUE)
 
     # Find the best shift using a grid search, starting wide and coarse
-    result_coarse = find_best_shift_grid(pred, obs, objective_fn,
+    result_coarse = find_best_shift_grid(pred = pred, obs = obs,
+                                         obs_bounds = obs_bounds,
+                                         objective_fn = objective_fn,
                                          search_window = 50,
-                                         search_increment = 2,
+                                         search_increment = 2, # TODO TEMP was 2
                                          return_full_grid = TRUE,
                                          parallel = parallel)
 
     # Centered around the best coarse shift, do a finer grid search, starting with the best shift
     # from the coarse iteration
-    result_fine = find_best_shift_grid(pred, obs, objective_fn,
+    result_fine = find_best_shift_grid(pred = pred, obs = obs,
+                                       obs_bounds = obs_bounds,
+                                       objective_fn = objective_fn,
                                        search_window = 3,
-                                       search_increment = 0.25,
+                                       search_increment = 0.25, # TODO TEMP was 0.25
                                        base_shift_x = result_coarse$best_shift$shift_x,
                                        base_shift_y = result_coarse$best_shift$shift_y,
                                        parallel = parallel)
@@ -307,6 +340,8 @@ find_best_shift = function(pred, obs,
 
     # Get the mean obj value of the alternatives from the first iteration
     median_obj = median(shifts$objective, na.rm = TRUE)
+
+
     # Get the number of shifts tried
     n_shifts_coarse = sum(!is.na(shifts$objective))
     # Get the number of trees in the observed dataset
@@ -345,9 +380,92 @@ find_best_shift = function(pred, obs,
   }
 }
 
+
+# Find the overall best shift using PDAL's grid search
+find_best_shift_icp = function(pred, obs) {
+
+  # Keep track of execution time
+  tictoc::tic.clear()
+  tictoc::tic(quiet = TRUE)
+
+  # Business logic
+
+  coords_pred = pred |> select(X = x, Y = y, Z = z)
+  pred_las = lidR::LAS(coords_pred)
+
+  obs = sim$obs
+  coords_obs = obs |> select(X = x, Y = y, Z = z)
+  obs_unaligned_las = lidR::LAS(coords_obs)
+
+  # Write to temp dir
+  pred_file = tempfile(fileext = ".las")
+  obs_unaligned_file = tempfile(fileext = ".las")
+  obs_aligned_file = tempfile(fileext = ".las")
+  lidR::writeLAS(pred_las, pred_file)
+  lidR::writeLAS(obs_unaligned_las, obs_unaligned_file)
+
+  # Create PDAL pipeline for filter.icp algorithm
+  pipeline = c(
+    "[",
+      paste0('"', pred_file, '"', ","),
+      paste0('"', obs_unaligned_file, '"', ","),
+      "{",
+        '"type":"filters.icp"',
+        # '"method":"rigid"',
+        "},",
+      paste0('"', obs_aligned_file, '"'),
+    "]"
+  )
+
+  pipeline_file = tempfile(fileext = ".json")
+  writeLines(pipeline, pipeline_file)
+
+  cmd_call = paste0("pdal pipeline ", pipeline_file)
+  cmd_call
+  system(cmd_call)
+
+  obs_aligned_las = lidR::readLAS(obs_aligned_file)
+
+  # Get the xyz coords
+  obs_aligned_sf = sf::st_as_sf(obs_aligned_las)
+  obs_aligned_coords = sf::st_coordinates(obs_aligned_sf)
+
+  obs_aligned_coords_conformed = obs_aligned_coords |>
+    dplyr::as_tibble() |>
+    dplyr::select(x = X, y = Y, z = Z)
+
+  obs_unaligned_sf = obs_unaligned_las |>
+    sf::st_as_sf()
+
+  obs_unaligned_coords_conformed = obs_unaligned_sf |>
+    sf::st_coordinates() |>
+    dplyr::as_tibble() |>
+    dplyr::select(x = X, y = Y, z = Z)
+
+  shifts = obs_unaligned_coords_conformed - obs_aligned_coords_conformed
+
+  # Get the number of trees in the observed dataset
+  n_trees_obs = nrow(obs)
+  # Get the time taken
+  toc = tictoc::toc()
+  time_taken = toc$toc - toc$tic
+
+  # Return the best shift and the ancillary data
+  result = data.frame(shift_x = mean(shifts$x),
+                      shift_y = mean(shifts$y),
+                      n_trees_obs = n_trees_obs,
+                      time_taken = time_taken)
+
+  row.names(result) = NULL
+
+  # Return the best shift
+  return(result)
+
+}
+
 # Generate one pair of random tree maps (pred and observed) with observed shifted a known amt, test
 # alignment, and return the result
-make_map_and_test_alignment = function(method, ...) {
+make_map_and_align = function(method, ...) {
 
   # Simulate a predicted and observed tree map with a known offset
   sim = simulate_tree_maps(shift_x = 12, shift_y = 21, ...)
@@ -357,7 +475,9 @@ make_map_and_test_alignment = function(method, ...) {
 
   # Find the optimal shift, unparallelized because it is more efficient to parallelize over multiple
   # runs of the current function
-  result = find_best_shift(sim$pred, sim$obs, method = method, parallel = FALSE)
+  result = find_best_shift(sim$pred, sim$obs,
+                           obs_bounds = sim$obs_bound,
+                           method = method, parallel = FALSE)
 
   # Determine if the x-y shift was successfully recovered, using a hard-coded tolerance of +- 3 m in both dimensions
   result$shift_recovered = result$shift_x < -12 + 3 &
@@ -381,10 +501,10 @@ calc_alignment_success_rate = function(n_tries = 4,
 
   if (parallel) future::plan(future::multicore, workers = parallelly::availableCores())
   # This looks convoluted (and it is), but it is the cleanest way I could find to pass the "..."
-  # parameter (essentially R's **kwargs) to 'make_map_and_test_alignment' and also run it for
+  # parameter (essentially R's **kwargs) to 'make_map_and_align' and also run it for
   # multiple random iterations in parallel
   shifts = furrr::future_map(1:n_tries,
-                             function(x, method, ...) make_map_and_test_alignment(method = method, ...), #nolint
+                             function(x, method, ...) make_map_and_align(method = method, ...), #nolint
                              method = method,
                              ...,
                              .options = furrr::furrr_options(seed = TRUE))
