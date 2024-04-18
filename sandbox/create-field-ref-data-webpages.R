@@ -223,7 +223,7 @@ htmlwidgets::saveWidget(dt, file.path(OVERVIEW_DATA_DIR, "field-plot-data-table.
 
 dt = datatable(d, rownames = FALSE, escape = FALSE)
 dt
-## Need to get links to work
+
 
 
 
@@ -253,9 +253,9 @@ trees_vis = trees_clean |>
   mutate(size = ifelse(is.na(dbh), height, dbh))
 
 
-# --- Plot map
+# --- Stem maps for each field plot
 
-plot_foc = plots[1, ]
+plot_foc = plots[100, ]
 
 bound_foc = bounds |>
   filter(plot_id == plot_foc$plot_id)
