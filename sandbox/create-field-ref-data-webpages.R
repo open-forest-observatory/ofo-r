@@ -60,6 +60,7 @@ plots = plots |>
 trees = trees |>
   mutate(plot_id = str_pad(plot_id, 4, pad = "0", side = "left"))
 
+
 # --- Data checking
 
 # Make sure there's a boundary for every plot in the tabular data
@@ -91,6 +92,18 @@ trees = trees |>
 trees_clean = trees |>
   filter((is.na(dbh) | dbh < 500) & (is.na(height) | height < 100))
   
+# Pull in 4-letter USDA species codes
+species_codes = species_codes |>
+  mutate(code_numeric = as.character(code_numeric)) |>
+  mutate(sp_code = ifelse(!is.na(code_usda), code_usda, code_supp))
+trees_clean = trees_clean |>
+  mutate(species = as.character(species)) |>
+  left_join(species_codes, by = join_by(species == code_numeric))
+  
+# If the tree is dead, set species to SNAG
+trees_clean = trees_clean |>
+  mutate(species = ifelse(live_dead == "D", "SNAG", species))
+  
 # Summarize tree data at the plot level
 tree_summ = trees_clean |>
   group_by(plot_id) |>
@@ -110,9 +123,9 @@ trees_w_summ = left_join(tree_summ, trees_clean, by = "plot_id") |>
 
 # Compute top tree species by BA, or if no BA, by ht (long format)
 top_species = trees_w_summ |>
-  filter(!is.na(species)) |>
-  mutate(species = as.character(species)) |>
-  group_by(plot_id, species) |>
+  filter(!is.na(sp_code)) |>
+  mutate(species = as.character(sp_code)) |>
+  group_by(plot_id, sp_code) |>
   summarize(n_trees_sp = n(),
             ba_sp = sum(ba),
             ht_sp = sum(height),
@@ -127,21 +140,13 @@ top_species = trees_w_summ |>
   arrange(plot_id, desc(n_trees_sp)) |>
   slice_head(n = 3)
 
-# Prepare species code data for joining
-species_codes = species_codes |>
-  mutate(code_numeric = as.character(code_numeric)) |>
-  mutate(sp_code = ifelse(!is.na(code_usda), code_usda, code_supp))
-
-top_species = top_species |>
-  left_join(species_codes, by = join_by(species == code_numeric))
-
 # Merge species USDA code and proportion into one column
 # sp_w_prop_alt is a nicer but wider version of sp_w_prop
 top_species = top_species |>
   mutate(sp_w_prop = paste0(prop_trees_sp, "-", sp_code),
          sp_w_prop_alt = paste0(sp_code, " (", prop_trees_sp, "%)")) |>
   group_by(plot_id) |>
-  summarize(top_species = paste(sp_w_prop, collapse = ","),
+  summarize(top_species = paste(sp_w_prop_alt, collapse = ", "),
             top_one_species = first(sp_w_prop_alt))
 
 
@@ -150,6 +155,9 @@ top_species = top_species |>
 # If plot-level min_dbh_ohvis is missing, use min_dbh
 plots = plots |>
   mutate(min_ht_ohvis = ifelse(is.na(min_ht_ohvis), min_ht, min_ht_ohvis))
+
+# Compute plot centroids
+plot_centroids = sf::st_centroid(bounds)
 
 
 # -- Make a HTML data table of plot attributes
@@ -194,14 +202,12 @@ d = d |>
          "License" = license_short)
 d
 
-dt = datatable(d, rownames = FALSE, options = list(paging = FALSE, scrollY = "100%",
-                                                   escape = FALSE,
-                                                   initComplete = JS(
-    "function(settings, json) {",
+formatJS = JS("function(settings, json) {",
     "$('body').css({'font-family': 'Arial'});",
-    "}"
-  )
-)) |>
+    "}")
+
+dt = datatable(d, rownames = FALSE, escape = FALSE, options = list(paging = FALSE, scrollY = "100%",
+                                                   initComplete = formatJS)) |>
   formatStyle(names(d), lineHeight = '100%',
                         padding = '4px 15px 4px 15px')
 
@@ -212,17 +218,15 @@ dt
 htmlwidgets::saveWidget(dt, file.path(OVERVIEW_DATA_DIR, "field-plot-data-table.html"))
 
 
+#TODO: make 0 BA be NA (for FOCAL plots)
 
-dt = datatable(d, rownames = FALSE, options = list(escape = FALSE))
+
+dt = datatable(d, rownames = FALSE, escape = FALSE)
 dt
 ## Need to get links to work
 
 
 
-
-
-# Compute plot centroids
-plot_centroids = sf::st_centroid(bounds)
 
 # Make leaflet map of all field plots
 m = leaflet() %>%
@@ -236,3 +240,56 @@ m = leaflet() %>%
 m
 
 htmlwidgets::saveWidget(m, file.path(OVERVIEW_DATA_DIR, "field-plot-map.html"))
+
+
+# ---- Create individual plot pages (tree-level detail)
+
+# Prep tree-level data
+trees_vis = trees_clean |>
+  # Bring in plot-level data
+  left_join(plotproj, by = "plot_id") |>
+  # If there is no DBH, use height for size plotting
+  # TODO: Make this check whether the whole plot had height
+  mutate(size = ifelse(is.na(dbh), height, dbh))
+
+
+# --- Plot map
+
+plot_foc = plots[1, ]
+
+bound_foc = bounds |>
+  filter(plot_id == plot_foc$plot_id)
+
+trees_foc = trees_vis |>
+  filter(plot_id == plot_foc$plot_id)
+
+trees_prepped = st_as_sf(trees_foc, coords = c("tree_lon", "tree_lat"), crs = 4326) |>
+  # largest trees on top
+  arrange(-size)
+
+pal = colorFactor("viridis", trees_prepped$sp_code)
+
+rescale_size = function(x, min_size = 5, max_size = 20) {
+  x = (x - min(x)) / (max(x) - min(x))
+  x = x * (max_size - min_size) + min_size
+  return(x)
+}
+
+m = leaflet() %>%
+  addPolygons(data = bound_foc, group = "bounds") |>
+  addProviderTiles(providers$Esri.WorldImagery, group = "Imagery",
+                   options = providerTileOptions(minZoom = 1, maxZoom = 20)) |>
+  addCircleMarkers(data = trees_prepped,
+                   stroke = FALSE,
+                   fillOpacity = 1,
+                   color = pal(trees_prepped$sp_code),
+                   radius = rescale_size(trees_prepped$dbh, 5, 20)) |>
+  hideGroup("Imagery") |>
+  #groupOptions("bounds", zoomLevels = 13:20) |>
+  addLayersControl(overlayGroups = c("Imagery"),
+                   options = layersControlOptions(collapsed = FALSE)) |>
+  addLegend(pal = pal, values = trees_prepped$sp_code, title = "Species", opacity = 1)
+m
+
+# TODO: allow interpolation of zoom level beyond the level provided by the data source:
+# https://gis.stackexchange.com/questions/332823/scaling-tiles-for-missing-zoom-levels-in-leaflet
