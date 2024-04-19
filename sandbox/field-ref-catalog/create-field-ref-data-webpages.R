@@ -14,6 +14,8 @@ datadir = readLines("sandbox/data-dirs/derek-fieldref-laptop.txt", n = 1)
 # ---- File path constants
 
 OVERVIEW_DATA_DIR = "~/repos/ofo-website-3/static/field-data-overviews/"
+PLOT_DATA_PAGE_DIR = "~/repos/ofo-website-3/content/data/field-ref-plot/"
+
 BASE_OFO_URL = "https://openforestobservatory.netlify.app"
 
 
@@ -52,6 +54,10 @@ bounds$area_ha_sf = (sf::st_area(bounds) |> as.numeric() / 10^4) |> round(4) # C
 
 
 # -- Cleaning tabular data
+
+# Fix a col that's being imported as a list col even though it's character
+plot = plots |>
+  mutate(contributor_plot_id = as.character(contributor_plot_id))
 
 # Standardize tabular plot ID formatting
 plots = plots |>
@@ -170,7 +176,9 @@ bounds_nosp = st_drop_geometry(bounds) |>
 plotproj = left_join(plots, projects, by = "project_id") |>
   left_join(top_species, by = "plot_id") |>
   left_join(tree_summ, by = "plot_id") |>
-  left_join(bounds_nosp, by = "plot_id")
+  left_join(bounds_nosp, by = "plot_id") |>
+  # for some reason this is converting contributor_plot_id to a list column
+  mutate(contributor_plot_id = as.character(contributor_plot_id))
 
 # Compute relevant columns to display
 plotproj = plotproj |>
@@ -224,6 +232,7 @@ htmlwidgets::saveWidget(dt, file.path(OVERVIEW_DATA_DIR, "field-plot-data-table.
 dt = datatable(d, rownames = FALSE, escape = FALSE)
 dt
 
+# TODO: constrain what columns are not escaped
 
 
 
@@ -255,7 +264,7 @@ trees_vis = trees_clean |>
 
 # --- Stem maps for each field plot
 
-plot_foc = plots[100, ]
+plot_foc = plotproj[100, ]
 
 bound_foc = bounds |>
   filter(plot_id == plot_foc$plot_id)
@@ -291,5 +300,99 @@ m = leaflet() %>%
   addLegend(pal = pal, values = trees_prepped$sp_code, title = "Species", opacity = 1)
 m
 
+###!!!! Export map here
+
+
 # TODO: allow interpolation of zoom level beyond the level provided by the data source:
 # https://gis.stackexchange.com/questions/332823/scaling-tiles-for-missing-zoom-levels-in-leaflet
+
+
+
+# --- Template the plot page
+
+library(jinjar)
+
+template_file = fs::path(file.path("sandbox", "field-ref-catalog", "templates", "field-ref-plot.md"))
+
+# Format numbers for display, e.g. rounding
+d = plotproj |>
+  mutate(plot_area_ha = round(plot_area_ha, 2),
+         ba_ha = round(ba_ha, 0),
+         min_ht_ohvis = round(min_ht_ohvis, 2),
+         min_dbh = round(min_dbh, 1))
+
+plotfoc = d[1, ]
+
+plotfoc = plotfoc |>
+  # Select just what's needed for a datatable
+  select("Plot ID" = plot_id,
+        "Project ID" = project_id,
+        "Measurement year" = survey_year,
+        "Plot area (ha)" = area_ha_sf,
+        "Tree count" = n_trees,
+        "Basal area (m2/ha)" = ba_ha,
+        "Top species" = top_species,
+        "Minimum DBH measured (cm)" = min_dbh,
+        "Minimum height measured (for trees visible from overhead) (m)" = min_ht_ohvis,
+        "Minimum height measured (for other trees) (m)" = min_ht,
+        "Data license" = license_short,
+        "Data license details" = license,
+        "Contributor/Investigator" = investigator_names,
+        "Contributor plot ID" = contributor_plot_id) |>
+  # Pivot longer
+  mutate(across(everything(), as.character)) |>
+  tidyr::pivot_longer(cols = everything(), names_to = "Attribute", values_to = "Value")
+
+formatJS = JS("function(settings, json) {",
+    "$('body').css({'font-family': 'Arial'});",
+    "}")
+
+headerCallbackJS = JS(
+              "function(thead, data, start, end, display){",
+              "  $(thead).remove();",
+              "}")
+
+
+dt = datatable(plotfoc, rownames = FALSE, escape = FALSE,
+               options = list(paging = FALSE, scrollY = "100%",
+                              dom = 't',
+                              autoWidth = TRUE,
+                              columnDefs = list(list(width = '50%', targets = "_all")),
+                              initComplete = formatJS,
+                              headerCallback = headerCallbackJS))
+dt
+
+# Make a temp dir to save the table to
+tempdir = tempdir()
+tabledir = file.path(tempdir, "table-staging")
+dir.create(tabledir)
+tablepath = file.path(tabledir, "table.html")
+tablepath
+
+htmlwidgets::saveWidget(dt, tablepath, selfcontained = FALSE)
+
+# Next: For the first plot, put the table files in static,
+# Then from the table HTML, extract the text from between the body tags, then put it in the markdown
+# page via a jinjar template
+
+
+
+
+
+dt = datatable(d, rownames = FALSE, escape = FALSE) |>
+  formatStyle(names(d), lineHeight = '100%',
+                        padding = '4px 15px 4px 15px')
+
+
+rendered = jinjar::render(template_file, another_param = "dd")
+rendered
+
+# Write rendered markdown page
+# To this repo's sandbox
+write_path = file.path("sandbox", "field-ref-catalog", "rendered-pages",
+                               paste0(plotfoc$plot_id, ".md"))
+# To the Hugo site
+write_path = file.path(PLOT_DATA_PAGE_DIR, plotfoc$plot_id, "index.md")
+
+
+writeLines(rendered, write_path)
