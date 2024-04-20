@@ -14,9 +14,13 @@ datadir = readLines("sandbox/data-dirs/derek-fieldref-laptop.txt", n = 1)
 # ---- File path constants
 
 OVERVIEW_DATA_DIR = "~/repos/ofo-website-3/static/field-data-overviews/"
-PLOT_DATA_PAGE_DIR = "~/repos/ofo-website-3/content/data/field-ref-plot/"
+DATATABLE_HEADER_FILES_DIR = "~/repos/ofo-website-3/static/datatable-header-files/"
+LEAFLET_HEADER_FILES_DIR = "~/repos/ofo-website-3/static/leaflet-header-files/"
+PLOT_DATATABLE_HTML_DIR = "~/repos/ofo-website-3/static/field-plot-datatables/"
+PLOT_MAP_HTML_DIR = "~/repos/ofo-website-3/static/field-plot-maps/"
+PLOT_DATA_PAGE_DIR = "~/repos/ofo-website-3/content/data-field-ref-plot/"
 
-BASE_OFO_URL = "https://openforestobservatory.netlify.app"
+BASE_OFO_URL = "https://openforestobservatory.netlify.app/"
 
 
 
@@ -165,8 +169,76 @@ plots = plots |>
 # Compute plot centroids
 plot_centroids = sf::st_centroid(bounds)
 
+# ----  Export and save datatable header files
 
-# -- Make a HTML data table of plot attributes
+# Make a temp dir to save the table package to before pulling out the header files
+tempdir = tempdir()
+tabledir = file.path(tempdir, "table-staging")
+if (dir.exists(tabledir)) unlink(tabledir, recursive = TRUE)
+dir.create(tabledir)
+tablepath = file.path(tabledir, "table.html")
+
+dt = datatable(data.frame(dummy = 1))
+htmlwidgets::saveWidget(dt, tablepath, selfcontained = FALSE)
+
+# Where did the header files get saved
+table_files_rel = list.files(file.path(tabledir, "table_files"), include.dirs = TRUE)
+table_files_abs = file.path(tabledir, "table_files", table_files_rel)
+
+# Copy to the website repo
+if (dir.exists(DATATABLE_HEADER_FILES_DIR)) unlink(DATATABLE_HEADER_FILES_DIR, recursive = TRUE)
+dir.create(DATATABLE_HEADER_FILES_DIR)
+file.copy(table_files_abs,
+          DATATABLE_HEADER_FILES_DIR,
+          recursive = TRUE)
+
+
+# ----  Export and save leaflet header files
+
+# Make a temp dir to save the map package to before pulling out the header files
+tempdir = tempdir()
+mapdir = file.path(tempdir, "map-staging")
+if (dir.exists(mapdir)) unlink(mapdir, recursive = TRUE)
+dir.create(mapdir)
+mappath = file.path(mapdir, "map.html")
+
+map = leaflet()
+htmlwidgets::saveWidget(map, mappath, selfcontained = FALSE)
+
+# Where did the header files get saved
+map_files_rel = list.files(file.path(mapdir, "map_files"), include.dirs = TRUE)
+map_files_abs = file.path(mapdir, "map_files", map_files_rel)
+
+# Copy to the website repo
+if (dir.exists(LEAFLET_HEADER_FILES_DIR)) unlink(LEAFLET_HEADER_FILES_DIR, recursive = TRUE)
+dir.create(LEAFLET_HEADER_FILES_DIR)
+file.copy(map_files_abs,
+          LEAFLET_HEADER_FILES_DIR,
+          recursive = TRUE)
+
+
+
+# # Extract the datatable HTML header that links in these files, and sub in the new paths
+# THIS IS NOW OBSOLETE because embedding the entire table HTML as an iframe
+
+# dt_html = readLines(tablepath)
+# dt_html_header = dt_html[grep("<head>", dt_html)[1]:grep("</head>", dt_html)[1]]
+# header_file_line_idxs = grep("(<link)|(<script)", dt_html_header)
+# header_file_lines = dt_html_header[header_file_line_idxs]
+
+# header_file_lines_updated = header_file_lines |>
+#   str_replace_all("table_files", "/datatable-header-files") |>
+#   str_replace_all("table_files", "/datatable-header-files") |>
+#   paste(collapse = "\n")
+# # ^ these lines are now ready to write into the markdown templates
+
+
+
+
+
+
+
+# -- Make a HTML data table of plot catalog
 
 # Prep plot bounds data for merging
 bounds_nosp = st_drop_geometry(bounds) |>
@@ -190,14 +262,14 @@ plotproj = plotproj |>
          ba_ha = round(ba_ha, 0),
          min_ht_ohvis = round(min_ht_ohvis, 2),
          min_dbh = round(min_dbh, 1))
-
+  
 # Create links to project and dataset pages
-d = plotproj |>
-  mutate(plot_id = paste0('<a href="', BASE_OFO_URL, "data/field/plot/", plot_id, ".html", '">', plot_id, "</a>"))
+plotproj = plotproj |>
+  mutate(plot_id_link = paste0('<a href="', BASE_OFO_URL, "data-field-ref-plot/", plot_id, '.html"', ' target="_PARENT">', plot_id, "</a>"))
 
 # Select relevant columns to display
-d = d |>
-  select("ID" = plot_id,
+d_dt = plotproj |>
+  select("ID" = plot_id_link,
          "Area (ha)" = area_ha_sf,
          "N Trees" = n_trees,
          "BA (m2/ha)" = ba_ha,
@@ -208,18 +280,16 @@ d = d |>
          "Year" = survey_year,
          "Project" = name_short,
          "License" = license_short)
-d
+d_dt
 
 formatJS = JS("function(settings, json) {",
     "$('body').css({'font-family': 'Arial'});",
     "}")
 
-dt = datatable(d, rownames = FALSE, escape = FALSE, options = list(paging = FALSE, scrollY = "100%",
+dt = datatable(d_dt, rownames = FALSE, escape = FALSE, options = list(paging = FALSE, scrollY = "100%",
                                                    initComplete = formatJS)) |>
-  formatStyle(names(d), lineHeight = '100%',
+  formatStyle(names(d_dt), lineHeight = '100%',
                         padding = '4px 15px 4px 15px')
-
-
 
 dt
 
@@ -228,18 +298,17 @@ htmlwidgets::saveWidget(dt, file.path(OVERVIEW_DATA_DIR, "field-plot-data-table.
 
 #TODO: make 0 BA be NA (for FOCAL plots)
 
-
-dt = datatable(d, rownames = FALSE, escape = FALSE)
-dt
-
 # TODO: constrain what columns are not escaped
 
 
 
 
-# Make leaflet map of all field plots
+# Make leaflet map of field data catalog
+
+d_map = left_join(plot_centroids, plotproj, by = join_by("plot_id" == "plot_id"))
+
 m = leaflet() %>%
-  addMarkers(data = plot_centroids, popup = ~plot_id) |>
+  addMarkers(data = d_map, popup = ~plot_id_link) |>
   addPolygons(data = bounds, group = "bounds") |>
   addProviderTiles(providers$Esri.WorldTopoMap, group = "Topo") |>
   addProviderTiles(providers$Esri.WorldImagery, group = "Imagery") |>
@@ -252,6 +321,16 @@ htmlwidgets::saveWidget(m, file.path(OVERVIEW_DATA_DIR, "field-plot-map.html"))
 
 
 # ---- Create individual plot pages (tree-level detail)
+if (dir.exists(PLOT_DATA_PAGE_DIR)) unlink(PLOT_DATA_PAGE_DIR, recursive = TRUE)
+dir.create(PLOT_DATA_PAGE_DIR)
+file.create(file.path(PLOT_DATA_PAGE_DIR, "_index.md"))
+
+if (dir.exists(PLOT_MAP_HTML_DIR)) unlink(PLOT_MAP_HTML_DIR, recursive = TRUE)
+dir.create(PLOT_MAP_HTML_DIR)
+
+if (dir.exists(PLOT_DATATABLE_HTML_DIR)) unlink(PLOT_DATATABLE_HTML_DIR, recursive = TRUE)
+dir.create(PLOT_DATATABLE_HTML_DIR)
+
 
 # Prep tree-level data
 trees_vis = trees_clean |>
@@ -300,7 +379,37 @@ m = leaflet() %>%
   addLegend(pal = pal, values = trees_prepped$sp_code, title = "Species", opacity = 1)
 m
 
-###!!!! Export map here
+# Make background transparent
+backg <- htmltools::tags$style(".leaflet-container { background: rgba(200,200,200,1) }")
+m = prependContent(m, backg)
+m
+
+
+# -- Save map HTML to website repo
+
+# Make a temp dir to save the table package to before pulling out the table HTML
+tempdir = tempdir()
+mapdir = file.path(tempdir, "map-staging")
+if (dir.exists(mapdir)) unlink(mapdir, recursive = TRUE)
+dir.create(mapdir)
+mappath = file.path(mapdir, "map.html")
+
+htmlwidgets::saveWidget(m, mappath, selfcontained = FALSE, background = "transparent")
+
+# Extract the datatable HTML to save to the website repo
+map_html = readLines(mappath) |>
+  # Update the paths to the header files
+  str_replace_all("map_files", "/leaflet-header-files")
+
+# Concatenate lines to a single string with newlines
+#dt_html = paste0(dt_html, collapse = "\n")
+
+# Write table HTML to the website repo
+
+writeLines(map_html, file.path(PLOT_MAP_HTML_DIR, paste0(plotfoc$plot_id, ".html")))
+
+map_html_path = paste0("/field-plot-maps/", plotfoc$plot_id, ".html")
+
 
 
 # TODO: allow interpolation of zoom level beyond the level provided by the data source:
@@ -308,25 +417,23 @@ m
 
 
 
-# --- Template the plot page
+# --- Tree-level data table prep
 
-library(jinjar)
-
-template_file = fs::path(file.path("sandbox", "field-ref-catalog", "templates", "field-ref-plot.md"))
 
 # Format numbers for display, e.g. rounding
 d = plotproj |>
   mutate(plot_area_ha = round(plot_area_ha, 2),
          ba_ha = round(ba_ha, 0),
+         min_ht = round(min_ht, 2),
          min_ht_ohvis = round(min_ht_ohvis, 2),
          min_dbh = round(min_dbh, 1))
 
 plotfoc = d[1, ]
 
-plotfoc = plotfoc |>
+plotfoc_dt = plotfoc |>
   # Select just what's needed for a datatable
   select("Plot ID" = plot_id,
-        "Project ID" = project_id,
+        "Project" = name_short,
         "Measurement year" = survey_year,
         "Plot area (ha)" = area_ha_sf,
         "Tree count" = n_trees,
@@ -338,61 +445,114 @@ plotfoc = plotfoc |>
         "Data license" = license_short,
         "Data license details" = license,
         "Contributor/Investigator" = investigator_names,
+        "Project description" = description,
         "Contributor plot ID" = contributor_plot_id) |>
   # Pivot longer
   mutate(across(everything(), as.character)) |>
   tidyr::pivot_longer(cols = everything(), names_to = "Attribute", values_to = "Value")
-
-formatJS = JS("function(settings, json) {",
+  
+formatJS = JS(
+  "function(settings, json) {",
     "$('body').css({'font-family': 'Arial'});",
-    "}")
+    "}"
+)
 
+# This is to remove the column header, but it conflicted with the initComplete call, and I was able
+# to mostly deal with this by setting colnames to NULL and bSort to FALSE
 headerCallbackJS = JS(
               "function(thead, data, start, end, display){",
               "  $(thead).remove();",
               "}")
 
-
-dt = datatable(plotfoc, rownames = FALSE, escape = FALSE,
+dt = datatable(plotfoc_dt, rownames = FALSE, escape = TRUE,
+               colnames = NULL,
                options = list(paging = FALSE, scrollY = "100%",
                               dom = 't',
+                              bSort = FALSE,
                               autoWidth = TRUE,
-                              columnDefs = list(list(width = '50%', targets = "_all")),
-                              initComplete = formatJS,
-                              headerCallback = headerCallbackJS))
+                              columnDefs = list(list(width = '40%', targets = "Attribute")),
+                              #headerCallback = headerCallbackJS,
+                              initComplete = formatJS))
 dt
 
-# Make a temp dir to save the table to
+dt$sizingPolicy$browser$padding = 0
+dt$sizingPolicy$browser$fill = FALSE
+
+
+# Make a temp dir to save the table package to before pulling out the table HTML
 tempdir = tempdir()
 tabledir = file.path(tempdir, "table-staging")
+if (dir.exists(tabledir)) unlink(tabledir, recursive = TRUE)
 dir.create(tabledir)
 tablepath = file.path(tabledir, "table.html")
-tablepath
 
 htmlwidgets::saveWidget(dt, tablepath, selfcontained = FALSE)
 
-# Next: For the first plot, put the table files in static,
-# Then from the table HTML, extract the text from between the body tags, then put it in the markdown
-# page via a jinjar template
+# Extract the datatable HTML to save to the website repo
+dt_html = readLines(tablepath) |>
+  # Update the paths to the header files
+  str_replace_all("table_files", "/datatable-header-files") |>
+  str_replace_all("table_files", "/datatable-header-files")
 
+# Concatenate lines to a single string with newlines
+#dt_html = paste0(dt_html, collapse = "\n")
 
+# Write table HTML to the website repo
 
+writeLines(dt_html, file.path(PLOT_DATATABLE_HTML_DIR, paste0(plotfoc$plot_id, ".html")))
 
+datatable_html_path = paste0("/field-plot-datatables/", plotfoc$plot_id, ".html")
 
-dt = datatable(d, rownames = FALSE, escape = FALSE) |>
-  formatStyle(names(d), lineHeight = '100%',
-                        padding = '4px 15px 4px 15px')
+# --- Template the plot page
 
+library(jinjar)
 
-rendered = jinjar::render(template_file, another_param = "dd")
+template_file = fs::path(file.path("sandbox", "field-ref-catalog", "templates", "field-ref-plot.md"))
+
+rendered = jinjar::render(template_file,
+                          plot_id = plotfoc$plot_id,
+                          map_html_path = map_html_path,
+                          datatable_html_path = datatable_html_path)
 rendered
 
 # Write rendered markdown page
-# To this repo's sandbox
-write_path = file.path("sandbox", "field-ref-catalog", "rendered-pages",
-                               paste0(plotfoc$plot_id, ".md"))
+# # To this repo's sandbox
+# write_path = file.path("sandbox", "field-ref-catalog", "rendered-pages",
+#                        paste0(plotfoc$plot_id, ".md"))
 # To the Hugo site
-write_path = file.path(PLOT_DATA_PAGE_DIR, plotfoc$plot_id, "index.md")
+
+
+write_path = file.path(PLOT_DATA_PAGE_DIR, paste0(plotfoc$plot_id, ".md"))
 
 
 writeLines(rendered, write_path)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+## OLD: extract datatable headers
+
+# # List table supporting files and copy to website repo static folder
+
+# table_files_rel = list.files(file.path(tabledir, "table_files"), include.dirs = TRUE)
+# table_files_abs = file.path(tabledir, "table_files", table_files_rel)
+
+# file.copy(table_files_abs,
+#           FIELDREF_PLOT_DATA_TABLE_SUPPORTING_FILES_DIR, recursive = TRUE)
+
+# # Extract the table HTML header that links in these files, and sub in the new paths
+
+# table_html = readLines(tablepath)
+# first_line = grep("<style>", table_html)[1]
+# last_line = grep("</style>", table_html)[1]
+
