@@ -1,6 +1,16 @@
+# Load all the functions (and package dependencies) of this R package
+devtools::load_all()
+
 # Load necessary libraries
 library(lubridate)
 library(sf)
+
+# Define the root of the local data directory
+datadir = readLines(file.path("sandbox", "data-dirs", "steven-metadata-laptop.txt"))
+
+# Get a list of the files containing the test EXIF data (one file per image dataset). These files
+# have already been created and saved into the project data folder.
+exif_files = list.files(file.path(datadir, "exif-examples"), pattern = "^exif.+\\.csv$", full.names = TRUE)
 
 # Define a function to process pitch values
 process_pitch_values <- function(pitch_values) {
@@ -62,4 +72,5 @@ extracted_metadata_df <- do.call(rbind, extracted_metadata)
 
 # Print the extracted metadata
 print(extracted_metadata_df)
+
 
