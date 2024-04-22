@@ -1,12 +1,6 @@
-# Load all the functions (and package dependencies) of this R package
-devtools::load_all()
-
-# Define the root of the local data directory
-datadir = readLines(file.path("sandbox", "data-dirs", "steven-metadata-laptop.txt"))
-
-# Get a list of the files containing the test EXIF data (one file per image dataset). These files
-# have already been created and saved into the project data folder.
-exif_files = list.files(file.path(datadir, "exif-examples"), pattern = "^exif.+\\.csv$", full.names = TRUE)
+# Load necessary libraries
+library(lubridate)
+library(sf)
 
 # Define a function to process pitch values
 process_pitch_values <- function(pitch_values) {
@@ -32,13 +26,40 @@ process_pitch_values <- function(pitch_values) {
   return(processed_pitch)
 }
 
-# Process each EXIF file
-for (exif_file in exif_files) {
-  exif = prep_exif(exif_file)
+# Define a function to extract datetime and pitch values from EXIF data
+extract_metadata <- function(exif) {
+  # Convert DateTimeOriginal to datetime objects
+  exif$DateTimeOriginal <- ymd_hms(gsub(":", " ", exif$DateTimeOriginal), tz = "UTC")
+
+  # Calculate start and end datetime_local
+  start_datetime_local <- min(exif$DateTimeOriginal)
+  end_datetime_local <- max(exif$DateTimeOriginal)
+
+  # Process pitch values
   camera_pitch_values = exif$CameraPitch
   camera_pitch_derived = process_pitch_values(camera_pitch_values)
-  if (!is.na(camera_pitch_derived)) {
-    print(paste("Processed camera_pitch_derived for", basename(exif_file), ":", camera_pitch_derived, "degrees."))
-  }
+
+  # Convert start and end datetime_local to the desired format (YYYYMMDD HHMMSS)
+  start_datetime_local_formatted <- format(start_datetime_local, "%Y%m%d %H%M%S")
+  end_datetime_local_formatted <- format(end_datetime_local, "%Y%m%d %H%M%S")
+
+  # Return the extracted values
+  return(list(start_datetime = start_datetime_local_formatted,
+              end_datetime = end_datetime_local_formatted,
+              pitch = camera_pitch_derived))
 }
+
+# Process each EXIF file and extract metadata
+extracted_metadata <- lapply(exif_files, function(exif_file) {
+  exif <- prep_exif(exif_file)
+  metadata <- extract_metadata(exif)
+  metadata$file_name <- basename(exif_file)
+  return(metadata)
+})
+
+# Combine the extracted metadata into a data frame
+extracted_metadata_df <- do.call(rbind, extracted_metadata)
+
+# Print the extracted metadata
+print(extracted_metadata_df)
 
