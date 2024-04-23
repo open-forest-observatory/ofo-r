@@ -147,7 +147,9 @@ prep_trees_for_plot_summary = function(trees) {
 }
 
 
-# Compute plot-level summary of tree data, including species proportions
+# Compute plot-level summary of tree data, including species proportions. Includes computation of
+# tree proportion by BA, height, and "size", which is previously computed as DBH or height (which
+# height is not available). TODO: switch to using "size" once "size" is corrected per github issue.
 summarize_trees_by_plot = function(trees_clean) {
 
   # Summarize tree data at the plot level
@@ -158,7 +160,9 @@ summarize_trees_by_plot = function(trees_clean) {
               dbh_cv = (sd(dbh) / mean(dbh)) |> round(2),
               n_trees = n(),
               ba_tot = sum(ba, na.rm = TRUE),
+              dbh_tot = sum(dbh, na.rm = TRUE),
               ht_tot = sum(height, na.rm = TRUE),
+              size_tot = sum(size, na.rm = TRUE),
               height_measured = (sum(!is.na(height)) / n()) > 0.9) |>
     # if no trees with DBH measured, set BA to NA instead of 0
     mutate(ba_tot = ifelse(ba_tot == 0, NA, ba_tot))
@@ -166,8 +170,9 @@ summarize_trees_by_plot = function(trees_clean) {
   # Add summarized plot-level tree data to tree-level table to enable computing proportions
   trees_w_summ = left_join(tree_summ, trees_clean, by = "plot_id") |>
     rename(n_trees_plot = n_trees,
-          ba_plot = ba_tot,
-          ht_plot = ht_tot)
+           ba_plot = ba_tot,
+           ht_plot = ht_tot,
+           size_plot = size_tot)
 
   # Compute top tree species by plot using BA, or if no BA, by ht (long format)
   top_species = trees_w_summ |>
@@ -175,17 +180,20 @@ summarize_trees_by_plot = function(trees_clean) {
     mutate(species = as.character(sp_code)) |>
     group_by(plot_id, sp_code) |>
     summarize(n_trees_sp = n(),
-              ba_sp = sum(ba),
-              ht_sp = sum(height),
-              n_trees_plot = median(n_trees_plot),
-              ba_plot = median(ba_plot),
-              ht_plot = median(ht_plot)) |>
+              ba_sp = sum(ba, na.rm = TRUE),
+              size_sp = sum(size, na.rm = TRUE),
+              ht_sp = sum(height, na.rm = TRUE),
+              n_trees_plot = median(n_trees_plot, na.rm = TRUE),
+              ba_plot = median(ba_plot, na.rm = TRUE),
+              ht_plot = median(ht_plot, na.rm = TRUE),
+              size_plot = median(size_plot, na.rm = TRUE)) |>
     mutate(prop_trees_sp_ba = ba_sp / ba_plot,
+           prop_trees_sp_size = size_sp / size_plot,
            prop_trees_sp_ht = ht_sp / ht_plot,
            prop_trees_sp = ifelse(is.na(prop_trees_sp_ba), prop_trees_sp_ht, prop_trees_sp_ba)) |>
     mutate(prop_trees_sp = round(prop_trees_sp, 2) * 100) |>
     group_by(plot_id) |>
-    arrange(plot_id, desc(n_trees_sp)) |>
+    arrange(plot_id, desc(prop_trees_sp)) |>
     slice_head(n = 3)
 
   # Merge species code and proportion for top 3 species into one column, and again for just the top
