@@ -19,7 +19,7 @@ plot_boundaries_data_dir = file.path(datadir, "field-plot-boundaries")
 google_sheet_id = "1GjDseDCR1BX_EIkJAni7rk2zvK6nHmZz1nOFBd1d6k4"
 
 BASE_OFO_URL = "https://openforestobservatory.netlify.app/"
-BASE_OFO_URL = "http://localhost:1313/"
+#BASE_OFO_URL = "http://localhost:1313/"
 WEBSITE_REPO_PATH = "~/repos/ofo-website-3/"
 
 # Path to the plot details template page within theis repo

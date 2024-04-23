@@ -18,7 +18,9 @@ read_and_standardize_tabular_field_ref_data = function(google_sheet_id) {
     mutate(plot_id = str_pad(plot_id, 4, pad = "0", side = "left"))
 
   trees = trees |>
-    mutate(plot_id = str_pad(plot_id, 4, pad = "0", side = "left"))
+    mutate(plot_id = str_pad(plot_id, 4, pad = "0", side = "left")) |>
+    # Fix a col that's being imported as a list col even though it's character
+    mutate(species = as.character(species))
 
   # Return a list
   ret = list(projects = projects,
@@ -118,7 +120,7 @@ prep_trees = function(trees, species_codes) {
 
   # If the tree is dead and species is UNK, set species to SNAG
   trees = trees |>
-    mutate(sp_code = ifelse((live_dead == "D" & sp_code == "UNK"), "UNKSNAG", sp_code))
+    mutate(sp_code = ifelse(((live_dead == "D" & !is.na(sp_code)) & sp_code == "UNK"), "UNKSNAG", sp_code))
 
   return(trees)
 
