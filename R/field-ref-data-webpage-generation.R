@@ -77,6 +77,18 @@ check_field_ref_data = function(tabular_data, plot_bounds) {
     plot_list = paste(trees_no_plots, collapse = ", ")
     warning("The following trees are missing plots:", plot_list)
   }
+  
+  # See which numeric species codes  exist in the dataset but do not have a corresponding code_usda
+  # or code_supp
+  numeric_codes_in_use = tabular_data$trees$species
+  numeric_codes_defined = tabular_data$species_codes$code_numeric
+  codes_in_use_not_defined = numeric_codes_in_use[!numeric_codes_in_use %in% numeric_codes_defined]
+  table = table(codes_in_use_not_defined) |> sort(decreasing = TRUE)
+  code_list = names(table) |> paste(collapse = ", ")
+  if (code_list != "") {
+    warning("The following numeric species codes are in use but not defined in the species codes table (in order or decreasing frequency): ", code_list)
+    print(table)
+  }
 
 }
 
@@ -98,7 +110,11 @@ prep_trees = function(trees, species_codes) {
 
   trees = trees |>
     mutate(species = as.character(species)) |>
-    left_join(species_codes, by = join_by(species == code_numeric))
+    left_join(species_codes, by = join_by(species == code_numeric)) |>
+    # If there's an entry in the tree table species column, but no matching species in the code
+    # table, use whatever is in the tree table (we sometimes record USDA codes there for species
+    # that don't have a numeric tree code, like shrubs)
+    mutate(sp_code = ifelse(is.na(sp_code), species, sp_code))
 
   # If the tree is dead and species is UNK, set species to SNAG
   trees = trees |>
@@ -282,7 +298,7 @@ compile_plot_summary_table = function(plots, projects, plot_level_tree_summary, 
 
   # Create links to project and dataset pages
   plotproj = plotproj |>
-    mutate(plot_id_link = paste0('<a href="http://', base_ofo_url, plot_details_dir, plot_id, '/"', ' target="_PARENT">', plot_id, "</a>"))
+    mutate(plot_id_link = paste0('<a href="', base_ofo_url, plot_details_dir, plot_id, '/"', ' target="_PARENT">', plot_id, "</a>"))
 
   return(plotproj)
 
@@ -392,7 +408,7 @@ make_plot_catalog_map = function(plot_summary,
     addProviderTiles(providers$Esri.WorldImagery, group = "Imagery") |>
     groupOptions("bounds", zoomLevels = 13:20) |>
     addLayersControl(baseGroups = c("Topo", "Imagery"),
-                    options = layersControlOptions(collapsed = FALSE))
+                     options = layersControlOptions(collapsed = FALSE))
 
   save_widget_html(m,
                    website_static_path = website_static_path,
@@ -600,6 +616,8 @@ render_plot_page = function(template_filepath,
   # Determine if we need a dataset message at the top of the page, and if so, prepare it
   if (plot_summary_foc$embargoed == TRUE) {
     top_message = "This dataset has been submitted to the OFO and is planned for release, but it is currently under embargo. The tree locations have been randomized. For questions about data availability, please contact the dataset contributors."
+  } else if (!is.na(plot_summary_foc$display_message)) {
+    top_message = plot_summary_foc$display_message
   } else {
     top_message = NA
   }
@@ -616,5 +634,57 @@ render_plot_page = function(template_filepath,
   writeLines(rendered, write_path)
 
   return(TRUE)
+
+}
+
+## Loop through each plot and make a details page, including its media (map and datatable)
+make_details_pages = function(plot_summary,
+                              bounds,
+                              trees_vis,
+                              website_static_path,
+                              leaflet_header_files_dir,
+                              datatable_header_files_dir,
+                              plot_details_datatable_dir,
+                              plot_details_map_dir,
+                              plot_details_template_dir,
+                              plot_details_page_dir) {
+
+  plot_ids = plot_summary$plot_id
+  nplots = length(plot_ids)
+
+  for (plot_id_foc in plot_ids) {
+
+    cat("\rGenerating details page for plot ", plot_id_foc, "of", nplots, "    ")
+
+    plot_summary_foc = plot_summary |>
+      filter(plot_id == plot_id_foc)
+
+    bound_foc = bounds |>
+      filter(plot_id == plot_id_foc)
+
+    trees_foc = trees_vis |>
+      filter(plot_id == plot_id_foc)
+
+    plot_details_map_path = make_plot_details_map(plot_summary_foc = plot_summary_foc,
+                              bound_foc = bound_foc,
+                              trees_foc = trees_foc,
+                              website_static_path = WEBSITE_STATIC_PATH,
+                              leaflet_header_files_dir = LEAFLET_HEADER_FILES_DIR,
+                              plot_details_map_dir = PLOT_DETAILS_MAP_DIR)
+
+    plot_details_datatable_path = make_plot_details_datatable(plot_summary_foc = plot_summary_foc,
+                                    website_static_path = WEBSITE_STATIC_PATH,
+                                    datatable_header_files_dir = DATATABLE_HEADER_FILES_DIR,
+                                    plot_details_datatable_dir = PLOT_DETAILS_DATATABLE_DIR)
+
+
+    # Render plot details page from template
+    render_plot_page(template_filepath = PLOT_DETAILS_TEMPLATE_FILEPATH,
+                    plot_summary_foc = plot_summary_foc,
+                    plot_details_map_path = plot_details_map_path,
+                    plot_details_datatable_path = plot_details_datatable_path,
+                    website_repo_content_path = WEBSITE_CONTENT_PATH,
+                    plot_details_page_dir = PLOT_DETAILS_PAGE_DIR)
+  }
 
 }

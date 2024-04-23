@@ -19,7 +19,7 @@ plot_boundaries_data_dir = file.path(datadir, "field-plot-boundaries")
 google_sheet_id = "1GjDseDCR1BX_EIkJAni7rk2zvK6nHmZz1nOFBd1d6k4"
 
 BASE_OFO_URL = "https://openforestobservatory.netlify.app/"
-BASE_OFO_URL = "localhost:1313/"
+BASE_OFO_URL = "http://localhost:1313/"
 WEBSITE_REPO_PATH = "~/repos/ofo-website-3/"
 
 # Path to the plot details template page within theis repo
@@ -111,47 +111,16 @@ reset_plot_detail_dirs(WEBSITE_STATIC_PATH,
 trees_vis = prep_trees_for_stem_map(trees_for_plot_summary, plot_summary)
 
 
-
-## Loop through each plot and make a details page, including its media (map and datatable)
-
-plot_ids = plot_summary$plot_id
-nplots = length(plot_ids)
-
-for(plot_id_foc in plot_ids) {
-
-  cat("\rGenerating details page for plot ", plot_id_foc, "of", nplots, "    ")
-
-  plot_summary_foc = plot_summary |>
-    filter(plot_id == plot_id_foc)
-
-  bound_foc = bounds |>
-    filter(plot_id == plot_id_foc)
-
-  trees_foc = trees_vis |>
-    filter(plot_id == plot_id_foc)
-
-  plot_details_map_path = make_plot_details_map(plot_summary_foc = plot_summary_foc,
-                            bound_foc = bound_foc,
-                            trees_foc = trees_foc,
-                            website_static_path = WEBSITE_STATIC_PATH,
-                            leaflet_header_files_dir = LEAFLET_HEADER_FILES_DIR,
-                            plot_details_map_dir = PLOT_DETAILS_MAP_DIR)
-
-  plot_details_datatable_path = make_plot_details_datatable(plot_summary_foc = plot_summary_foc,
-                                  website_static_path = WEBSITE_STATIC_PATH,
-                                  datatable_header_files_dir = DATATABLE_HEADER_FILES_DIR,
-                                  plot_details_datatable_dir = PLOT_DETAILS_DATATABLE_DIR)
-
-
-  # Render plot details page from template
-  render_plot_page(template_filepath = PLOT_DETAILS_TEMPLATE_FILEPATH,
-                  plot_summary_foc = plot_summary_foc,
-                  plot_details_map_path = plot_details_map_path,
-                  plot_details_datatable_path = plot_details_datatable_path,
-                  website_repo_content_path = WEBSITE_CONTENT_PATH,
-                  plot_details_page_dir = PLOT_DETAILS_PAGE_DIR)
-}
-
+make_details_pages(plot_summary = plot_summary,
+                   bounds = bounds,
+                   trees_vis = trees_vis,
+                   website_static_path = WEBSITE_STATIC_PATH,
+                   leaflet_header_files_dir = LEAFLET_HEADER_FILES_DIR,
+                   datatable_header_files_dir = DATATABLE_HEADER_FILES_DIR,
+                   plot_details_datatable_dir = PLOT_DETAILS_DATATABLE_DIR,
+                   plot_details_map_dir = PLOT_DETAILS_MAP_DIR,
+                   plot_details_template_dir = PLOT_DETAILS_TEMPLATE_FILEPATH,
+                   plot_details_page_dir = PLOT_DETAILS_PAGE_DIR)
 
 
 
