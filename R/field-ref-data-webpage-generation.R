@@ -304,6 +304,7 @@ compile_plot_summary_table = function(plots, projects, plot_level_tree_summary, 
     mutate(area_ha_sf = round(area_ha_sf, 2),
           ba_ha = round(ba_ha, 0),
           min_ht_ohvis = round(min_ht_ohvis, 2),
+          min_ht = round(min_ht, 2),
           min_dbh = round(min_dbh, 1))
 
   # Create links to project and dataset pages
