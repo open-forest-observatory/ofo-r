@@ -5,8 +5,8 @@ library(tidyverse)
 library(exifr)
 library(furrr)
 
-IMAGERY_INPUT_PATH = "/ofo-share/drone-imagery-organization/1_manually-cleaned/2023-ny-ofo/"
-IMAGERY_OUTPUT_PATH = "/ofo-share/drone-imagery-organization/2_standardized-preclean/2023-ny-ofo/"
+IMAGERY_INPUT_PATH = "/ofo-share/drone-imagery-organization/1_manually-cleaned/2022-early-regen/"
+IMAGERY_OUTPUT_PATH = "/ofo-share/drone-imagery-organization/2_standardized-preclean/2022-early-regen/"
 BASEROW_DATA_PATH = "/ofo-share/scratch-derek/standardize-image-folders_data/baserow/"
 
 
@@ -101,9 +101,6 @@ b2 = b |>
 # First goal is to create a data frame of: dataset_id, date, aircraft_id, [list col of all image
 # filepaths]. We will do this by getting this info for each image file in every folder, then grouping.
 
-dataset_folder = "20230527-0005/"
-
-
 get_image_data = function(dataset_folder) {
 
   # Get the full path to the dataset folder
@@ -117,13 +114,21 @@ get_image_data = function(dataset_folder) {
 
   # Compile relevant per-image info (including potential ways to distinguish two drones) into data
   # frame
+
+  # Check if nay of the relevant columns are null
+  date_null = is.null(exif$DateTimeOriginal)
+  model_null = is.null(exif$Model)
+  serialnumber_null = is.null(exif$SerialNumber)
+  if(date_null || model_null || serialnumber_null) {
+    warning("Null values (likely complete image corruption) found in ", base_folder, ". Skipping.")
+    return(NULL)
+  }
+
   image_data_onefolder = data.frame(folder_in = base_folder,
-                          image_path = image_filepaths,
-                          date = exif$DateTimeOriginal,
-                          model = exif$Model,
-                          software = exif$Software,
-                          serialnumber = exif$SerialNumber,
-                          dewarpdata = exif$DewarpData)
+                           image_path = image_filepaths,
+                           date = exif$DateTimeOriginal,
+                           model = exif$Model,
+                           serialnumber = exif$SerialNumber)
 
   return(image_data_onefolder)
 
@@ -136,69 +141,49 @@ folders = list.dirs(IMAGERY_INPUT_PATH, full.names = TRUE, recursive = FALSE)
 plan = future::plan(multicore)
 l = future_map(folders, get_image_data)
 
+image_data = bind_rows(l)
+write_csv(image_data, file.path(BASEROW_DATA_PATH, "image_data_2022-early-regen.csv"))
 
 
+## Process the image-level data into dataset-level data to determine how to split and group the image files in their ultimate standardized folders
+
+image_data = read_csv(file.path(BASEROW_DATA_PATH, "image_data_2022-early-regen.csv"))
+
+# Remove images without a date (likely corrupted)
+image_data = image_data |>
+  filter(!is.na(date))
+
+# Standardize date and get dataset ID from folder name, accommodating that it may be in the format
+# {date}-{4-digit ID} or simply {4- to 6-digit ID}
+image_data = image_data |>
+  mutate(date = str_split(date, " ", simplify = TRUE)[, 1] |>
+           str_replace_all(fixed(":"), "-") |>
+           as.Date()) |>
+  mutate(folder_in = str_replace_all(folder_in, fixed("/"), "")) |>
+  separate_wider_delim(delim = "_and_", names = c("folder_in", "folder_in_2", "folder_in_3")) |>
+  mutate(dataset_id_old_format = grepl("[0-9]{8}-[0-9]{4}", folder_in)) |>
+  mutate(dataset_id = ifelse(dataset_id_old_format, str_sub(folder_in, -4, -1), folder_in) |>
+           str_pad(6, "left", pad = "0")) |>
+  # Images without a date are corrupted
+  filter(!is.na(date))
+
+datasets = image_data |>
+  group_by(dataset_id, serialnumber, date) |>
+  summarize(n_images = n()) |>
+  # Datasets with < 30 images are likely not useful
+  filter(n_images > 30)
+
+# When does the same dataset ID show up for more than one date or serial number?
+multiples = datasets |>
+  group_by(dataset_id) |>
+  summarize(n_dates = n_distinct(date),
+            n_serialnumbers = n_distinct(serialnumber)) |>
+  filter(n_dates > 1 | n_serialnumbers > 1)
+
+## TODO: If the same dataset shows up in multiple dates or drone serial numbers, deal with that situation
 
 
-##### TODO: modify to process data frame of image data
-
-focal_dataset = file.path(IMAGERY_INPUT_PATH, dataset_folder)
-base_folder = basename(focal_dataset)
-
-# Get list of image files
-image_files = list.files(focal_dataset, full.names = TRUE, recursive = TRUE, pattern = "(.jpg$)|(.jpeg$)|(.JPG$)|(.JPEG$)")
-
-# Get exif data
-exif = read_exif(images)
-
-# Compile relevant per-image info (including potential ways to distinguish two drones) into data
-# frame
-image_data_onefolder = data.frame(folder_in = base_folder,
-                        image_path = image_files,
-                        date = exif$DateTimeOriginal,
-                        model = exif$Model,
-                        software = exif$Software,
-                        serialnumber = exif$SerialNumber,
-                        dewarpdata = exif$DewarpData)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-#################################################
-
-# Get the unique dates that have at least 25 images (assumed minimum for photogrammetry)
-image_dates_unique = image_data |>
-  count(date) |>
-  filter(n >= 25) |>
-  pull(date)
-
-# Get the baserow record(s) for this dataset
-baserow_foc = baserow |>
-  filter(dataset_id == dataset_id)
-
-
-
-
-
-# Get the dataset ID from the folder name
-base_folder = basename(focal_dataset)
-dataset_id = str_sub(base_folder, -4, -1)
-
-
-
-date = str_split(datetime, " ", simplify = TRUE)[, 1] |>
-         str_replace_all(fixed(":"), "-") |>
-         as.Date()
-         
+# TODO: If image folder separated by _and_, check what baserow columns are different between the
+# two. If it's just date, split on date into those two columns. If it's something else like base
+# loc, then don't split, assign to the first ID, and add a record saying that the image dataset
+# includes ultiple values of {all columns that have multiple values}
