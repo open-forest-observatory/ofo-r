@@ -148,7 +148,7 @@ percent_images_rtk
 
 #### white_balance_mode_derived ####
 
-# The most common white balance setting across all images in the project. Options: sunny, cloudy, auto
+# The most common white balance setting across all images in the project. Options: auto and manual
 
 # BEGIN FUNCTION CODE
 
