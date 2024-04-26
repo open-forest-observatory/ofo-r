@@ -10,7 +10,6 @@ IMAGERY_OUTPUT_PATH = "/ofo-share/drone-imagery-organization/2_standardized-prec
 BASEROW_DATA_PATH = "/ofo-share/scratch-derek/standardize-image-folders_data/baserow/"
 
 
-
 ## END CONSTANTS
 
 ## Prep baserow
@@ -205,7 +204,7 @@ for (i in 1:nrow(combos_by_exif)) {
     select(dataset_id, dataset_id_2, dataset_id_3) |>
     unlist() |> na.omit() |> unique()
 
-  # does it have multiple baserow records, indicated by an "_and_" in the image folder?
+  # Does it have multiple baserow records, indicated by an "_and_" in the image folder?
   if (length(ids_by_foldername) > 1) {
 
     # Determine if subsets of this "composite" image folder can be matched 1:1 with baserow records
@@ -224,7 +223,9 @@ for (i in 1:nrow(combos_by_exif)) {
              overlap_side_nominal, altitude_agl_nominal, terrain_follow) |>
       distinct()
 
-    # See which fields differ between the two baserow records
+    # See which fields differ between the two baserow records, so that we can make sure all
+    # differences are explained (separable) by date, and if now so we can record what else they
+    # differed by
     cols_diff_idx = which(apply(baserow_summ, 2, function(a) length(unique(a)) > 1))
     cols_diff_names = names(baserow_summ)[cols_diff_idx]
     # Remove boilerplate columns
@@ -311,18 +312,38 @@ for (i in 1:nrow(combos_by_exif)) {
 
     }
 
-  }
+  } else {
+    # There are multiple dates or drone models for this dataset ID, but they are all in a single
+    # baserow record. Save them to different sub-datasets of the same dataset ID
 
+    datasets_foc = datasets |>
+      filter(dataset_id == dataset_id_foc)
+
+    for (k in 1:nrow(datasets_foc)) {
+
+      dataset_foc = datasets_foc[k, ]
+
+      image_data[image_data$dataset_id == dataset_id_foc &
+                   image_data$date == dataset_foc$date &
+                   image_data$serialnumber == dataset_foc$serialnumber,
+                 "dataset_id_out"] = dataset_id_foc
+
+      image_data[image_data$dataset_id == dataset_id_foc &
+                   image_data$date == dataset_foc$date &
+                   image_data$serialnumber == dataset_foc$serialnumber,
+                 "subdataset_out"] = k
+
+    }
+  }
 }
 
-# Summerize image_data to inspect
+# Summarize image_data to inspect
 inspect = image_data |>
-  group_by(dataset_id, dataset_id_2, dataset_id_3, date, serialnumber, dataset_id_out) |>
+  group_by(dataset_id, dataset_id_2, dataset_id_3, date, serialnumber, dataset_id_out, subdataset_out) |>
   summarize(n_images = n())
 inspect
 
-    # *******((((((((TODO: Also have to deal with fact taht combos_by_exif could be different by serial number and not
-    # date. What happens in that case?
+
 
 # TODO: any remaining combo by name cannot be split out, so assign them the first dataset ID and
 # record a record that they contain additional values for one or more columns. May not need the
