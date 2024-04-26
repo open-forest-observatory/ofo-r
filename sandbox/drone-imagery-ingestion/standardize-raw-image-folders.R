@@ -283,6 +283,7 @@ for (i in 1:nrow(combos_by_exif)) {
     # adding a column to the exif table that is the image's destination dataset ID
     
     ### RESUME HERE:
+
     for (i in 1:nrow(exif_summ2)) {
       
       date_foc = exif_summ2$date[i]
@@ -294,7 +295,8 @@ for (i in 1:nrow(combos_by_exif)) {
 
 }
 
-
+    # *******((((((((TODO: Also have to deal with fact taht combos_by_exif could be different by serial number and not
+    # date. What happens in that case?
 
 # TODO: any remaining combo by name cannot be split out, so assign them the first dataset ID and
 # record a record that they contain additional values for one or more columns. May not need the
