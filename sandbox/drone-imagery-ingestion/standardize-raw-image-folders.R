@@ -82,9 +82,9 @@ b = baserow |>
          date = dataset_date_canon) |>
   mutate(dataset_id = str_pad(dataset_id, 6, pad = "0"))
 
-# There may be baserow records that are identical except for the date or base station location
-# (because a data curator duplicated the entry to accommodate the multiple dates). Assign the
-# associated records a group ID that is unique for each group.
+# There may be baserow records that are identical except for the date or base station location or
+# aircraft (because a data curator duplicated the entry to accommodate the multiple dates). Assign
+# the associated records a group ID that is unique for each group.
 b2 = b |>
   group_by(contributor_dataset_name, submission_id, project_id, aircraft_model_id, sensor_id, flight_planner_id, flight_pattern, overlap_front_nominal,
            overlap_side_nominal, camera_pitch_nominal, terrain_follow, altitude_agl_nominal) |>
@@ -188,8 +188,125 @@ combos_by_exif = datasets |>
             n_serialnumbers = n_distinct(serialnumber)) |>
   filter(n_dates > 1 | n_serialnumbers > 1)
 
-## TODO: If the same dataset shows up in multiple dates or drone serial numbers, deal with that situation
-# ^ still TODO
+## If the same dataset ID contains multiple dates or drone serial numbers, deal with splitting it
+for (i in 1:nrow(combos_by_exif)) {
+
+  combo_by_exif = combos_by_exif[i, ]
+  dataset_id_foc = combo_by_exif$dataset_id
+  exif_data = image_data |>
+    filter(dataset_id == dataset_id_foc)
+ 
+  exif_summ = exif_data |>
+    group_by(dataset_id, dataset_id_2, dataset_id_3) |>
+    summarize(n_images = n())
+  
+  ids_by_name = exif_summ |>
+    select(dataset_id, dataset_id_2, dataset_id_3) |>
+    unlist() |> na.omit() |> unique()
+
+  # does it have multiple baserow records, indicated by an "_and_" in the image folder?
+  if (!is.na(exif_summ$dataset_id_2[1])) {
+
+    # Determine if subsets of this "composite" image folder can be matched 1:1 with baserow records
+    # to enable splitting them out by date
+
+    # Get the baserow records for the dataset IDs making up the combo according to the image folder name
+    baserow_records = b2 |>
+      filter(dataset_id %in% ids_by_name)
+
+    # According to baserow, what are the unique combinations of date, aircraft_model_id, base_lat,
+    # flight_pattern, overlap_front_nominal, overlap_side_nominal, altitude_agl_nominal, and
+    # terrain_follow? This will tell us if date alone can be used to split the image folders.
+    baserow_summ = baserow_records |>
+      ungroup() |>
+      select(date, aircraft_model_id, base_lat, flight_pattern, overlap_front_nominal,
+            overlap_side_nominal, altitude_agl_nominal, terrain_follow) |>
+      distinct()
+
+    # See which fields differ between the two baserow records
+    cols_diff_idx = which(apply(baserow_records, 2, function(a) length(unique(a)) > 1))
+    cols_diff_names = names(baserow_records)[cols_diff_idx]
+    # Remove boilerplate columns
+    cols_diff_names = setdiff(cols_diff_names, c("baserow_dataset_id", "Created on", "dataset_id"))
+
+    baserow_unique_record_count = nrow(baserow_summ)
+    baserow_unique_date_count = n_distinct(baserow_summ$date)
+
+    if (baserow_unique_record_count > baserow_unique_date_count) {
+      warning("The baserow records for the dataset IDs ", paste(combo_by_name_dataset_ids, collapse = ", "), " differ by more than date; impossible to split the composite photo folder to two baserow records. Naming by the first dataset ID.")
+      dataset_not_separable = data.frame(dataset_id = combo_by_name_dataset_ids[1],
+                                        dataset_id_2 = combo_by_name_dataset_ids[2],
+                                        dataset_id_3 = combo_by_name_dataset_ids[3],
+                                        differ_by = paste(cols_diff_names, collapse = ", "))
+      datasets_not_separable = bind_rows(datasets_not_separable, dataset_not_separable)
+      # ^ This will be used to add a record to the baserow records that says that the image dataset
+      # contains additional values for one or more columns but could not be separated automatically
+      next()
+    }
+
+    # Date is sufficient to identify the unique baserow records for this combo image folder. Now need
+    # to make sure that image files themselves have the same number of unique combinations of date and
+    # drone model so that they can be split correctly by date.
+
+    exif_summ2 = exif_data |>
+      # The first of the folder name dataset IDs is the one that was assigned to the dataset_id column
+      # for the image-level data, so filter on that
+      filter(dataset_id == dataset_id_foc) |>
+      select(date, serialnumber) |>
+      distinct()
+
+    exif_unique_record_count = nrow(exif_summ2)
+    exif_unique_date_count = n_distinct(exif_summ2$date)
+
+    if (exif_unique_record_count > exif_unique_date_count) {
+      warning("The imagery exif records for the dataset IDs ", paste(combo_by_name_dataset_ids, collapse = ", "), " differ by more than date; impossible to split the composite photo folder to two baserow records. Naming by the first dataset ID.")
+      dataset_not_separable = data.frame(dataset_id = combo_by_name_dataset_ids[1],
+                                        dataset_id_2 = combo_by_name_dataset_ids[2],
+                                        dataset_id_3 = combo_by_name_dataset_ids[3],
+                                        differ_by = paste(cols_diff_names, collapse = ", "))
+      datasets_not_separable = bind_rows(datasets_not_separable, dataset_not_separable)
+      next()
+    }
+
+    if (exif_unique_record_count != baserow_unique_record_count) {
+      warning("For combo dataset IDs ", paste(combo_by_name_dataset_ids, collapse = ", "), ", there are ", exif_unique_record_count, " unique exif dates and ", baserow_unique_record_count, " unique baserow dates. Impossible to split the composite photo folder to two baserow records. Naming by the first dataset ID.")
+      dataset_not_separable = data.frame(dataset_id = combo_by_name_dataset_ids[1],
+                                        dataset_id_2 = combo_by_name_dataset_ids[2],
+                                        dataset_id_3 = combo_by_name_dataset_ids[3],
+                                        differ_by = paste(cols_diff_names, collapse = ", "))
+      datasets_not_separable = bind_rows(datasets_not_separable, dataset_not_separable)
+      next()
+    }
+    
+    # Here, we can match the images to the baserow records 1:1 by date, so we can split the image
+    # foler into two folders with different dataset IDs according to the date. We do this by first
+    # adding a column to the exif table that is the image's destination dataset ID
+    
+    ### RESUME HERE:
+    for (i in 1:nrow(exif_summ2)) {
+      
+      date_foc = exif_summ2$date[i]
+      
+    }
+    
+
+  }
+
+}
+
+
+
+# TODO: any remaining combo by name cannot be split out, so assign them the first dataset ID and
+# record a record that they contain additional values for one or more columns. May not need the
+# "datasets_not_separable" dataframe created above if it can be created here.
+
+
+
+## OBSOLETE:
+
+
+
+
 
 # If image folder separated by _and_, check what baserow columns are different between the
 # two. If it's just date, split on date into those two columns. If it's something else like base
