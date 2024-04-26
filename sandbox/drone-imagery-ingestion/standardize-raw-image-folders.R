@@ -18,7 +18,7 @@ BASEROW_DATA_PATH = "/ofo-share/scratch-derek/standardize-image-folders_data/bas
 # Load baserow records
 baserow = read_csv(file.path(BASEROW_DATA_PATH, "export - datasets-imagery.csv"))
 dataset_associations = read.table(file.path(BASEROW_DATA_PATH, "export - dataset-associations.csv"), sep = "\t", header = TRUE)
-if ("notes" %in% colnames(dataset_associations)) stop("You need to export the dataset associations table without comments because they screw up the cell delimitations for some reason")
+if ("notes" %in% colnames(dataset_associations)) stop("You need to export the dataset associations table without comments because they screw up the cell delimitations for some reason.")
 
 split_to_list = function(x) {
   a = str_split(x, ",")
@@ -189,43 +189,44 @@ combos_by_exif = datasets |>
   filter(n_dates > 1 | n_serialnumbers > 1)
 
 ## If the same dataset ID contains multiple dates or drone serial numbers, deal with splitting it
+datasets_not_separable = data.frame()
 for (i in 1:nrow(combos_by_exif)) {
 
   combo_by_exif = combos_by_exif[i, ]
   dataset_id_foc = combo_by_exif$dataset_id
   exif_data = image_data |>
     filter(dataset_id == dataset_id_foc)
- 
+
   exif_summ = exif_data |>
     group_by(dataset_id, dataset_id_2, dataset_id_3) |>
     summarize(n_images = n())
-  
-  ids_by_name = exif_summ |>
+
+  ids_by_foldername = exif_summ |>
     select(dataset_id, dataset_id_2, dataset_id_3) |>
     unlist() |> na.omit() |> unique()
 
   # does it have multiple baserow records, indicated by an "_and_" in the image folder?
-  if (!is.na(exif_summ$dataset_id_2[1])) {
+  if (length(ids_by_foldername) > 1) {
 
     # Determine if subsets of this "composite" image folder can be matched 1:1 with baserow records
     # to enable splitting them out by date
 
     # Get the baserow records for the dataset IDs making up the combo according to the image folder name
     baserow_records = b2 |>
-      filter(dataset_id %in% ids_by_name)
+      filter(dataset_id %in% ids_by_foldername)
 
     # According to baserow, what are the unique combinations of date, aircraft_model_id, base_lat,
     # flight_pattern, overlap_front_nominal, overlap_side_nominal, altitude_agl_nominal, and
     # terrain_follow? This will tell us if date alone can be used to split the image folders.
     baserow_summ = baserow_records |>
       ungroup() |>
-      select(date, aircraft_model_id, base_lat, flight_pattern, overlap_front_nominal,
-            overlap_side_nominal, altitude_agl_nominal, terrain_follow) |>
+      select(date, aircraft_model_id, base_lat, base_lon, base_alt, flight_pattern, overlap_front_nominal,
+             overlap_side_nominal, altitude_agl_nominal, terrain_follow) |>
       distinct()
 
     # See which fields differ between the two baserow records
-    cols_diff_idx = which(apply(baserow_records, 2, function(a) length(unique(a)) > 1))
-    cols_diff_names = names(baserow_records)[cols_diff_idx]
+    cols_diff_idx = which(apply(baserow_summ, 2, function(a) length(unique(a)) > 1))
+    cols_diff_names = names(baserow_summ)[cols_diff_idx]
     # Remove boilerplate columns
     cols_diff_names = setdiff(cols_diff_names, c("baserow_dataset_id", "Created on", "dataset_id"))
 
@@ -233,11 +234,16 @@ for (i in 1:nrow(combos_by_exif)) {
     baserow_unique_date_count = n_distinct(baserow_summ$date)
 
     if (baserow_unique_record_count > baserow_unique_date_count) {
-      warning("The baserow records for the dataset IDs ", paste(combo_by_name_dataset_ids, collapse = ", "), " differ by more than date; impossible to split the composite photo folder to two baserow records. Naming by the first dataset ID.")
-      dataset_not_separable = data.frame(dataset_id = combo_by_name_dataset_ids[1],
-                                        dataset_id_2 = combo_by_name_dataset_ids[2],
-                                        dataset_id_3 = combo_by_name_dataset_ids[3],
-                                        differ_by = paste(cols_diff_names, collapse = ", "))
+      warning("The baserow records for the dataset IDs (from folder name) ", paste(ids_by_foldername, collapse = ", "), " differ by more than date; impossible to split the composite photo folder to each baserow record. Naming by the first dataset ID.")
+
+      # TOOD: here, could check if a dataset is a composite of > 3 baserow records, can at least one
+      # of them be cleanly split?
+
+      dataset_not_separable = data.frame(dataset_id = ids_by_foldername[1],
+                                         dataset_id_2 = ids_by_foldername[2],
+                                         dataset_id_3 = ids_by_foldername[3],
+                                         differ_by = paste(cols_diff_names, collapse = ", "),
+                                         why_not_splittable = "EXIF date does not explain other EXIF variation")
       datasets_not_separable = bind_rows(datasets_not_separable, dataset_not_separable)
       # ^ This will be used to add a record to the baserow records that says that the image dataset
       # contains additional values for one or more columns but could not be separated automatically
@@ -258,42 +264,62 @@ for (i in 1:nrow(combos_by_exif)) {
     exif_unique_record_count = nrow(exif_summ2)
     exif_unique_date_count = n_distinct(exif_summ2$date)
 
+    # Make sure that everything else that varies is perfectly coinciding with date differences
     if (exif_unique_record_count > exif_unique_date_count) {
-      warning("The imagery exif records for the dataset IDs ", paste(combo_by_name_dataset_ids, collapse = ", "), " differ by more than date; impossible to split the composite photo folder to two baserow records. Naming by the first dataset ID.")
-      dataset_not_separable = data.frame(dataset_id = combo_by_name_dataset_ids[1],
-                                        dataset_id_2 = combo_by_name_dataset_ids[2],
-                                        dataset_id_3 = combo_by_name_dataset_ids[3],
+      warning("The imagery exif records for the dataset IDs ", paste(ids_by_foldername, collapse = ", "), " differ by more than date; impossible to split the composite photo folder to each baserow record. Naming by the first dataset ID.")
+      dataset_not_separable = data.frame(dataset_id = ids_by_foldername[1],
+                                        dataset_id_2 = ids_by_foldername[2],
+                                        dataset_id_3 = ids_by_foldername[3],
                                         differ_by = paste(cols_diff_names, collapse = ", "))
       datasets_not_separable = bind_rows(datasets_not_separable, dataset_not_separable)
       next()
     }
 
+    # Make sure that exif info agrees with baserow on the number of dates
     if (exif_unique_record_count != baserow_unique_record_count) {
-      warning("For combo dataset IDs ", paste(combo_by_name_dataset_ids, collapse = ", "), ", there are ", exif_unique_record_count, " unique exif dates and ", baserow_unique_record_count, " unique baserow dates. Impossible to split the composite photo folder to two baserow records. Naming by the first dataset ID.")
-      dataset_not_separable = data.frame(dataset_id = combo_by_name_dataset_ids[1],
-                                        dataset_id_2 = combo_by_name_dataset_ids[2],
-                                        dataset_id_3 = combo_by_name_dataset_ids[3],
-                                        differ_by = paste(cols_diff_names, collapse = ", "))
+      warning("For combo dataset IDs ", paste(ids_by_foldername, collapse = ", "), ", there are ", exif_unique_record_count, " unique exif dates and ", baserow_unique_record_count, " unique baserow dates. Impossible to split the composite photo folder to each baserow record. Naming by the first dataset ID.")
+      dataset_not_separable = data.frame(dataset_id = ids_by_foldername[1],
+                                        dataset_id_2 = ids_by_foldername[2],
+                                        dataset_id_3 = ids_by_foldername[3],
+                                        differ_by = paste(cols_diff_names, collapse = ", "),
+                                        splittable_by_date = TRUE,
+                                        why_not_splittable = "Uniqe EXIF does not match unique baserow")
       datasets_not_separable = bind_rows(datasets_not_separable, dataset_not_separable)
       next()
     }
-    
+
     # Here, we can match the images to the baserow records 1:1 by date, so we can split the image
     # foler into two folders with different dataset IDs according to the date. We do this by first
     # adding a column to the exif table that is the image's destination dataset ID
-    
+
     ### RESUME HERE:
 
-    for (i in 1:nrow(exif_summ2)) {
-      
-      date_foc = exif_summ2$date[i]
-      
+    for (j in 1:nrow(exif_summ2)) {
+
+      date_foc = exif_summ2$date[j]
+
+      # Which baserow dataset ID does this date corespond to? Note, this does not refer to the
+      # baserow column "baserow_dataset_id" (which is just an auto-number of rows by Postgres), but
+      # to the "dataset_id" number according to the Baserow table, which is the OFO dataset ID.
+      baserow_dataset_id = baserow_records |>
+        filter(date == date_foc) |>
+        pull(dataset_id)
+
+      # In the full image exif dataframe, assign the baserow dataset ID to the image
+      image_data[image_data$dataset_id == dataset_id_foc & image_data$date == date_foc, "dataset_id_out"] = baserow_dataset_id
+
+
     }
-    
 
   }
 
 }
+
+# Summerize image_data to inspect
+inspect = image_data |>
+  group_by(dataset_id, dataset_id_2, dataset_id_3, date, serialnumber, dataset_id_out) |>
+  summarize(n_images = n())
+inspect
 
     # *******((((((((TODO: Also have to deal with fact taht combos_by_exif could be different by serial number and not
     # date. What happens in that case?
@@ -302,6 +328,8 @@ for (i in 1:nrow(combos_by_exif)) {
 # record a record that they contain additional values for one or more columns. May not need the
 # "datasets_not_separable" dataframe created above if it can be created here.
 
+# TODO: look for datasets that contain multiple drone serialnumbers and split them into sub-datasets
+# as well
 
 
 ## OBSOLETE:
