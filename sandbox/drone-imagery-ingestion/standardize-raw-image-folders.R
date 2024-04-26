@@ -204,8 +204,15 @@ for (i in 1:nrow(combos_by_exif)) {
     select(dataset_id, dataset_id_2, dataset_id_3) |>
     unlist() |> na.omit() |> unique()
 
+  exif_summ2 = exif_data |> # TODO: <- rename
+    # The first of the folder name dataset IDs is the one that was assigned to the dataset_id column
+    # for the image-level data, so filter on that
+    filter(dataset_id == dataset_id_foc) |>
+    select(date, serialnumber) |>
+    distinct()
+
   # Does it have multiple baserow records, indicated by an "_and_" in the image folder?
-  if (length(ids_by_foldername) > 1) {
+  if (length(ids_by_foldername) > 1) { # !!TODO!!! Possible remove
 
     # Determine if subsets of this "composite" image folder can be matched 1:1 with baserow records
     # to enable splitting them out by date
@@ -248,19 +255,25 @@ for (i in 1:nrow(combos_by_exif)) {
       datasets_not_separable = bind_rows(datasets_not_separable, dataset_not_separable)
       # ^ This will be used to add a record to the baserow records that says that the image dataset
       # contains additional values for one or more columns but could not be separated automatically
+
+      # Assign the first dataset ID and split by date or serialnumber if possible
+      # TODO: turn this and the 3 similar blocks below into a function
+      for (j in 1:nrow(exif_summ2)) {
+        exif_summ_foc = exif_summ2[j, ]
+        image_data[image_data$dataset_id == dataset_id_foc &
+                     image_data$date == exif_summ_foc$date,
+                   "dataset_id_out"] = dataset_id_foc
+        image_data[image_data$dataset_id == dataset_id_foc &
+                     image_data$date == exif_summ_foc$date,
+                   "subdataset_out"] = j
+      }
+
       next()
     }
 
     # Date is sufficient to identify the unique baserow records for this combo image folder. Now need
     # to make sure that image files themselves have the same number of unique combinations of date and
     # drone model so that they can be split correctly by date.
-
-    exif_summ2 = exif_data |>
-      # The first of the folder name dataset IDs is the one that was assigned to the dataset_id column
-      # for the image-level data, so filter on that
-      filter(dataset_id == dataset_id_foc) |>
-      select(date, serialnumber) |>
-      distinct()
 
     exif_unique_record_count = nrow(exif_summ2)
     exif_unique_date_count = n_distinct(exif_summ2$date)
@@ -273,6 +286,9 @@ for (i in 1:nrow(combos_by_exif)) {
                                         dataset_id_3 = ids_by_foldername[3],
                                         differ_by = paste(cols_diff_names, collapse = ", "))
       datasets_not_separable = bind_rows(datasets_not_separable, dataset_not_separable)
+      
+      # HERE: split by date if possible
+      
       next()
     }
 
@@ -286,6 +302,9 @@ for (i in 1:nrow(combos_by_exif)) {
                                         splittable_by_date = TRUE,
                                         why_not_splittable = "Uniqe EXIF does not match unique baserow")
       datasets_not_separable = bind_rows(datasets_not_separable, dataset_not_separable)
+
+      # HERE: split by date if possible
+
       next()
     }
 
@@ -343,14 +362,19 @@ inspect = image_data |>
   summarize(n_images = n())
 inspect
 
-
-
-# TODO: any remaining combo by name cannot be split out, so assign them the first dataset ID and
+# Any remaining combo by folder name ("_and_") cannot be split out to unique baserow records, so assign them the first dataset ID and
 # record a record that they contain additional values for one or more columns. May not need the
 # "datasets_not_separable" dataframe created above if it can be created here.
 
-# TODO: look for datasets that contain multiple drone serialnumbers and split them into sub-datasets
-# as well
+composites_not_split = image_data |>
+  filter(is.na(dataset_id_out) & (!is.na(dataset_id_2) | !is.na(dataset_id_3))) |>
+  group_by(dataset_id, dataset_id_2, dataset_id_3, date, serialnumber) |>
+  summarize(n_images = n())
+  
+datasets_not_separable
+
+
+
 
 
 ## OBSOLETE:
