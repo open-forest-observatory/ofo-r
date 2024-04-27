@@ -435,10 +435,62 @@ datasets_not_separable
 # dataset ID.
 
 # Create one overarching group_id_full that unifies all records that share a group_id OR
-# association_id
+# association_id. A given observation may have both, linking it to some records via group_id and
+# others via association_id. This whole cascade of linked records should be assigned the same
+# group_id_full. Approach: create an incrementing group_id_full. Loop through each baserow record.
+# When you reach one that has not been assigned a group_id_full, first check if any other records of
+# the same association_id or group_id have been assigned a group_id_full. If so, assign the same
+# group_id full. If not, assign a new group_id_full and assign it to all records with the same
+# group_id or association_id.
+
+b3 = b2
+
+# Prep: where group ID is missing, assign an incrementing group ID that's not used
+max_group_id = max(b3$group_id, na.rm = TRUE)
+max_association_id = max(b3$association_id, na.rm = TRUE)
+b3 = b3 |>
+  ungroup() |>
+  mutate(group_id = ifelse(is.na(group_id), max_group_id + row_number(), group_id),
+         association_id = ifelse(is.na(association_id), max_association_id + row_number(), association_id))
 
 
 
+current_group_id_full = 1
+b3$group_id_full = NA
+for (i in seq_len(nrow(b3))) {
+
+  b3_row = b3[i, ]
+
+  if (!is.na(b3_row$group_id_full)) next()
+
+  group_id_foc = b3_row$group_id
+  association_id_foc = b3_row$association_id
+
+  # Find any records with the same group_id or association_id that have already been assigned a
+  # group_id_full and assign the same group_id_full to this record
+  existing_paired_records = b3 |>
+    filter(group_id == group_id_foc | association_id == association_id_foc) |>
+    filter(!is.na(group_id_full))
+
+  if (nrow(existing_paired_records) > 0) {
+
+    existing_group_id_full = existing_paired_records$group_id_full |> unique()
+    if (length(existing_group_id_full) > 1) stop("Multiple group_id_fulls found for the same group_id or association_id.")
+
+    b3[i, "group_id_full"] = existing_group_id_full
+    group_id_to_assign = existing_group_id_full
+  } else {
+    group_id_to_assign = current_group_id_full
+    current_group_id_full = current_group_id_full + 1
+  }
+
+  b3[which(b3$group_id == group_id_foc | b3$association_id == association_id_foc), "group_id_full"] = group_id_to_assign
+}
+
+inspect = b3 |>
+  ungroup() |>
+  select(contributor_dataset_name, association_id, group_id, group_id_full)
+View(inspect)
 # For each group_id_full in baserow, and every subdataset ID, assign the right dataset_id and a
 # unique subdataset_id_full to the image_data table, probalby by merging in a subset of the baserow
 # table b2 into the image_data table and calling a cur_group_id() on the merged table.
