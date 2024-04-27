@@ -414,6 +414,12 @@ for (i in seq_len(nrow(composites_not_split))) {
 
 }
 
+# If dataset_id_out was not assigned (because it was not a composite dataset), then assign the,
+# original dataset_id
+image_data = image_data |>
+  mutate(dataset_id_out = ifelse(is.na(dataset_id_out), dataset_id, dataset_id_out),
+         subdataset_out = ifelse(is.na(subdataset_out), 1, subdataset_out))
+
 
 # Summarize image_data to inspect
 inspect = image_data |>
@@ -491,6 +497,43 @@ inspect = b3 |>
   ungroup() |>
   select(contributor_dataset_name, association_id, group_id, group_id_full)
 View(inspect)
-# For each group_id_full in baserow, and every subdataset ID, assign the right dataset_id and a
-# unique subdataset_id_full to the image_data table, probalby by merging in a subset of the baserow
-# table b2 into the image_data table and calling a cur_group_id() on the merged table.
+
+# For each group_id_full in baserow, and every subdataset ID in image_data, assign the right
+# dataset_id (the first one that occurs for the group) and a unique subdataset_id_full to the
+# image_data table, probably by merging in a subset of the baserow table b3 into the image_data
+# table and calling a cur_group_id() on the merged table.
+
+b3_simp = b3 |>
+  select(contributor_dataset_name, dataset_id, association_id, group_id, group_id_full)
+
+final_ids_for_images = image_data |>
+  left_join(b3_simp, by = "dataset_id") |>
+  # Outputs should be uniquely defined by dataset_id_out, subdataset_out, and group_id_full
+  arrange(dataset_id_out, subdataset_out, group_id_full) |>
+  group_by(dataset_id_out, subdataset_out, group_id_full) |>
+  summarize(n_images = n()) |>
+  group_by(group_id_full) |>
+  mutate(dataset_id_out_final = first(dataset_id_out),
+         subdataset_out_final = row_number()) |>
+  # We can drop group_id_full because it only serves to indicate two unique dataset IDs are related.
+  # It is not necessary as a unique identifier.
+  select(dataset_id_out, subdataset_out, dataset_id_out_final, subdataset_out_final)
+
+View(final_ids_for_images)
+
+# Pull it in to image data. Also save a record of, for each final dataset X subdataset, what the
+# original dataset ID was. This should include the what differed between them, including the
+# previously computed data frame for this (datasets_not_separable).
+
+
+
+
+
+inspect = image_data_w_baserow |>
+  group_by(dataset_id, dataset_id_2, dataset_id_3, date, serialnumber, dataset_id_out, contributor_dataset_name, subdataset_out, association_id, group_id, group_id_full) |>
+  summarize(n_images = n())
+inspect
+
+
+
+
