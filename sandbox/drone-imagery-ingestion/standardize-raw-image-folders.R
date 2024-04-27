@@ -26,6 +26,7 @@ split_to_list = function(x) {
 }
 
 # Merge the dataset assoc ID into the main baserow records
+
 assoc = dataset_associations |>
   # Separate the multiple dataset IDs (currently in a column separated by commas) into a list column
   mutate(dataset_ids = split_to_list(dataset_ids))
@@ -424,5 +425,20 @@ View(inspect)
 datasets_not_separable
 
 
+## Using baserow records, determine what folders of images should be associated (merged to one).
+# They are grouped by association_id when they were associated in baserow as being contiguous or two
+# orientations of a grid, so put these together under one dataset ID.
+# They are grouped by group_id when they differ by date or base station location or aircraft (and
+# have the same contributor dataset ID, altitude, and other important mission parameters), so also
+# put these together under one dataset ID.
+# We will need to create a new table that links the new dataset ID (with subdataset ID) to the old
+# dataset ID.
+
+# Create one overarching group_id_full that unifies all records that share a group_id OR
+# association_id
 
 
+
+# For each group_id_full in baserow, and every subdataset ID, assign the right dataset_id and a
+# unique subdataset_id_full to the image_data table, probalby by merging in a subset of the baserow
+# table b2 into the image_data table and calling a cur_group_id() on the merged table.
