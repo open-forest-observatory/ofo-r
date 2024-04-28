@@ -15,6 +15,7 @@ datadir = readLines(file.path("sandbox", "data-dirs", "michellegarcia-metadata-m
 # Get a list of the files containing the test EXIF data (one file per image dataset). These files
 # have already been created and saved into the project data folder.
 exif_files = list.files(file.path(datadir, "exif-examples"), pattern = "^exif.+\\.csv$", full.names = TRUE)
+exif_files
 
 # Define which test EXIF file to run the functions on
 exif_file = exif_files[1]
@@ -39,6 +40,7 @@ write.csv(metadata, file.path(out_dir, "dataset-metadata_dy.csv"), row.names = F
 # Select an EXIF file to test on, and prep the EXIF data by loading it as a geospatial data frame
 # using the 'prep_exif' function. The 'prep_exif' function is defined in
 # 'R/imagery-metadata-extraction_general.R'            # nolint
+
 exif_file = exif_files[1]
 exif = prep_exif(exif_file)
 # Note that the 'prep_exif' function returns the EXIF data as a geospatial data frame (an 'sf'
@@ -84,58 +86,28 @@ image_count
 
 
 #START CODE FOR CENTROID LAT/LONG
-
-GPSLocation = exif$GPSPosition
-
-#splitting the list (was this step really necessary for my dataset? I'm not really sure this actually helped?)
-coordinates <- strsplit(GPSLocation, split = ";")
-
-# Separating the GPS from the whole exif file
-almostdone <- strsplit(unlist(coordinates), split = ",")
-
-#Creating a seperate dataframe with just the coordinates to call upon later
-isolatedcoordinates <- as.data.frame(do.call(rbind, almostdone))
-
 library(stringr)
-#Need to download this package as it will help with the following functions
-separator(df)
-
-install.packages("tidyverse")
 library(tidyverse)
 
-df2 = separate(exif,
-        col = GPSPosition,
-        into = c("lat", "long"),
-        sep = " " )
-#Here this worked, instead of doing by number of characters, did it by seperating at
-#the space in between the two (since the number of characters differed from row to row).
+#Getting the coordinates listed in the exif file and for it to seperate into long/lat
 
-print(df2)
-#printed out the new df that includes the "lat" and "long"
+coordinate = sf::st_coordinates(exif)
+lon = coords[, 1]
+lat = coords[, 2]
 
-#when looking online, it says that the way to find the centroid lat/long is to
-#just use the average of the lat and the average of the long
+#assigning the points
+points <- st_as_sf(exif, coord = c(coordinate), crs = 4326)
 
-str(df2$lat)
-str(df2$long)
+# Making it a multipoint
+multipoint <- st_union(points)
 
-#here checking what type of character the lat and long are within the
-#dataset, if it is not numeric, will need to change it.
+# Calculate the centroid of the MULTIPOINT geometry
+centroid <- st_centroid(multipoint)
 
-df2$lat = as.numeric(df2$lat)
-df2$long = as.numeric(df2$long)
-
-#had to convert to numeric numbers since it was thinking that the column was a
-#character.
-
-xcoordinate = mean(df2$lat, na.rm=TRUE)
-ycoordinate = mean(df2$long, na.rm= TRUE)
-
-#finding the mean of the lat and long, since this is all one mission,
-#it should give us the centroid lat/long, at least from what I researched.
-
-print(ycoordinate)
-print(xcoordinate)
+# Print the centroid to get the coordinates
+print(centroid)
+#Ploting to make sure it comes out as a single point
+plot(centroid)
 
 #END CODE FOR CENTOID CALCULATIONS
 
@@ -146,7 +118,6 @@ print(xcoordinate)
 #found the package suntools which will calculate the solar noon, this way we do not have to do
 #any crazy calculations, it is all included in the function and only needs lat/long and the time.
 
-install.packages("suntools")
 library("suntools")
 
 #Here we are seperating the date from the time, since we only need the date to run this function
@@ -161,14 +132,15 @@ date <- datetimedf[1, 143]$date
 date
 #now using the newly seperated date column and using the first row to get the date to be used in the function below
 
-#used the centroid calculated in the above code chunk for the lat/long
-solarnoon <- solarnoon(
-  matrix(c(xcoordinate, ycoordinate), nrow = 1),
+#used the general coordinates and input into this function
+
+sncalc <- solarnoon(
+  matrix(c(coordinate), nrow = 1),
   as.POSIXct(date),
   POSIXct.out=TRUE
 )
 
-solarnoon
+sncalc
 #This gives the solar noon as a fraction of the day as well as the datetime.
 
 #END CODE FOR SOLARNOON CALCULATION
