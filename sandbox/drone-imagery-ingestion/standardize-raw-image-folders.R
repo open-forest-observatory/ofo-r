@@ -1,18 +1,26 @@
-# Purpose: Read in the manually cleaned drone images in mission folders and write them back out in a
-# standardized folder structure with standaridzed file names
+# Purpose: Read the EXIF data previously extracted from drone images, combined with baserow
+# metadata, and determine how to split the images into a standrdized folder structure (e.g., no more
+# than one date per folder, but with multiple dates associated via sub-IDs). Save the data needed to
+# execute the sorting to a CSV.
 
 library(tidyverse)
-library(exifr)
-library(furrr)
 
-IMAGERY_INPUT_PATH = "/ofo-share/drone-imagery-organization/1_manually-cleaned/2022-early-regen/"
-IMAGERY_OUTPUT_PATH = "/ofo-share/drone-imagery-organization/2_standardized-preclean/2022-early-regen/"
-BASEROW_DATA_PATH = "/ofo-share/scratch-derek/standardize-image-folders_data/baserow/"
+IMAGERY_PROJECT_NAME = "2022-early-regen"
+
+BASEROW_DATA_PATH = "/ofo-share/scratch-derek/standardize-image-folders_data/baserow"
+EXIF_INPUT_PATH = "/ofo-share/drone-imagery-organization/1b_exif-unprocessed"
+PROCESSED_EXIF_OUTPUT_PATH = "/ofo-share/drone-imagery-organization/1c_exif-for-sorting"
 
 
 ## END CONSTANTS
 
-## Prep baserow
+## Set up derived constants
+exif_input_path = file.path(EXIF_INPUT_PATH, paste0(IMAGERY_PROJECT_NAME, ".csv"))
+exif_output_path = file.path(PROCESSED_EXIF_OUTPUT_PATH, paste0(IMAGERY_PROJECT_NAME, "_exif.csv"))
+crosswalk_output_path = file.path(PROCESSED_EXIF_OUTPUT_PATH, paste0(IMAGERY_PROJECT_NAME, "_crosswalk.csv"))
+
+
+## Prep baserow metadata
 
 # Load baserow records
 baserow = read_csv(file.path(BASEROW_DATA_PATH, "export - datasets-imagery.csv"))
@@ -31,7 +39,7 @@ assoc = dataset_associations |>
   # Separate the multiple dataset IDs (currently in a column separated by commas) into a list column
   mutate(dataset_ids = split_to_list(dataset_ids))
 
-# TODO: Make this more efficient
+# TODO: Make this more efficient. Though it is not that slow.
 baserow$association_id = NA
 for (i in 1:nrow(baserow)) {
 
@@ -92,62 +100,10 @@ b2 = b |>
          n_in_group = n()) |>
   mutate(group_id = ifelse(n_in_group > 1, group_id, NA))
 
-# If an image folder needs to be split to two associated folders (e.g. because two dates or
-# aircrafts), then assign the associated records a group ID that is unique for each group.
-# Ultimately, we need to create dataset IDs that are the same but have a sub-ID to differentiate. We
-# will determine this by going through the image files in each folder and checking the date of each
-# image.
-
-# First goal is to create a data frame of: dataset_id, date, aircraft_id, [list col of all image
-# filepaths]. We will do this by getting this info for each image file in every folder, then grouping.
-
-get_image_data = function(dataset_folder) {
-
-  # Get the full path to the dataset folder
-  base_folder = basename(dataset_folder)
-
-  # Get list of image files
-  image_filepaths = list.files(dataset_folder, full.names = TRUE, recursive = TRUE, pattern = "(.jpg$)|(.jpeg$)|(.JPG$)|(.JPEG$)")
-
-  # Get exif data
-  exif = read_exif(image_filepaths)
-
-  # Compile relevant per-image info (including potential ways to distinguish two drones) into data
-  # frame
-
-  # Check if nay of the relevant columns are null
-  date_null = is.null(exif$DateTimeOriginal)
-  model_null = is.null(exif$Model)
-  serialnumber_null = is.null(exif$SerialNumber)
-  if(date_null || model_null || serialnumber_null) {
-    warning("Null values (likely complete image corruption) found in ", base_folder, ". Skipping.")
-    return(NULL)
-  }
-
-  image_data_onefolder = data.frame(folder_in = base_folder,
-                           image_path = image_filepaths,
-                           date = exif$DateTimeOriginal,
-                           model = exif$Model,
-                           serialnumber = exif$SerialNumber)
-
-  return(image_data_onefolder)
-
-}
-
-
-# All folders
-folders = list.dirs(IMAGERY_INPUT_PATH, full.names = TRUE, recursive = FALSE)
-
-plan = future::plan(multicore)
-l = future_map(folders, get_image_data)
-
-image_data = bind_rows(l)
-write_csv(image_data, file.path(BASEROW_DATA_PATH, "image_data_2022-early-regen.csv"))
-
 
 ## Process the image-level data into dataset-level data to determine how to split and group the image files in their ultimate standardized folders
 
-image_data = read_csv(file.path(BASEROW_DATA_PATH, "image_data_2022-early-regen.csv"))
+image_data = read_csv(file.path(exif_input_path))
 
 # Remove images without a date (likely corrupted)
 image_data = image_data |>
@@ -247,7 +203,7 @@ for (i in 1:nrow(combos_by_exif)) {
                                         dataset_id_2 = ids_by_foldername[2],
                                         dataset_id_3 = ids_by_foldername[3],
                                         differ_by = paste(cols_diff_names, collapse = ", "),
-                                        why_not_splittable = "EXIF date does not explain other EXIF variation")
+                                        why_not_separable = "EXIF date does not explain other EXIF variation")
     datasets_not_separable = bind_rows(datasets_not_separable, dataset_not_separable)
     # ^ This will be used to add a record to the baserow records that says that the image dataset
     # contains additional values for one or more columns but could not be separated automatically
@@ -314,7 +270,7 @@ for (i in 1:nrow(combos_by_exif)) {
                                       dataset_id_2 = ids_by_foldername[2],
                                       dataset_id_3 = ids_by_foldername[3],
                                       differ_by = paste(cols_diff_names, collapse = ", "),
-                                      why_not_splittable = "Uniqe EXIF does not match unique baserow")
+                                      why_not_separable = "Uniqe EXIF does not match unique baserow")
     datasets_not_separable = bind_rows(datasets_not_separable, dataset_not_separable)
 
     # Assign the first ID and split into subdatasets by date and serialnumber
@@ -406,7 +362,7 @@ for (i in seq_len(nrow(composites_not_split))) {
                                      dataset_id_2 = ids_by_foldername[2],
                                      dataset_id_3 = ids_by_foldername[3],
                                      differ_by = paste(cols_diff_names, collapse = ", "),
-                                     why_not_splittable = "Only one date")
+                                     why_not_separable = "Only one date")
   datasets_not_separable = bind_rows(datasets_not_separable, dataset_not_separable)
 
   # Save the main dataset ID as the dataset ID out
@@ -426,7 +382,6 @@ inspect = image_data |>
   group_by(dataset_id, dataset_id_2, dataset_id_3, date, serialnumber, dataset_id_out, subdataset_out) |>
   summarize(n_images = n())
 inspect
-View(inspect)
 
 datasets_not_separable
 
@@ -458,7 +413,6 @@ b3 = b3 |>
   ungroup() |>
   mutate(group_id = ifelse(is.na(group_id), max_group_id + row_number(), group_id),
          association_id = ifelse(is.na(association_id), max_association_id + row_number(), association_id))
-
 
 
 current_group_id_full = 1
@@ -496,7 +450,6 @@ for (i in seq_len(nrow(b3))) {
 inspect = b3 |>
   ungroup() |>
   select(contributor_dataset_name, association_id, group_id, group_id_full)
-View(inspect)
 
 # For each group_id_full in baserow, and every subdataset ID in image_data, assign the right
 # dataset_id (the first one that occurs for the group) and a unique subdataset_id_full to the
@@ -519,21 +472,39 @@ final_ids_for_images = image_data |>
   # It is not necessary as a unique identifier.
   select(dataset_id_out, subdataset_out, dataset_id_out_final, subdataset_out_final)
 
-View(final_ids_for_images)
 
-# Pull it in to image data. Also save a record of, for each final dataset X subdataset, what the
-# original dataset ID was. This should include the what differed between them, including the
-# previously computed data frame for this (datasets_not_separable).
+# Pull it in to image data
+image_data_w_outnames = image_data |>
+  left_join(final_ids_for_images, by = join_by("dataset_id_out" == "dataset_id_out",
+                                               "subdataset_out" == "subdataset_out")) |>
+  # Format it for writing a folder name
+  mutate(subdataset_out_final = str_pad(subdataset_out_final, 2, side = "left", pad = "0"),
+         folder_out_final = paste(dataset_id_out_final, subdataset_out_final, sep = "-"))
 
-
-
-
-
-inspect = image_data_w_baserow |>
-  group_by(dataset_id, dataset_id_2, dataset_id_3, date, serialnumber, dataset_id_out, contributor_dataset_name, subdataset_out, association_id, group_id, group_id_full) |>
+inspect = image_data_w_outnames |>
+  group_by(dataset_id, dataset_id_2, dataset_id_3, date, serialnumber, dataset_id_out, subdataset_out, group_id_full, dataset_id_out_final, subdataset_out_final) |>
   summarize(n_images = n())
 inspect
 
+# Save a table of the data needed for creating the new folder structure
+image_reorg_data = image_data_w_outnames |>
+  select(folder_in, image_path, folder_out_final)
+write_csv(image_reorg_data, exif_output_path)
 
 
+# Save a record of, for each final dataset X subdataset, what the
+# original dataset ID was. This should include the what differed between them, including the
+# previously computed data frame for this (datasets_not_separable).
+folderid_baserow_crosswalk = image_data_w_outnames |>
+  select(dataset_id_baserow = dataset_id, dataset_id_imagefolder = folder_out_final) |>
+  group_by(dataset_id_baserow, dataset_id_imagefolder) |>
+  summarize(n_images = n())
 
+datasets_not_separable2 = datasets_not_separable |>
+  unite(addl_dataset_ids_baserow, dataset_id_2, dataset_id_3, sep = ",", na.rm = TRUE) |>
+  select(dataset_id_baserow = dataset_id, addl_dataset_ids_baserow, addl_baserow_differ_by, why_not_separable)
+
+folderid_baserow_crosswalk = folderid_baserow_crosswalk |>
+  left_join(datasets_not_separable2, by = "dataset_id_baserow")
+
+write_csv(folderid_baserow_crosswalk, crosswalk_output_path)
