@@ -5,12 +5,14 @@
 
 library(tidyverse)
 
-IMAGERY_PROJECT_NAME = "2022-early-regen"
+IMAGERY_PROJECT_NAME = "2023-ny-ofo" # 2023-ny-ofo, 2022-early-regen
 
 BASEROW_DATA_PATH = "/ofo-share/scratch-derek/standardize-image-folders_data/baserow"
 EXIF_INPUT_PATH = "/ofo-share/drone-imagery-organization/1b_exif-unprocessed"
 PROCESSED_EXIF_OUTPUT_PATH = "/ofo-share/drone-imagery-organization/1c_exif-for-sorting"
 
+# What is the padding width for the dataset ID in the folder name? (New format)
+FOLDER_DATASET_ID_PADDING = 4
 
 ## END CONSTANTS
 
@@ -67,26 +69,28 @@ for (i in 1:nrow(baserow)) {
 }
 
 
-# Create a column for the canonical dataset ID (from dataset_id_old if populated, otherwise from
-# dataset_id)
+# Create a column for the canonical dataset ID (and get the date out of the old ID given it was not
+# previously recorded separately, just as a part of the dataset ID)
 b = baserow |>
   # Remove a database row ID (not an actual dataset ID)
   select(-id) |>
   mutate(across(contains("dataset_id"), as.character)) |>
-  mutate(uses_old_id = !is.na(dataset_id_old)) |>
+  mutate(folder_uses_old_id = !is.na(dataset_id_old)) |>
   # Remove the first part of the ID (the date, separated from the actual ID by a "-")
+  mutate(folder_name = ifelse(folder_uses_old_id,
+                                    dataset_id_old,
+                                    dataset_id |> str_pad(FOLDER_DATASET_ID_PADDING, "left", "0"))) |>
   mutate(dataset_id_old_trimmed = str_split(dataset_id_old, "-", simplify = TRUE)[, 2]) |>
   # Also save the date out of the old dataset ID
   mutate(date_old = str_split(dataset_id_old, "-", simplify = TRUE)[, 1]) |>
   mutate(date_old = paste(str_sub(date_old, 1, 4), str_sub(date_old, 5, 6), str_sub(date_old, 7, 8), sep = "-")) |>
   mutate(date_old = as.Date(date_old)) |>
-  mutate(dataset_id_canon = ifelse(uses_old_id, dataset_id_old_trimmed, dataset_id)) |>
-  mutate(dataset_date_canon = ifelse(uses_old_id, date_old, date) |> as.Date()) |>
+  mutate(dataset_date_canon = ifelse(folder_uses_old_id, date_old, date) |> as.Date()) |>
   # Preserve baserow_dataset_id for linking tables
   rename(baserow_dataset_id = dataset_id) |>
   # Remove intermediate cols 
-  select(-dataset_id_old, -dataset_id_old_trimmed, -uses_old_id, -date_old, -date) |>
-  rename(dataset_id = dataset_id_canon,
+  select(-dataset_id_old, -dataset_id_old_trimmed, -folder_uses_old_id, -date_old, -date) |>
+  rename(dataset_id = baserow_dataset_id,
          date = dataset_date_canon) |>
   mutate(dataset_id = str_pad(dataset_id, 6, pad = "0"))
 
@@ -109,35 +113,90 @@ image_data = read_csv(file.path(exif_input_path))
 image_data = image_data |>
   filter(!is.na(date))
 
-# Standardize date and get dataset ID from folder name, accommodating that it may be in the format
-# {date}-{4-digit ID} or simply {4- to 6-digit ID}
+# Standardize date and separate the folder name into its components (if it is a composite dataset
+# with names separated by "_and_")
 image_data = image_data |>
   mutate(date = str_split(date, " ", simplify = TRUE)[, 1] |>
            str_replace_all(fixed(":"), "-") |>
            as.Date()) |>
   mutate(folder_in = str_replace_all(folder_in, fixed("/"), "")) |>
   separate_wider_delim(delim = "_and_", cols = "folder_in", names = c("folder_in", "folder_in_2", "folder_in_3"), too_few = "align_start") |>
-  mutate(dataset_id_old_format = grepl("[0-9]{8}-[0-9]{4}", folder_in)) |>
-  mutate(dataset_id = ifelse(dataset_id_old_format, str_sub(folder_in, -4, -1), folder_in) |>
-           str_pad(6, "left", pad = "0")) |>  mutate(dataset_id_old_format = grepl("[0-9]{8}-[0-9]{4}", folder_in)) |>
-  mutate(dataset_id_old_format_2 = grepl("[0-9]{8}-[0-9]{4}", folder_in_2)) |>
-  mutate(dataset_id_2 = ifelse(dataset_id_old_format_2, str_sub(folder_in_2, -4, -1), folder_in_2) |>
-           str_pad(6, "left", pad = "0")) |>
-  mutate(dataset_id_old_format_3 = grepl("[0-9]{8}-[0-9]{4}", folder_in_3)) |>
-  mutate(dataset_id_3 = ifelse(dataset_id_old_format_3, str_sub(folder_in_3, -4, -1), folder_in_3) |>
-           str_pad(6, "left", pad = "0")) |>
-  select(-dataset_id_old_format, -dataset_id_old_format_2, -dataset_id_old_format_3) |>
-  # Images without a date are corrupted
   filter(!is.na(date))
+  # mutate(dataset_id_old_format = grepl("[0-9]{8}-[0-9]{4}", folder_in)) |>
+  # mutate(dataset_id = ifelse(dataset_id_old_format, str_sub(folder_in, -4, -1), folder_in) |>
+  #          str_pad(6, "left", pad = "0")) |>  mutate(dataset_id_old_format = grepl("[0-9]{8}-[0-9]{4}", folder_in)) |>
+  # mutate(dataset_id_old_format_2 = grepl("[0-9]{8}-[0-9]{4}", folder_in_2)) |>
+  # mutate(dataset_id_2 = ifelse(dataset_id_old_format_2, str_sub(folder_in_2, -4, -1), folder_in_2) |>
+  #          str_pad(6, "left", pad = "0")) |>
+  # mutate(dataset_id_old_format_3 = grepl("[0-9]{8}-[0-9]{4}", folder_in_3)) |>
+  # mutate(dataset_id_3 = ifelse(dataset_id_old_format_3, str_sub(folder_in_3, -4, -1), folder_in_3) |>
+  #          str_pad(6, "left", pad = "0")) |>
+  # select(-dataset_id_old_format, -dataset_id_old_format_2, -dataset_id_old_format_3) |>
+  # Images without a date are corrupted
+
+
+# Bring in the dataset ID (as listed in Baserow) corresponding to each image folder name (for the older format)
+crosswalk = b |>
+  select(dataset_id_baserow = dataset_id, folder_name)
+image_data = image_data |>
+  left_join(crosswalk, by = c("folder_in" = "folder_name")) |>
+  rename(dataset_id = dataset_id_baserow)
+image_data = image_data |>
+  left_join(crosswalk, by = c("folder_in_2" = "folder_name")) |>
+  rename(dataset_id_2 = dataset_id_baserow)
+image_data = image_data |>
+  left_join(crosswalk, by = c("folder_in_3" = "folder_name")) |>
+  rename(dataset_id_3 = dataset_id_baserow)
 
 datasets = image_data |>
-  group_by(dataset_id, serialnumber, date) |>
+  group_by(dataset_id, dataset_id_2, dataset_id_3, folder_in, serialnumber, date) |>
   summarize(n_images = n()) |>
   # Datasets with < 30 images are likely not useful
   filter(n_images > 30) |>
   ungroup()
 
-# When does the same dataset ID show up for more than one date or serial number?
+# Check for any folders unmatched to dataset IDs
+
+if (any(is.na(datasets$dataset_id))) {
+  folders_no_id = datasets |>
+    filter(is.na(dataset_id)) |>
+    select(folder_in) |>
+    pull()
+  warning("Image folders ", paste(folders_no_id, collapse = ", ") , " could not be matched to a dataset ID. Make sure these is a corresponding record in Baserow. Ignoring them.")
+  datasets = datasets |>
+    filter(!is.na(dataset_id))
+  image_data = image_data |>
+    filter(!is.na(dataset_id))
+}
+
+a = image_data |>
+  group_by(dataset_id_2, folder_in_2) |>
+  summarize(n_images = n()) |>
+  filter(!is.na(folder_in_2))
+
+if (any(is.na(a$dataset_id_2))) {
+  folders_no_id = a |>
+    filter(is.na(dataset_id_2)) |>
+    select(folder_in_2) |>
+    pull()
+  warning("Secondary (of composite) image folder names ", paste(folders_no_id, collapse = ", ") , " could not be matched to a dataset ID. Make sure these is a corresponding record in Baserow. Pretending the main folder is not part of a composite.")
+}
+
+a = image_data |>
+  group_by(dataset_id_3, folder_in_3) |>
+  summarize(n_images = n()) |>
+  filter(!is.na(folder_in_3))
+
+if (any(is.na(a$dataset_id_3))) {
+  folders_no_id = a |>
+    filter(is.na(dataset_id_3)) |>
+    select(folder_in_3) |>
+    pull()
+  warning("Tertiary (of composite) image folder names ", paste(folders_no_id, collapse = ", ") , " could not be matched to a dataset ID. Make sure these is a corresponding record in Baserow. Pretending the main folder is not part of a composite.")
+}
+
+
+# When does the same dataset ID (image folder) show up for more than one date or serial number?
 combos_by_exif = datasets |>
   group_by(dataset_id) |>
   summarize(n_dates = n_distinct(date),
@@ -146,7 +205,9 @@ combos_by_exif = datasets |>
 
 ## If the same dataset ID contains multiple dates or drone serial numbers, deal with splitting it
 datasets_not_separable = data.frame()
-for (i in 1:nrow(combos_by_exif)) {
+image_data$dataset_id_out = NA
+image_data$subdataset_out = NA
+for (i in seq_len(nrow(combos_by_exif))) {
 
   combo_by_exif = combos_by_exif[i, ]
   dataset_id_foc = combo_by_exif$dataset_id
@@ -183,8 +244,8 @@ for (i in 1:nrow(combos_by_exif)) {
     distinct()
 
   # If multiple baserow records, see which fields differ between them, so that we can make sure all
-  # differences are explained (separable) by date, and if now so we can record what else they
-  # differed by
+  # differences are explained (separable) by date, and if so we can record what else they differed
+  # by
   cols_diff_idx = which(apply(baserow_summ, 2, function(a) length(unique(a)) > 1))
   cols_diff_names = names(baserow_summ)[cols_diff_idx]
   # Remove boilerplate columns
@@ -194,7 +255,7 @@ for (i in 1:nrow(combos_by_exif)) {
   baserow_unique_date_count = n_distinct(baserow_summ$date)
 
   if (baserow_unique_record_count > baserow_unique_date_count) {
-    warning("The baserow records for the dataset IDs (from folder name) ", paste(ids_by_foldername, collapse = ", "), " differ by more than date; impossible to split the composite photo folder to each baserow record. Naming by the first dataset ID.")
+    warning("The baserow records for the dataset IDs ", paste(ids_by_foldername, collapse = ", "), " differ by more than date; impossible to split the composite photo folder to each baserow record. Naming by the first dataset ID.")
 
     # TOOD: here, could check if a dataset is a composite of > 3 baserow records, can at least one
     # of them be cleanly split?
@@ -296,12 +357,12 @@ for (i in 1:nrow(combos_by_exif)) {
 
     date_foc = exif_summ2$date[j]
 
-    # Which baserow dataset ID does this date corespond to? Note, this does not refer to the
-    # baserow column "baserow_dataset_id" (which is just an auto-number of rows by Postgres), but
-    # to the "dataset_id" number according to the Baserow table, which is the OFO dataset ID.
+    # Which baserow dataset ID does this date corespond to?
     baserow_dataset_id = baserow_records |>
       filter(date == date_foc) |>
       pull(dataset_id)
+
+    if (length(baserow_dataset_id) == 0) stop("Mismatch in dates between Baserow metadata and image EXIF data for dataset ID ", dataset_id_foc, ", which is from image folder.")
 
     # In the full image exif dataframe, assign the baserow dataset ID to the image
     image_data[image_data$dataset_id == dataset_id_foc & image_data$date == date_foc, "dataset_id_out"] = baserow_dataset_id
@@ -472,7 +533,6 @@ final_ids_for_images = image_data |>
   # It is not necessary as a unique identifier.
   select(dataset_id_out, subdataset_out, dataset_id_out_final, subdataset_out_final)
 
-
 # Pull it in to image data
 image_data_w_outnames = image_data |>
   left_join(final_ids_for_images, by = join_by("dataset_id_out" == "dataset_id_out",
@@ -482,7 +542,7 @@ image_data_w_outnames = image_data |>
          folder_out_final = paste(dataset_id_out_final, subdataset_out_final, sep = "-"))
 
 inspect = image_data_w_outnames |>
-  group_by(dataset_id, dataset_id_2, dataset_id_3, date, serialnumber, dataset_id_out, subdataset_out, group_id_full, dataset_id_out_final, subdataset_out_final) |>
+  group_by(dataset_id, dataset_id_2, dataset_id_3, folder_in, date, serialnumber, folder_out_final) |>
   summarize(n_images = n())
 inspect
 
@@ -500,11 +560,15 @@ folderid_baserow_crosswalk = image_data_w_outnames |>
   group_by(dataset_id_baserow, dataset_id_imagefolder) |>
   summarize(n_images = n())
 
-datasets_not_separable2 = datasets_not_separable |>
-  unite(addl_dataset_ids_baserow, dataset_id_2, dataset_id_3, sep = ",", na.rm = TRUE) |>
-  select(dataset_id_baserow = dataset_id, addl_dataset_ids_baserow, addl_baserow_differ_by, why_not_separable)
+if(nrow(datasets_not_separable) > 0) {
 
-folderid_baserow_crosswalk = folderid_baserow_crosswalk |>
-  left_join(datasets_not_separable2, by = "dataset_id_baserow")
+  datasets_not_separable2 = datasets_not_separable |>
+    unite(addl_dataset_ids_baserow, dataset_id_2, dataset_id_3, sep = ",", na.rm = TRUE) |>
+    select(dataset_id_baserow = dataset_id, addl_dataset_ids_baserow, addl_baserow_differ_by = differ_by, why_not_separable)
+
+  folderid_baserow_crosswalk = folderid_baserow_crosswalk |>
+    left_join(datasets_not_separable2, by = "dataset_id_baserow")
+
+}
 
 write_csv(folderid_baserow_crosswalk, crosswalk_output_path)
