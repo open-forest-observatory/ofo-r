@@ -146,8 +146,13 @@ sncalc
 #END CODE FOR SOLARNOON CALCULATION
 
 
+#START CODE FOR EARLIEST/LATEST TIME
 
+earliest_time_local <- min(exif$capture_datetime)
+earliest_time_local
 
+latest_time_local<- max(exif$capture_datetime)
+latest_time_local
 
-
+#END CODE FOR EARLIEST/LATEST TIME
 
