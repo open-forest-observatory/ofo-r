@@ -20,11 +20,11 @@ library(devtools)
 #'
 #' @export
 
-extract_dataset_id = function (exif) {
+extract_dataset_id_dataset_level = function (exif) {
 
-  dataset_id = exif$dataset_id[1]
+  dataset_id_dataset_level = exif$dataset_id[1]
 
-  return(dataset_id)
+  return(dataset_id_dataset_level)
 
 }
 
@@ -256,7 +256,7 @@ extract_area_ha = function (exif, image_merge_distance) {
 #'
 #'#' @param image_merge_distance The horizontal distance between images below which they are merged into one mission polygon
 #'
-#' @return a data.frame of dataset_id, image_count, file_size, percent_images_rtk, white_balance_mode_derived, white_balance_mode_prop_derived, exposure_median_derived, exposure_stdev_derived, image_density, and area_ha
+#' @return a data.frame of dataset_id_dataset_level, image_count, file_size, percent_images_rtk, white_balance_mode_derived, white_balance_mode_prop_derived, exposure_median_derived, exposure_stdev_derived, image_density, and area_ha
 #'
 #' @examples
 #' extract_dataset_metadata_emp(exif)
@@ -269,7 +269,7 @@ extract_dataset_metadata_emp = function(exif_filepath, image_merge_distance) {
   exif = prep_exif(exif_filepath)
 
   # Extract/compute metadata attributes
-  dataset_id = extract_dataset_id(exif)
+  dataset_id_dataset_level = extract_dataset_id_dataset_level(exif)
   image_count = extract_image_count(exif)
   file_size = extract_file_size(exif)
   percent_images_rtk = extract_percent_images_rtk(exif)
@@ -281,7 +281,7 @@ extract_dataset_metadata_emp = function(exif_filepath, image_merge_distance) {
   area_ha = extract_area_ha(exif, image_merge_distance = 50)
 
   # Return extracted/computed metadata as a data frame row
-  metadata = data.frame(dataset_id = dataset_id,
+  metadata = data.frame(dataset_id_dataset_level = dataset_id_dataset_level,
                         image_count = image_count,
                         file_size = file_size,
                         percent_images_rtk = percent_images_rtk,
