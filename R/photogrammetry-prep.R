@@ -26,7 +26,7 @@ make_derived_yaml = function(cfg_base, replacements, derived_yaml_dir) {
   cfg_filename = paste0(replacements$config_filename, ".yml")
 
   # remove the filename since that doesn't go into the yaml
-  replacements = replacements |> dplyr::select(-config_filename)
+  replacements = replacements |> dplyr::select(-"config_filename")
 
   cfg_derived = cfg_base
 
@@ -46,7 +46,6 @@ make_derived_yaml = function(cfg_base, replacements, derived_yaml_dir) {
 
 # Take a base yaml file and a set of scenarios (value replacements for specific keys) and write them
 # all
-# 'base_yaml_filepath' must be an absolute filepath if the batch shell script creation is to work
 make_derived_configs = function(base_yaml_filepath,
                                 scenarios, derived_yaml_out_folder = "",
                                 automate_metashape_path = "") {
@@ -54,6 +53,10 @@ make_derived_configs = function(base_yaml_filepath,
   # if not specified, write derived yamls in same dir as the base
   if(derived_yaml_out_folder == "") {
     derived_yaml_out_folder = dirname(base_yaml_filepath)
+  }
+
+  if(!dir.exists(derived_yaml_out_folder)) {
+    dir.create(derived_yaml_out_folder, recursive = TRUE)
   }
 
   config_files_created = NULL
