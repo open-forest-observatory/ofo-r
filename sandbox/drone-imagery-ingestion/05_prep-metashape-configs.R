@@ -7,7 +7,7 @@ IMAGERY_PROJECT_NAME = "2022-early-regen"
 DATASET_DIR = "/ofo-share/drone-imagery-organization/2z_sorted-notcleaned-combined"  
 BASE_YAML_FILEPATH = "/ofo-share/repos-derek/ofo-r/sandbox/drone-imagery-ingestion/full-run-configs/base.yml"
 DERIVED_YAML_OUTFOLDER = "/ofo-share/repos-derek/ofo-r/sandbox/drone-imagery-ingestion/full-run-configs"
-AUTOMATE_METASHAPE_PATH = "/ofo-share/repos-derek/automate-metashapa/python/metashape_workflow.py"
+AUTOMATE_METASHAPE_PATH = "/ofo-share/repos-derek/automate-metashape"
 METASHAPE_OUTPUT_PATH = "/ofo-share/drone-imagery-processed/01/metashape-outputs"
 METASHAPE_PROJECT_PATH = "/ofo-share/drone-imagery-processed/01/metashape-projects"
 
@@ -29,7 +29,7 @@ for (dataset in datasets) {
 
   scenario = data.frame(photo_path = I(list(subdirs)),
                    config_filename = config_filename)
-  
+
   scenarios = bind_rows(scenarios, scenario)
 }
 
