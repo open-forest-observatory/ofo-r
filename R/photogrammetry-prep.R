@@ -19,6 +19,19 @@ change_yaml_value = function(cfg, key, value) {
   return(cfg)
 }
 
+# If x is a list of one element that contains a list, extract the inner list. This nesting can happen
+# when reading a list col from a data frame.
+unnest_list = function(x) {
+  if(is.list(x) && length(x) == 1) {
+    return(x[[1]])
+  } else {
+    x = x[[1]]
+  }
+
+  return(x)
+}
+
+
 # Take a base metashape config (as a nested list) and a set of replacements (for one scenario), and
 # write out a derived yaml file
 make_derived_yaml = function(cfg_base, replacements, derived_yaml_dir) {
@@ -33,6 +46,7 @@ make_derived_yaml = function(cfg_base, replacements, derived_yaml_dir) {
   # Replace the values in the base config with the values from the scenario
   for (key in names(replacements)) {
     replacement_value = replacements[[key]]
+    replacement_value = unnest_list(replacement_value)
     cfg_derived = change_yaml_value(cfg_derived, key, replacement_value)
   }
 
