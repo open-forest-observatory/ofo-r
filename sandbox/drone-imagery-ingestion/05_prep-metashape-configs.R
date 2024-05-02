@@ -2,9 +2,9 @@
 
 library(dplyr)
 
-IMAGERY_PROJECT_NAME = "2022-early-regen"
+IMAGERY_PROJECT_NAME = "2023-ny-ofo"
 
-DATASET_DIR = "/ofo-share/drone-imagery-organization/2z_sorted-notcleaned-combined"  
+DATASET_DIR = "/ofo-share/drone-imagery-organization/2z_sorted-notcleaned-combined"
 BASE_YAML_FILEPATH = "/ofo-share/repos-derek/ofo-r/sandbox/drone-imagery-ingestion/full-run-configs/base.yml"
 DERIVED_YAML_OUTFOLDER = "/ofo-share/repos-derek/ofo-r/sandbox/drone-imagery-ingestion/full-run-configs"
 AUTOMATE_METASHAPE_PATH = "/ofo-share/repos-derek/automate-metashape"
