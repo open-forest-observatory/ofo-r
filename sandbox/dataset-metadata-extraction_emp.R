@@ -2,17 +2,6 @@
 
 # --- Setup ---
 
-# load packages
-
-library(stringr)
-library(tidyverse)
-library(sf)
-library(devtools)
-
-# Set working directory
-
-setwd("C:\\Users\\emily\\Desktop\\FOCAL\\ofo-r")
-
 # Load all the functions (and package dependencies) of this R package
 devtools::load_all()
 
@@ -121,9 +110,9 @@ file_size
 
 # BEGIN FUNCTION CODE
 
-exif$rtk_fix = extract_rtk_fix(exif)
+rtk_fix = extract_rtk_fix(exif)
 
-percent_images_rtk = (sum(exif$rtk_fix == TRUE) / nrow(exif)) * 100
+percent_images_rtk = (sum(rtk_fix == TRUE) / nrow(exif)) * 100
 
 # END FUNCTION CODE
 
@@ -131,9 +120,9 @@ percent_images_rtk = (sum(exif$rtk_fix == TRUE) / nrow(exif)) * 100
 
 extract_percent_images_rtk = function (exif) {
 
-  exif$rtk_fix = extract_rtk_fix(exif)
+  rtk_fix = extract_rtk_fix(exif)
 
-  percent_images_rtk = (sum(exif$rtk_fix == TRUE) / nrow(exif)) * 100
+  percent_images_rtk = (sum(rtk_fix == TRUE) / nrow(exif)) * 100
 
   return(percent_images_rtk)
 
@@ -146,79 +135,51 @@ percent_images_rtk = extract_percent_images_rtk(exif)
 percent_images_rtk
 
 
-#### white_balance_mode_derived ####
+#### white_balance_mode_and_prop_derived: white_balance_mode_derived and white_balance_mode_prop_derived ####
 
-# The most common white balance setting across all images in the project. Options: auto and manual
+# white_balance_mode_derived is the most common white balance setting across all images in the project. Options: auto and manual; white_balance_mode_prop_derived is the proportion of images with a white balance setting that matches the modal white balance setting in the dataset
 
 # BEGIN FUNCTION CODE
 
-exif$white_balance = extract_white_balance(exif)
+white_balance = extract_white_balance(exif)
 
 Mode <- function(x) {
   ux <- unique(x)
   ux[which.max(tabulate(match(x, ux)))]
 }
 
-white_balance_mode_derived = Mode(exif$white_balance)
+white_balance_mode_derived = Mode(white_balance)
+
+white_balance_mode_prop_derived = (sum(white_balance == white_balance_mode_derived) / nrow(exif))
 
 # END FUNCTION CODE
 
 # turn code into a function
 
-extract_white_balance_mode_derived = function (exif) {
+extract_white_balance_mode_and_prop_derived = function (exif) {
 
-  exif$white_balance = extract_white_balance(exif)
+  white_balance = extract_white_balance(exif)
 
   Mode <- function(x) {
     ux <- unique(x)
     ux[which.max(tabulate(match(x, ux)))]
   }
 
-  white_balance_mode_derived = Mode(exif$white_balance)
+  white_balance_mode_derived = Mode(white_balance)
 
-  return(white_balance_mode_derived)
+  white_balance_mode_prop_derived = (sum(white_balance == white_balance_mode_derived) / nrow(exif))
 
-}
+  white_balance_mode_and_prop_derived = data.frame (white_balance_mode_derived, white_balance_mode_prop_derived)
 
-# test function on exif data
-
-white_balance_mode_derived = extract_white_balance_mode_derived(exif)
-
-white_balance_mode_derived
-
-#### white_balance_mode_prop_derived ####
-
-# The proportion of images with a white balance setting that matches the modal white balance setting in the dataset
-
-# BEGIN FUNCTION CODE
-
-exif$white_balance = extract_white_balance(exif)
-
-white_balance_mode_derived = extract_white_balance_mode_derived(exif)
-
-white_balance_mode_prop_derived = (sum(exif$white_balance == white_balance_mode_derived) / nrow(exif))
-
-# END FUNCTION CODE
-
-# turn code into a function
-
-extract_white_balance_mode_prop_derived = function (exif) {
-
-  exif$white_balance = extract_white_balance(exif)
-
-  white_balance_mode_derived = extract_white_balance_mode_derived(exif)
-
-  white_balance_mode_prop_derived = (sum(exif$white_balance == white_balance_mode_derived) / nrow(exif))
-
-  return(white_balance_mode_prop_derived)
+  return(white_balance_mode_and_prop_derived)
 
 }
 
 # test function on exif data
 
-white_balance_mode_prop_derived = extract_white_balance_mode_prop_derived(exif)
+white_balance_mode_and_prop_derived = extract_white_balance_mode_and_prop_derived(exif)
 
-white_balance_mode_prop_derived
+white_balance_mode_and_prop_derived
 
 #### exposure_median_derived ####
 
@@ -272,37 +233,13 @@ exposure_stdev_derived = extract_exposure_stdev_derived(exif)
 
 exposure_stdev_derived
 
-#### image_density ####
+#### area_ha_and_image_density ####
 
-# Computed based on image count and footprint. Units: img/ha
+# area_ha: calculates area of mission footprint. Units: ha. image_density: computed based on image count and footprint. Units: img/ha
 
 # BEGIN FUNCTION CODE
 
 image_density = (nrow(exif))/(units::set_units(sf::st_area(create_mission_polygon(exif, image_merge_distance)), "hectare"))
-
-# END FUNCTION CODE
-
-# turn code into a function
-
-extract_image_density = function (exif, image_merge_distance) {
-
-  image_density = (nrow(exif))/(units::set_units(sf::st_area(create_mission_polygon(exif, image_merge_distance)), "hectare"))
-
-  return(image_density)
-
-}
-
-# test function on exif data
-
-image_density = extract_image_density(exif, image_merge_distance = 50)
-
-image_density
-
-#### area_ha ####
-
-# Area of mission footprint. Units: ha.
-
-# BEGIN FUNCTION CODE
 
 area_ha = units::set_units(sf::st_area(create_mission_polygon(exif, image_merge_distance)), "hectare")
 
@@ -310,19 +247,23 @@ area_ha = units::set_units(sf::st_area(create_mission_polygon(exif, image_merge_
 
 # turn code into a function
 
-extract_area_ha = function (exif, image_merge_distance) {
+extract_area_ha_and_image_density = function (exif, image_merge_distance) {
 
   area_ha = units::set_units(sf::st_area(create_mission_polygon(exif, image_merge_distance)), "hectare")
 
-  return(area_ha)
+   image_density = (nrow(exif))/(units::set_units(sf::st_area(create_mission_polygon(exif, image_merge_distance)), "hectare"))
+
+   area_ha_and_image_density = data.frame (area_ha, image_density)
+
+  return(area_ha_and_image_density)
 
 }
 
 # test function on exif data
 
-area_ha = extract_area_ha(exif, image_merge_distance = 50)
+area_ha_and_image_density = extract_area_ha_and_image_density(exif, image_merge_distance = 50)
 
-area_ha
+area_ha_and_image_density
 
 #### Create wrapper for metadata extraction functions. Preps the EXIF data for passing to the extraction functions, then calls all the individual extraction functions to extract the respective attributes. ####
 
@@ -336,24 +277,20 @@ extract_dataset_metadata_emp = function(exif_filepath, image_merge_distance) {
   image_count = extract_image_count(exif)
   file_size = extract_file_size(exif)
   percent_images_rtk = extract_percent_images_rtk(exif)
-  white_balance_mode_derived = extract_white_balance_mode_derived(exif)
-  white_balance_mode_prop_derived = extract_white_balance_mode_prop_derived(exif)
+  white_balance_mode_and_prop_derived = extract_white_balance_mode_and_prop_derived(exif)
   exposure_median_derived = extract_exposure_median_derived(exif)
   exposure_stdev_derived = extract_exposure_stdev_derived(exif)
-  image_density = extract_image_density(exif, image_merge_distance)
-  area_ha = extract_area_ha(exif, image_merge_distance = 50)
+  area_ha_and_image_density = extract_area_ha_and_image_density(exif, image_merge_distance)
 
   # Return extracted/computed metadata as a data frame row
   metadata = data.frame(dataset_id_dataset_level = dataset_id_dataset_level,
                         image_count = image_count,
                         file_size = file_size,
                         percent_images_rtk = percent_images_rtk,
-                        white_balance_mode_derived = white_balance_mode_derived,
-                        white_balance_mode_prop_derived = white_balance_mode_prop_derived,
+                        white_balance_mode_and_prop_derived,
                         exposure_median_derived = exposure_median_derived,
                         exposure_stdev_derived = exposure_stdev_derived,
-                        image_density = image_density,
-                        area_ha = area_ha
+                        area_ha_and_image_density
   )
 
   return(metadata)

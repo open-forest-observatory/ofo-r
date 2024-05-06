@@ -267,7 +267,7 @@ extract_white_balance = function(exif) {
 
 extract_received_image_path = function(exif) {
 
-  received_image_path = stringr::str_split_fixed(exif$SourceFile, fixed(exif$dataset_id), 2)
+  received_image_path = stringr::str_split_fixed(exif$SourceFile, stringr::fixed(exif$dataset_id), 2)
 
   received_image_path <- received_image_path[,2]
 
@@ -315,7 +315,7 @@ extract_metadata_emp = function(exif_file) {
 
   exif = prep_exif(exif_file)
 
-  dataset_id_image_level = extract_dataset_id_image_level (exif)
+  dataset_id_image_level = extract_dataset_id_image_level(exif)
   datatime_local = extract_datatime_local(exif)
   lat_lon = extract_lat_lon(exif)
   rtk_fix = extract_rtk_fix(exif)
