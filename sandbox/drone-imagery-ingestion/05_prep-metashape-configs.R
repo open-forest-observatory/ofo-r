@@ -2,7 +2,7 @@
 
 library(dplyr)
 
-IMAGERY_PROJECT_NAME = "2023-ny-ofo"
+IMAGERY_PROJECT_NAME = "2022-early-regen"
 
 DATASET_DIR = "/ofo-share/drone-imagery-organization/2z_sorted-notcleaned-combined"
 BASE_YAML_FILEPATH = "/ofo-share/repos-derek/ofo-r/sandbox/drone-imagery-ingestion/full-run-configs/base.yml"
@@ -41,4 +41,5 @@ scenarios
 make_derived_configs(base_yaml_filepath = BASE_YAML_FILEPATH,
                      scenarios,
                      derived_yaml_out_folder = derived_yaml_out_folder,
-                     automate_metashape_path = AUTOMATE_METASHAPE_PATH)
+                     automate_metashape_path = AUTOMATE_METASHAPE_PATH,
+                     n_shell_splits = 8)

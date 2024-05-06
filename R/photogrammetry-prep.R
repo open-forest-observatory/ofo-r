@@ -62,7 +62,8 @@ make_derived_yaml = function(cfg_base, replacements, derived_yaml_dir) {
 # all
 make_derived_configs = function(base_yaml_filepath,
                                 scenarios, derived_yaml_out_folder = "",
-                                automate_metashape_path = "") {
+                                automate_metashape_path = "",
+                                n_shell_splits = 1) {
 
   # if not specified, write derived yamls in same dir as the base
   if(derived_yaml_out_folder == "") {
@@ -93,6 +94,27 @@ make_derived_configs = function(base_yaml_filepath,
 
     writeLines(shell_lines,
                con = paste0(derived_yaml_out_folder,"/config_batch.sh"), sep="\n")
+
+    # Optionally generate n_shell_splits shell scripts, each with a random subset of the config
+    # files, sampling completely and without replacement
+    if (n_shell_splits > 1) {
+
+      # Randomize the order, in case really large projects are grouped together, we don't want them
+      # all loaded on the same instance
+      shell_lines = sample(shell_lines, length(shell_lines), replace = FALSE)
+
+      shell_chunks = chunk_up(shell_lines, n = 8)
+
+      for (i in 1:n_shell_splits) {
+        writeLines(shell_chunks[[i]],
+                   con = paste0(derived_yaml_out_folder,"/config_batch_",i-1,".sh"), sep="\n")
+      }
+
+    }
+
   }
 
 }
+
+# Convenience function to split a vector x into n chunks
+chunk_up = function(x, n) split(x, cut(seq_along(x), n, labels = FALSE))
