@@ -19,6 +19,19 @@ change_yaml_value = function(cfg, key, value) {
   return(cfg)
 }
 
+# If x is a list of one element that contains a list, extract the inner list. This nesting can happen
+# when reading a list col from a data frame.
+unnest_list = function(x) {
+  if(is.list(x) && length(x) == 1) {
+    return(x[[1]])
+  } else {
+    x = x[[1]]
+  }
+
+  return(x)
+}
+
+
 # Take a base metashape config (as a nested list) and a set of replacements (for one scenario), and
 # write out a derived yaml file
 make_derived_yaml = function(cfg_base, replacements, derived_yaml_dir) {
@@ -26,13 +39,14 @@ make_derived_yaml = function(cfg_base, replacements, derived_yaml_dir) {
   cfg_filename = paste0(replacements$config_filename, ".yml")
 
   # remove the filename since that doesn't go into the yaml
-  replacements = replacements |> dplyr::select(-config_filename)
+  replacements = replacements |> dplyr::select(-"config_filename")
 
   cfg_derived = cfg_base
 
   # Replace the values in the base config with the values from the scenario
   for (key in names(replacements)) {
     replacement_value = replacements[[key]]
+    replacement_value = unnest_list(replacement_value)
     cfg_derived = change_yaml_value(cfg_derived, key, replacement_value)
   }
 
@@ -46,14 +60,18 @@ make_derived_yaml = function(cfg_base, replacements, derived_yaml_dir) {
 
 # Take a base yaml file and a set of scenarios (value replacements for specific keys) and write them
 # all
-# 'base_yaml_filepath' must be an absolute filepath if the batch shell script creation is to work
 make_derived_configs = function(base_yaml_filepath,
                                 scenarios, derived_yaml_out_folder = "",
-                                automate_metashape_path = "") {
+                                automate_metashape_path = "",
+                                n_shell_splits = 1) {
 
   # if not specified, write derived yamls in same dir as the base
   if(derived_yaml_out_folder == "") {
     derived_yaml_out_folder = dirname(base_yaml_filepath)
+  }
+
+  if(!dir.exists(derived_yaml_out_folder)) {
+    dir.create(derived_yaml_out_folder, recursive = TRUE)
   }
 
   config_files_created = NULL
@@ -76,6 +94,27 @@ make_derived_configs = function(base_yaml_filepath,
 
     writeLines(shell_lines,
                con = paste0(derived_yaml_out_folder,"/config_batch.sh"), sep="\n")
+
+    # Optionally generate n_shell_splits shell scripts, each with a random subset of the config
+    # files, sampling completely and without replacement
+    if (n_shell_splits > 1) {
+
+      # Randomize the order, in case really large projects are grouped together, we don't want them
+      # all loaded on the same instance
+      shell_lines = sample(shell_lines, length(shell_lines), replace = FALSE)
+
+      shell_chunks = chunk_up(shell_lines, n = 8)
+
+      for (i in 1:n_shell_splits) {
+        writeLines(shell_chunks[[i]],
+                   con = paste0(derived_yaml_out_folder,"/config_batch_",i-1,".sh"), sep="\n")
+      }
+
+    }
+
   }
 
 }
+
+# Convenience function to split a vector x into n chunks
+chunk_up = function(x, n) split(x, cut(seq_along(x), n, labels = FALSE))
