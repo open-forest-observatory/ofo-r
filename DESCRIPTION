@@ -19,6 +19,7 @@ Imports:
     lubridate,
     stringr,
     yaml,
-    lidR
+    lidR,
+    xml2
 URL: https://github.com/open-forest-observatory/ofo
 BugReports: https://github.com/open-forest-observatory/ofo/issues

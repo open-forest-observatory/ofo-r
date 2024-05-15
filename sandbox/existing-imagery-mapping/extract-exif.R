@@ -10,10 +10,10 @@ library(dplyr)
 datadir = readLines(file.path("sandbox", "data-dirs", "derek-map-imagery-js.txt"))
 
 # Which folder contans folders of image sets that we want to extract EXIF from?
-focal_folder = file.path(datadir, "1_manually-cleaned", "2022-early-regen")
+focal_folder = file.path(datadir, "2z_sorted-notcleaned-combined", "2023-ny-ofo")
 
 # Which folder do we want to save the extracted data to?
-out_folder = file.path(datadir, "ancillary", "extracted-exif", "2022-early-regen")
+out_folder = file.path(datadir, "ancillary", "extracted-exif-2z")
 
 # Define sets to skip because corrupted
 sets_to_skip = c("20220621-0037", "20220622-0047", "20220621-0037_and_20220622-0047")

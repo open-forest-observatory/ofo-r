@@ -1,6 +1,7 @@
 # Prep the EXIF data for extraction of metadata attributes. Speficially, load the EXIF CSV file into
 # a dataframe, add a dataset_id attribute based on the filename, compute image capture datetime, order the images by capture time, and optionally plot
 # the flight path for visual inspection
+#' @export
 prep_exif = function(exif_filepath, plot_flightpath = FALSE) {
 
   # Read in the EXIF data from file for the provided dataset filepath, as a data frame

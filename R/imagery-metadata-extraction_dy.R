@@ -26,7 +26,9 @@ extract_flight_speed = function(exif) {
 }
 
 # Get a polygon of the mission
-# image_merge_distance: The horizontal distance between images below which they are merged into one mission polygon
+# image_merge_distance: The horizontal distance between images below which they are merged into one
+# mission polygon
+#' @export
 create_mission_polygon = function(exif, image_merge_distance) {
 
   exif = sf::st_transform(exif, 3310)
@@ -56,7 +58,8 @@ create_mission_polygon = function(exif, image_merge_distance) {
 
 
 # Extract camera pitch
-extract_pitch <- function(exif) {
+#' @export
+extract_camera_pitch <- function(exif) {
   # Extract CameraPitch directly from exif and adjust pitch values
   camera_pitch_values <- as.numeric(exif$CameraPitch) + 90  # Adjust pitch values
   adjusted_pitch_values <- camera_pitch_values  # Adjusted pitch values to represent 0 as nadir (down)
