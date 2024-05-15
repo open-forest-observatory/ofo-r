@@ -85,6 +85,8 @@ plot_summary = compile_plot_summary_table(plots = plots,
                                           base_ofo_url = BASE_OFO_URL,
                                           plot_details_dir = PLOT_DETAILS_PAGE_DIR)
 
+# Write the plot-level data to a csv
+readr::write_csv(plot_summary, file.path(datadir, "field-plot-summaries", "field-plot-summary.csv"))
 
 # Make a HTML data table of plot catalog
 dt = make_plot_catalog_datatable(plot_summary = plot_summary,

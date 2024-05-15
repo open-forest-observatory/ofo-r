@@ -158,9 +158,11 @@ summarize_trees_by_plot = function(trees_clean) {
   tree_summ = trees_clean |>
     group_by(plot_id) |>
     summarize(dbh_mean = mean(dbh) |> round(1),
+              dbh_quad_mean = sqrt(mean(dbh^2)) |> round(1),
               dbh_sd = sd(dbh) |> round(1),
               dbh_cv = (sd(dbh) / mean(dbh)) |> round(2),
               n_trees = n(),
+              n_gt40in = sum(dbh > (40*2.54), na.rm = TRUE),
               ba_tot = sum(ba, na.rm = TRUE),
               dbh_tot = sum(dbh, na.rm = TRUE),
               ht_tot = sum(height, na.rm = TRUE),
