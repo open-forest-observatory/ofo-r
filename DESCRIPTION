@@ -18,6 +18,7 @@ Imports:
     ggplot2,
     lubridate,
     stringr,
-    yaml
+    yaml,
+    lidR
 URL: https://github.com/open-forest-observatory/ofo
 BugReports: https://github.com/open-forest-observatory/ofo/issues
