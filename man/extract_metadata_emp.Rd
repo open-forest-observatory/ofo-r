@@ -10,7 +10,7 @@ extract_metadata_emp(exif_file)
 \item{exif_file}{the exif filepath (before being prepared to pass to the functions in the wrapper)}
 }
 \value{
-a data.frame of dataset_id, datatime_local, lat, lon, rtk_fix, accuracy_x, accuracy_y, camera_pitch, camera_roll, camera_yaw, exposure, aperture, iso, white_balance, received_image_path, and altitude_asl
+a data.frame of dataset_id_image_level, datatime_local, lat, lon, rtk_fix, accuracy_x, accuracy_y, camera_pitch, camera_roll, camera_yaw, exposure, aperture, iso, white_balance, received_image_path, and altitude_asl
 }
 \description{
 Returns a collection of image-level metadata parameters

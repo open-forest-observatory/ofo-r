@@ -32,25 +32,25 @@ exif = prep_exif(exif_file)
 
 # BEGIN FUNCTION CODE
 
-dataset_id = exif$dataset_id
+dataset_id_image_level = exif$dataset_id
 
 # END FUNCTION CODE
 
 # turn code into a function
 
-extract_dataset_id = function (exif) {
+extract_dataset_id_image_level() = function (exif) {
 
-  dataset_id = exif$dataset_id
+  dataset_id_image_level = exif$dataset_id
 
-  return(dataset_id)
+  return(dataset_id_image_level)
 
 }
 
 # test function on exif data
 
-dataset_id = extract_dataset_id (exif)
+dataset_id_image_level = extract_dataset_id_image_level (exif)
 
-dataset_id
+dataset_id_image_level
 
 #### datatime_local (Format: YYYYMMDD HHMMSS (local time zone, 24 hr)) ####
 
@@ -315,11 +315,11 @@ received_image_path <- with(exif, paste0(dataset_id, received_image_path))
 
 extract_received_image_path = function(exif) {
 
-  received_image_path = stringr::str_split_fixed(exif$SourceFile, fixed(dataset_id), 2)
+  received_image_path = stringr::str_split_fixed(exif$SourceFile, stringr::fixed(exif$dataset_id), 2)
 
   received_image_path <- received_image_path[,2]
 
-  received_image_path <- with(exif, paste0(dataset_id, received_image_path))
+  received_image_path <- with(exif, paste0(exif$dataset_id, received_image_path))
 
   return(received_image_path)
 }
@@ -371,7 +371,7 @@ extract_metadata_emp = function(exif_filepath) {
   exif = prep_exif(exif_filepath)
 
   # Extract/compute metadata attributes
-  dataset_id = extract_dataset_id (exif)
+  dataset_id_image_level = extract_dataset_id_image_level(exif)
   datatime_local = extract_datatime_local(exif)
   lat_lon = extract_lat_lon(exif)
   rtk_fix = extract_rtk_fix(exif)
@@ -385,7 +385,7 @@ extract_metadata_emp = function(exif_filepath) {
   altitude_asl = extract_altitude_asl(exif)
 
   # Return extracted/computed metadata as a data frame row
-  metadata = data.frame(dataset_id = dataset_id,
+  metadata = data.frame(dataset_id_image_level = dataset_id_image_level,
                         datatime_local = datatime_local,
                         lat_lon,
                         rtk_fix = rtk_fix,
