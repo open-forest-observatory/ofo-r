@@ -134,7 +134,7 @@ get_mission_agl = function(run_name,
   lwr = quantile(agl, probs = 0.1, na.rm = TRUE)
   upr = quantile(agl, probs = 0.9, na.rm = TRUE)
   agl_core = agl[agl > lwr & agl < upr]
-  agl_cv = sd(agl_core) / mean(agl_core)
+  agl_cv = sd(agl_core, na.rm = TRUE) / mean(agl_core, na.rm = TRUE)
 
   ret = data.frame(
     mission = run_name,

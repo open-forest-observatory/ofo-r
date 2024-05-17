@@ -57,32 +57,33 @@ create_mission_polygon = function(exif, image_merge_distance) {
 }
 
 
-# Extract camera pitch
+# Extract camera pitch, detecting if smart oblique, and if so, report the oblique value (which is
+# unfortunatley reported identically whether forward or backward)
 #' @export
 extract_camera_pitch <- function(exif) {
-  # Extract CameraPitch directly from exif and adjust pitch values
-  camera_pitch_values <- as.numeric(exif$CameraPitch) + 90  # Adjust pitch values
-  adjusted_pitch_values <- camera_pitch_values  # Adjusted pitch values to represent 0 as nadir (down)
+  # Extract CameraPitch directly from exif and adjust pitch values so 0 is nadir. Also take abs val
+  # just in case the pitch is reported as negative for backward (even thouth it apparently never
+  # is), so that for smart-oblique missions, the low quantile represents nadir and the high quantile
+  # represents the oblique mission pitch
+  camera_pitch_values <- abs(as.numeric(exif$CameraPitch) + 90)
 
-  # Compute 0.1, 0.5, and 0.9 quantiles
-  quantiles <- quantile(adjusted_pitch_values, c(0.1, 0.5, 0.9), na.rm = TRUE)
+  quantiles <- quantile(camera_pitch_values, c(0.1, 0.5, 0.9), na.rm = TRUE)
 
-  # Check if quantiles contains valid values
-  if (!any(is.na(quantiles))) {
-    # Check if the range between 0.1 and 0.9 quantiles is at least 10 degrees
-    pitch_range <- quantiles[3] - quantiles[1]
-    if (pitch_range >= 10) {
-      # Use 0.1 or 0.9 quantile directly as the mission pitch
-      processed_pitch <- quantiles[1]
-    } else {
-      # Compute the average of absolute pitch values for non-smart oblique missions
-      processed_pitch <- mean(abs(c(quantiles[1], quantiles[3])), na.rm = TRUE)
-    }
+  # Check if the range between 0.1 and 0.9 quantiles is at least 10 degrees
+  pitch_range <- quantiles[3] - quantiles[1]
+  if (pitch_range >= 10) {
+    # If so, then infer it's smart-oblique
+    # Use 0.9 quantile directly as the mission pitch
+    processed_pitch <- quantiles[3]
+    smart_oblique = TRUE
   } else {
-    processed_pitch <- NA  # Set processed_pitch to NA if quantiles are not valid
+    # For non-smart oblique missions, use the median pitch value
+    processed_pitch <- abs(quantiles[2])
+    smart_oblique = FALSE
   }
 
-  return(processed_pitch)
+
+  return(list(processed_pitch = processed_pitch, smart_oblique = smart_oblique))
 }
 
 # Get the correlation between the altitude of the drone and the ground elevation (i.e. trerrain

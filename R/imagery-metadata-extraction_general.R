@@ -12,6 +12,12 @@ prep_exif = function(exif_filepath, plot_flightpath = FALSE) {
   # Alternatively, if we wanted to match the convention for the dataset_id, it would be
   # "(([0-9]){8}-([0-9]){4})"   # nolint
 
+  # Standardize column names across different drone models
+  candidate_pitch_cols = c("CameraPitch", "GimbalPitchDegree")
+
+  exif = exif |>
+    dplyr::mutate(CameraPitch = dplyr::coalesce(!!!dplyr::select(exif, dplyr::any_of(candidate_pitch_cols))))
+
   # Remove any rows with missing GPS data
   missing_gps_rows = is.na(exif$GPSLongitude) | is.na(exif$GPSLatitude)
   n_missing_gps_rows = sum(missing_gps_rows)

@@ -22,7 +22,7 @@ files = list.files(PROCESSED_IMAGERY_DIR, pattern = "report.pdf$", recursive = F
 files
 dataset_runs = str_sub(files, 1, 20) |> unique()
 
-dataset_run = dataset_runs[1]
+dataset_run = dataset_runs[94]
 
 get_poly_alt_pitch = function(dataset_run, processed_imagery_dir, exif_dir) {
 
@@ -39,7 +39,7 @@ get_poly_alt_pitch = function(dataset_run, processed_imagery_dir, exif_dir) {
 
   # Get gimbal pitch
   pitch = extract_camera_pitch(exif)
-  poly$camera_pitch = pitch
+  poly = bind_cols(poly, pitch)
   poly = bind_cols(poly, alt)
 
   return(poly)
