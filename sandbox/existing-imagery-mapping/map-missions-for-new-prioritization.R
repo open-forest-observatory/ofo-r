@@ -9,6 +9,7 @@ library(sf)
 PROCESSED_IMAGERY_DIR = "/ofo-share/drone-imagery-processed/01/metashape-outputs/"
 RAW_IMAGES_DIR = "/ofo-share/drone-imagery-organization/2z_sorted-notcleaned-combined/"
 EXIF_DIR = "/ofo-share/drone-imagery-organization/ancillary/extracted-exif-2z/"
+MISSION_POLYGONS_OUT_DIR = "/ofo-share/drone-imagery-processed/01/mission-polygons/"
 
 # devtools::load_all()
 devtools::document()
@@ -60,4 +61,20 @@ polys_list = furrr::future_map(dataset_runs, get_poly_alt_pitch, processed_image
 
 polys = bind_rows(polys_list)
 
-# Check why getting som NA AGL CVs and camera_pitches
+
+# Compute some derived cols for categorizing the polygons
+polys = polys |>
+  mutate(oblique = processed_pitch > 16,
+         quality_flag = prop_aligned < .5 | agl_cv > 0.1,
+         mission_type = case_when(
+           quality_flag ~ "poor-quality",
+           between(agl_median, 60, 100) & processed_pitch > 16  ~ "low-oblique",
+           between(agl_median, 95, 145) & processed_pitch < 9 ~ "high-nadir",
+           TRUE ~ "other"
+         ))
+
+if(!dir.exists(MISSION_POLYGONS_OUT_DIR)) {
+  dir.create(MISSION_POLYGONS_OUT_DIR)
+}
+
+st_write(polys, file.path(MISSION_POLYGONS_OUT_DIR, "mission_polygons.gpkg"))
