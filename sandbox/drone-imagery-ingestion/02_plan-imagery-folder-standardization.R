@@ -5,9 +5,9 @@
 
 library(tidyverse)
 
-IMAGERY_PROJECT_NAME = "2023-ny-ofo" # 2023-ny-ofo, 2022-early-regen
+IMAGERY_PROJECT_NAME = "2022-early-regen" # 2023-ny-ofo, 2022-early-regen
 
-BASEROW_DATA_PATH = "/ofo-share/scratch-derek/standardize-image-folders_data/baserow"
+BASEROW_DATA_PATH = "/ofo-share/drone-imagery-organization/ancillary/baserow-snapshots"
 EXIF_INPUT_PATH = "/ofo-share/drone-imagery-organization/1b_exif-unprocessed"
 PROCESSED_EXIF_OUTPUT_PATH = "/ofo-share/drone-imagery-organization/1c_exif-for-sorting"
 
@@ -26,7 +26,7 @@ crosswalk_output_path = file.path(PROCESSED_EXIF_OUTPUT_PATH, paste0(IMAGERY_PRO
 
 # Load baserow records
 baserow = read_csv(file.path(BASEROW_DATA_PATH, "export - datasets-imagery.csv"))
-dataset_associations = read.table(file.path(BASEROW_DATA_PATH, "export - dataset-associations.csv"), sep = "\t", header = TRUE)
+dataset_associations = read_csv(file.path(BASEROW_DATA_PATH, "export - dataset-associations - Grid.csv"))
 if ("notes" %in% colnames(dataset_associations)) stop("You need to export the dataset associations table without comments because they screw up the cell delimitations for some reason.")
 
 split_to_list = function(x) {

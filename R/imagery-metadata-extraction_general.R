@@ -1,6 +1,7 @@
 # Prep the EXIF data for extraction of metadata attributes. Speficially, load the EXIF CSV file into
 # a dataframe, add a dataset_id attribute based on the filename, compute image capture datetime, order the images by capture time, and optionally plot
 # the flight path for visual inspection
+#' @export
 prep_exif = function(exif_filepath, plot_flightpath = FALSE) {
 
   # Read in the EXIF data from file for the provided dataset filepath, as a data frame
@@ -10,6 +11,12 @@ prep_exif = function(exif_filepath, plot_flightpath = FALSE) {
   exif$dataset_id = stringr::str_extract(basename(exif_filepath), "(?<=exif_)(.*)(?=\\.csv)")
   # Alternatively, if we wanted to match the convention for the dataset_id, it would be
   # "(([0-9]){8}-([0-9]){4})"   # nolint
+
+  # Standardize column names across different drone models
+  candidate_pitch_cols = c("CameraPitch", "GimbalPitchDegree")
+
+  exif = exif |>
+    dplyr::mutate(CameraPitch = dplyr::coalesce(!!!dplyr::select(exif, dplyr::any_of(candidate_pitch_cols))))
 
   # Remove any rows with missing GPS data
   missing_gps_rows = is.na(exif$GPSLongitude) | is.na(exif$GPSLatitude)

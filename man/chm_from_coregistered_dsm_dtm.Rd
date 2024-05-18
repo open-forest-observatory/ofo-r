@@ -18,3 +18,6 @@ A terra SpatRaster representing the Canopy Height Model.
 This function calculates the Canopy Height Model (CHM) by subtracting the Digital Terrain Model
 (DTM) from the Digital Surface Model (DSM).
 }
+\examples{
+chm_from_coregistered_dsm_dtm(dsm_raster, dtm_raster)
+}

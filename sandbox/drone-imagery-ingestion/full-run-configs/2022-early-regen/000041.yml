@@ -1,7 +1,7 @@
 load_project: ''
 photo_path:
-- /ofo-share/drone-imagery-organization/2z_sorted-notcleaned-combined/2022-early-regen/000040/000040-01
-- /ofo-share/drone-imagery-organization/2z_sorted-notcleaned-combined/2022-early-regen/000040/000040-02
+- /ofo-share/drone-imagery-organization/2z_sorted-notcleaned-combined/2022-early-regen/000041/000041-01
+- /ofo-share/drone-imagery-organization/2z_sorted-notcleaned-combined/2022-early-regen/000041/000041-02
 separate_calibration_per_path: yes
 multispectral: no
 output_path: /ofo-share/drone-imagery-processed/01/metashape-outputs
