@@ -161,4 +161,3 @@ extract_metadata_sd <- function(exif_file_path) {
     start_end_datetime = start_end_datetime,
     pitch = pitch
   )}
-
