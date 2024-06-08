@@ -89,7 +89,7 @@ extract_camera_pitch <- function(exif) {
 extract_earliest_date = function(exif) {
 
   earliest_date = min(exif$capture_datetime) |>
-    lubridate::format("%Y%m%d")
+    format("%Y%m%d")
 
   return(earliest_date)
 
@@ -175,10 +175,10 @@ extract_mission_centroid_sf = function(exif) {
   #Getting the coordinates listed in the exif file and for it to seperate into long/lat
 
   # Making it a multipoint
-  multipoint <- st_union(exif)
+  multipoint <- sf::st_union(exif)
 
   # Calculate the centroid of the MULTIPOINT geometry
-  centroid <- st_centroid(multipoint)
+  centroid <- sf::st_centroid(multipoint)
 
   return(centroid)
 
@@ -186,9 +186,9 @@ extract_mission_centroid_sf = function(exif) {
 
 centroid_sf_to_lonlat = function(centroid) {
 
-  coords = st_coordinates(centroid)
-  lon = coords[1, 1]
-  lat = coords[1, 2]
+  coords = sf::st_coordinates(centroid)
+  lon = coords[1, 1] |> as.numeric()
+  lat = coords[1, 2] |> as.numeric()
 
   ret = list(lon = lon, lat = lat)
   return(ret)
@@ -197,21 +197,23 @@ centroid_sf_to_lonlat = function(centroid) {
 solarnoon_from_centroid_and_date = function(centroid, date) {
 
   # Seperat the date from the time, since we only need the date to run this function
-  date = str_split(exif$capture_datetime[1], " ", simplify = TRUE)[1]
+  date = stringr::str_split(exif$capture_datetime[1], " ", simplify = TRUE)[1]
 
-  sncalc <- solarnoon(matrix(c(coordinate), nrow = 1),as.POSIXct(date),POSIXct.out=TRUE)
+  sncalc <- suntools::solarnoon(sf::st_as_sf(centroid), as.POSIXct(date), POSIXct.out=TRUE)
 
-  sncalc
+  solarnoon = sncalc$time |> format("%H:%M:%S %Z")
+
+  return(solarnoon)
 }
 
 extract_earliest_latest_datetime = function(exif) {
 
   etl <- min(exif$capture_datetime)
-  earliest_time_local <- lubridate::format(etl, "%Y%m%dT%H%M%S")
+  earliest_time_local <- lubridate::format(etl, "%Y-%m-%d %H:%M:%S %Z")
   earliest_time_local
 
   ltl <- max(exif$capture_datetime)
-  latest_time_local <- lubridate::format(ltl, "%Y%m%dT%H%M%S")
+  latest_time_local <- lubridate::format(ltl, "%Y-%m-%d %H:%M:%S %Z")
   latest_time_local
 
   ret = list(earliest_time_local = earliest_time_local, latest_time_local = latest_time_local)
@@ -431,7 +433,7 @@ extract_area_ha_and_image_density = function (exif, image_merge_distance) {
 # Image frequency (imgs/sec)
 extract_image_frequency <- function(exif) {
   # Convert DateTimeOriginal to datetime object
-  exif$DateTimeOriginal <- as.POSIXct(exif$DateTimeOriginal, format = "%Y:%m:%d %H:%M:%S", tz = "UTC")
+  exif$DateTimeOriginal <- lubridate::date(exif$DateTimeOriginal)
 
   # Calculate time difference between consecutive images
   time_diff <- diff(exif$DateTimeOriginal)
@@ -497,10 +499,10 @@ extract_file_type <- function(exif) {
 # Earliest and latest mission times
 extract_earliest_latest_time_local <- function(exif) {
 
-  earliest_time = lubridate::format("%H%M%S")
+  earliest_time = lubridate::format("%H:%M:%S %Z")
     min()
 
-  latest_time = lubridate::format("%H%M%S")
+  latest_time = lubridate::format("%H:%M:%S %Z")
     max()
 
   return(list(earliest_time = earliest_time, latest_time = latest_time))

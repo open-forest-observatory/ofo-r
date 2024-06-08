@@ -17,67 +17,60 @@ datadir = "/ofo-share/str-disp_drone-data-partial/str-disp_drone-data_imagery-mi
 exif_files = list.files(file.path(datadir, "exif-examples"), pattern = "^exif.+\\.csv$", full.names = TRUE)
 
 # Define which test EXIF file to run the functions on
-exif_file = exif_files[1]
+exif_filepath = exif_files[1]
+plot_flightpath = TRUE
+crop_to_contiguous = TRUE
 
 # Run for that one EXIF file.
 extract_metadata_dy(exif_file, plot_flightpath = TRUE)
-# ^ If you want to inspect the definition of this function, it is at the bottom of
-# 'R/imagery-metadata-extraction_dy.R'.
-
-# Run extraction on all EXIF files
-metadata = purrr::map_dfr(exif_files, extract_metadata_dy, plot_flightpath = TRUE)
-metadata
-
-# Write results to file (creating directory if it doesn't exist)
-out_dir = file.path(datadir, "extracted-metadata", "dataset-level-tabular")
-if (!dir.exists(out_dir)) dir.create(out_dir, recursive = TRUE)
-write.csv(metadata, file.path(out_dir, "dataset-metadata_dy.csv"), row.names = FALSE)
 
 
-# --- 2. Example of how to use this sandbox script to write a metadata extraction function ---
+  # Prep the EXIF data for extraction of metadata attributes
+  exif = prep_exif(exif_filepath, plot_flightpath = plot_flightpath)
 
-# Select an EXIF file to test on, and prep the EXIF data by loading it as a geospatial data frame
-# using the 'prep_exif' function. The 'prep_exif' function is defined in
-# 'R/imagery-metadata-extraction_general.R'            # nolint
-exif_file = exif_files[1]
-exif = prep_exif(exif_file)
-# Note that the 'prep_exif' function returns the EXIF data as a geospatial data frame (an 'sf'
-# object) with point geometry. So any geospatial operations you attempt on it should use functions
-# from the 'sf' package. If you are more familiar with 'terra' objects and would rather work with
-# them, let Derek know and we can create an option to return 'terra::vect' objects.
+  # Compute geospatial features
+  mission_polygon = extract_mission_polygon(exif, image_merge_distance = 50)
 
-# Between the BEGIN and END comments below, write code to extract the metadata attribute you're
-# working on. When you're done, you can wrap it in a function definition, taking only one parameter,
-# 'exif'. Here is an example of developing code to extract the number of images in an imagery
-# dataset.
+  if (crop_to_contiguous) {
 
-# BEGIN FUNCTION CODE
+    # Keep only the images within the largest contiguous patch of images
+    polygon_proj_buffer = mission_polygon |> sf::st_transform(3310) |> sf::st_buffer(20)
+    exif_proj = sf::st_transform(exif, 3310)
+    intersection_idxs = sf::st_intersects(exif_proj, polygon_proj_buffer, sparse = FALSE)
+    exif = exif[intersection_idxs[,1], ]
+  }
 
-# Get the number of images in the dataset by counting the rows of the EXIF data frame
-image_count = nrow(exif)
+  # Extract/compute metadata attributes
+  flight_speed_derived = extract_flight_speed(exif)
+  flight_terrain_correlation_derived = extract_flight_terrain_correlation(exif)
+  flight_elev_agl_derived = extract_flight_elev_agl(exif)
+  camera_pitch_pre = extract_camera_pitch(exif)
+  camera_pitch_derived = camera_pitch_pre$processed_pitch
+  smart_oblique_derived = camera_pitch_pre$smart_oblique
+  earliest_date_internal = extract_earliest_date(exif)
+  single_date_derived = extract_single_date(exif)
+  centroid_internal = extract_mission_centroid_sf(exif)
+  lonlat_pre = centroid_sf_to_lonlat(mission_centroid_internal)
+  centroid_lon_derived = lonlat_pre$lon
+  centroid_lat_derived = lonlat_pre$lat
+  solarnoon_derived = solarnoon_from_centroid_and_date(centroid_internal, earliest_date_internal)
+  
+  
+  
+  
+  
+  
+  
+  
+  
 
-# END FUNCTION CODE
+  # Return extracted/computed metadata as a data frame row
+  metadata = data.frame(dataset_id = exif$dataset_id[1],
+                        flight_speed_derived = flight_speed_derived,
+                        flight_terrain_correlation = flight_terrain_correlation,
+                        flight_elev_agl = flight_elev_agl
+                        # Add more metadata variables here
+                        )
 
-
-# Now here is an example of turning that code into a function
-
-extract_image_count = function(exif) {
-
-  # Get the number of images in the dataset by counting the rows of the EXIF data frame
-  image_count = nrow(exif)
-
-  return(image_count)
-
-}
-
-
-# Now you can test the function on the EXIF data
-
-image_count = extract_image_count(exif)
-image_count
-
-# Once it is working right, you can move this function to your
-# 'R/imagery-metadata-extraction_<initials>.R' file and then add a call to this function from within
-# your 'extract_metadata_<initials>' function. Once it is in there, then you can run the top part of
-# this script again, and when it extracts the metadata for each EXIF dataset, your additional
-# metadata should be included.
+  ret = list(metadata = metadata,
+             mission_polygon = mission_polygon)
