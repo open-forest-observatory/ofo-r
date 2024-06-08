@@ -20,6 +20,7 @@ Imports:
     stringr,
     yaml,
     lidR,
-    xml2
+    xml2,
+    suncalc
 URL: https://github.com/open-forest-observatory/ofo
 BugReports: https://github.com/open-forest-observatory/ofo/issues
