@@ -13,7 +13,8 @@ extract_dataset_id_dataset_level(exif)
 dataset id
 }
 \description{
-Pulls the dataset id to include in dataset-level metadata
+Pulls the dataset id to include in dataset-level metadata. Relies on dataset_id being set
+properly by the prep_exif function.
 }
 \examples{
 extract_dataset_id(exif)
