@@ -1,5 +1,4 @@
-# This script has two purposes: 1. Demonstrate how to run functions to extract metadata from imagery
-# dataset EXIF data, and 2. Demonstrate how to write a new metadata extraction function.
+# Purpose: Extract metada from drone imagery datasets
 
 # --- Setup ---
 
@@ -18,12 +17,14 @@ exif_files = list.files(file.path(datadir, "exif-examples"), pattern = "^exif.+\
 # Define which test EXIF file to run the functions on
 exif_filepath = exif_files[6]
 
-imagery_metadata_single = extract_imagery_dataset_metadata(exif_filepath,
+imagery_dataset_metadata_single = extract_imagery_dataset_metadata(exif_filepath,
                                                            plot_flightpath = TRUE,
                                                            crop_to_contiguous = TRUE)
 
 
-imagery_metadata_all = purrr::map(exif_files, extract_imagery_dataset_metadata,
+imagery_dataset_metadata_all = purrr::map(exif_files, extract_imagery_dataset_metadata,
                                   plot_flightpath = TRUE,
                                   crop_to_contiguous = TRUE) |>
   dplyr::bind_rows()
+
+imagery_perimage_metadata_single = extract_imagery_perimage_metadata(exif_filepath)
