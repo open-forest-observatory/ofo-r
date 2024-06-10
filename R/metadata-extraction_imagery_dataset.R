@@ -3,7 +3,7 @@
 
 
 # Flight speed in meters per second
-extract_flight_speed_ms = function(exif) {
+extract_flight_speed = function(exif) {
 
   # Get distance from each image to the next, in meters
   start_image = exif[1:(nrow(exif) - 1), ]
@@ -58,7 +58,7 @@ extract_mission_polygon = function(exif, image_merge_distance) {
 # Extract camera pitch, detecting if smart oblique, and if so, report the oblique value (which is
 # unfortunatley reported identically whether forward or backward)
 #' @export
-extract_camera_pitch <- function(exif) {
+extract_camera_pitch_summary <- function(exif) {
   # Extract CameraPitch directly from exif and adjust pitch values so 0 is nadir. Also take abs val
   # just in case the pitch is reported as negative for backward (even thouth it apparently never
   # is), so that for smart-oblique missions, the low quantile represents nadir and the high quantile
@@ -207,7 +207,7 @@ solarnoon_from_centroid_and_date = function(centroid, date) {
 #' extract_dataset_id(exif)
 #'
 #' @export
-extract_dataset_id_dataset_level = function (exif) {
+extract_dataset_id_summary = function (exif) {
 
   dataset_id_dataset_level = exif$dataset_id[1]
 
@@ -251,10 +251,10 @@ extract_image_count = function (exif) {
 #' extract_file_size(exif)
 #'
 #' @export
-extract_file_size_gb = function (exif) {
+extract_file_size_summary = function (exif) {
 
   file_size = sum(exif$FileSize) / 1000000000
-  
+
   file_size = round(file_size, 2)
 
   return(file_size)
@@ -299,7 +299,7 @@ extract_pct_images_rtk = function (exif) {
 #' extract_white_balance_mode_and_prop(exif)
 #'
 #' @export
-extract_white_balance_mode_and_pct = function (exif) {
+extract_white_balance_summary = function (exif) {
 
   white_balance = extract_white_balance(exif)
 
@@ -329,7 +329,7 @@ extract_white_balance_mode_and_pct = function (exif) {
 #' extract_exposure(exif)
 #'
 #' @export
-extract_exposure = function (exif) {
+extract_exposure_summary = function (exif) {
 
   exposure_median_derived = median(exif$ExposureTime)
   exposure_stdev_derived = sd(exif$ExposureTime)
@@ -338,34 +338,13 @@ extract_exposure = function (exif) {
   exposure_stdev_derived = round(exposure_stdev_derived, 6)
   exposure_cv_derived = round(exposure_cv_derived, 2)
 
-  ret = data.frame(exposure_sec_median_derived = exposure_median_derived,
+  ret = data.frame(exposure_median_derived = exposure_median_derived,
                    exposure_cv_derived)
 
   return(ret)
 
 }
 
-#### exposure_stdev_derived ####
-
-#' Extracts the standard deviation of exposure time
-#'
-#' The standard deviation of exposure time across all images in the dataset. Units: sec
-#'
-#' @param exif the exif metadata file
-#'
-#' @return the standard deviation of exposure time across all images in the dataset. Units: sec
-#'
-#' @examples
-#' extract_exposure_stdev_derived(exif)
-#'
-#' @export
-extract_exposure_stdev_derived = function (exif) {
-
-  exposure_stdev_derived = sd(exif$ExposureTime)
-
-  return(exposure_stdev_derived)
-
-}
 
 #### area_ha_and_image_density ####
 
@@ -398,10 +377,10 @@ extract_area_and_density = function(exif, mission_polygon) {
 
   image_density_derived = (nrow(imgs_intersecting)) / area_ha_derived
 
-  area_ha_derived = round(area_ha_derived, 2)
+  area_derived = round(area_ha_derived, 2)
   image_density_derived = round(image_density_derived, 2)
 
-  ret = data.frame(area_ha_derived, image_density_derived)
+  ret = data.frame(area_derived, image_density_derived)
 
   return(ret)
 
@@ -445,7 +424,7 @@ extract_image_frequency <- function(exif) {
 }
 
 # Resolution and aspect ratio
-extract_resolution_and_aspect_ratio <- function(exif) {
+extract_resolution_and_aspect_ratio_summary <- function(exif) {
 
   # Get Xresolution and Yresolution from the EXIF data
   resolution_x <- unique(exif$ImageWidth)
@@ -465,7 +444,7 @@ extract_resolution_and_aspect_ratio <- function(exif) {
 
 
 # File type
-extract_file_format <- function(exif) {
+extract_file_format_summary <- function(exif) {
   
   # Get image file format
   image_file_format <- unique(exif$FileType)
@@ -505,44 +484,44 @@ extract_imagery_dataset_metadata = function(exif_filepath, plot_flightpath, crop
   }
 
   # Extract/compute metadata attributes
-  dataset_id = extract_dataset_id_dataset_level(exif)
-  flight_speed_ms_derived = extract_flight_speed_ms(exif)
+  dataset_id = extract_dataset_id_summary(exif)
+  flight_speed_derived = extract_flight_speed(exif)
   flight_terrain_correlation_derived = extract_flight_terrain_correlation(exif)
-  camera_pitch = extract_camera_pitch(exif)
+  camera_pitch = extract_camera_pitch_summary(exif)
   dates_times = extract_dates_times(exif)
   centroid_internal = extract_mission_centroid_sf(exif)
   centroid_lonlat = centroid_sf_to_lonlat(centroid_internal)
   solarnoon_local_derived = solarnoon_from_centroid_and_date(centroid_internal, dates_times$earliest_date_derived)
   image_count_derived = extract_image_count(exif)
-  file_size_gb_derived = extract_file_size_gb(exif)
+  file_size_derived = extract_file_size_summary(exif)
   percent_images_rtk_derived = extract_pct_images_rtk(exif)
-  white_balance = extract_white_balance_mode_and_pct(exif)
-  exposure = extract_exposure(exif)
+  white_balance = extract_white_balance_summary(exif)
+  exposure = extract_exposure_summary(exif)
   area_and_density = extract_area_and_density(exif, mission_polygon)
-  image_frequency_sec_derived = extract_image_frequency(exif)
-  resolution_and_aspect_ratio = extract_resolution_and_aspect_ratio(exif)
-  file_format_derived = extract_file_format(exif)
+  image_frequency_derived = extract_image_frequency(exif)
+  resolution_and_aspect_ratio = extract_resolution_and_aspect_ratio_summary(exif)
+  file_format_derived = extract_file_format_summary(exif)
 
   # Return extracted/computed metadata as a data frame row
   dataset_metadata = data.frame(
     dataset_id,
-    flight_speed_ms_derived,
+    flight_speed_derived,
     flight_terrain_correlation_derived,
     camera_pitch, # this is a multi-column dataframe; preserving its column names
     dates_times,
     centroid_lonlat, # this is a multi-column dataframe; preserving its column names
     solarnoon_local_derived,
     image_count_derived,
-    file_size_gb_derived,
+    file_size_derived,
     percent_images_rtk_derived,
     white_balance, # this is a multi-column dataframe; preserving its column names
     exposure, # this is a multi-column dataframe; preserving its column names
     area_and_density, # this is a multi-column dataframe; preserving its column names
-    image_frequency_sec_derived,
+    image_frequency_derived,
     resolution_and_aspect_ratio,
     file_format_derived
   )
-  
+
   return(dataset_metadata)
 
 }
