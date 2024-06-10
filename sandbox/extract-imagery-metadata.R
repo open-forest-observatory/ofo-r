@@ -28,3 +28,6 @@ imagery_dataset_metadata_all = purrr::map(exif_files, extract_imagery_dataset_me
   dplyr::bind_rows()
 
 imagery_perimage_metadata_single = extract_imagery_perimage_metadata(exif_filepath)
+
+imagery_perimage_metadata_all = purrr::map(exif_files, extract_imagery_perimage_metadata) |>
+  dplyr::bind_rows()
