@@ -1,15 +1,12 @@
-# This script defines image-level metadata extraction functions
-# Written by Emily Marie Purvis, last updated March 27th 2024
-
-library(devtools)
-
-#### Step 1: Define image-level metadata extraction functions ####
+# Image-level metadata extraction functions
+# Originally written by Emily Marie Purvis, last updated March 27th 2024
+# Since updated by others
 
 #### dataset ID ####
 
 #' Extract dataset id
 #'
-#' Pulls the dataset id to include in image-level metadata collation
+#' Pulls the dataset id, to include in image-level metadata collation
 #'
 #' @param exif the exif metadata file
 #'
@@ -19,16 +16,13 @@ library(devtools)
 #' extract_dataset_id(exif)
 #'
 #' @export
-
-extract_dataset_id_image_level = function (exif) {
+extract_dataset_id_perimage = function (exif) {
 
   dataset_id_image_level = exif$dataset_id
 
   return(dataset_id_image_level)
 
 }
-
-#### datatime_local (Format: YYYYMMDD HHMMSS (local time zone, 24 hr)) ####
 
 #' Extract local date and time of image collection
 #'
@@ -42,14 +36,11 @@ extract_dataset_id_image_level = function (exif) {
 #' extract_datatime_local(exif)
 #'
 #' @export
+extract_datetime_local = function (exif) {
 
-extract_datatime_local = function (exif) {
+  datetime_local = exif$capture_datetime
 
-  exif$DateTimeOriginal_nocolon = stringr::str_replace_all(exif$DateTimeOriginal, ":", "")
-
-  datatime_local = (exif$DateTimeOriginal_nocolon)
-
-  return(datatime_local)
+  return(datetime_local)
 
 }
 
@@ -68,17 +59,15 @@ extract_datatime_local = function (exif) {
 #'
 #' @export
 
-extract_lat_lon = function (exif) {
+extract_lon_lat = function (exif) {
 
-  exif_coordinates <- data.frame(exif$X, sf::st_coordinates(exif[,1], st_coordinates(exif[,2])))
+  coords = sf::st_coordinates(exif)
+  lon = coords[, 1] |> as.numeric()
+  lat = coords[, 2] |> as.numeric()
 
-  lat = exif_coordinates$Y
+  ret = list(lon = lon, lat = lat)
 
-  lon = exif_coordinates$X
-
-  lat_lon = data.frame (lat, lon)
-
-  return(lat_lon)
+  return(ret)
 }
 
 #### rtk_fix (Format: True/False. Use EXIF RTKFlat) ####
@@ -95,7 +84,6 @@ extract_lat_lon = function (exif) {
 #' extract_rtk_fix(exif)
 #'
 #' @export
-
 extract_rtk_fix = function(exif) {
   if ("RtkFlag" %in% names(exif)) {
     rtk_fix = exif$RtkFlag == 50
@@ -122,7 +110,7 @@ extract_rtk_fix = function(exif) {
 #'
 #' @export
 
-extract_accuracy = function (exif) {
+extract_accuracy = function(exif) {
 
   exif["RtkStdLon"[!("RtkStdLon" %in% colnames(exif))]] = NA
 
@@ -132,9 +120,13 @@ extract_accuracy = function (exif) {
 
   accuracy_y = exif$RtkStdLat
 
-  accuracy = data.frame (accuracy_x, accuracy_y)
+  accuracy_x = round(accuracy_x, 4)
+  accuracy_y = round(accuracy_y, 4)
 
-  return(accuracy)
+  ret = list(accuracy_x = accuracy_x,
+             accuracy_y = accuracy_y)
+
+  return(ret)
 }
 
 #### pitch_roll_yaw: camera_pitch (Units: deg, degrees up from nadir), camera_roll (Units: deg, degrees clockwise from up), camera_yaw (Units: deg, degrees right from true north) ####
@@ -159,8 +151,14 @@ extract_pitch_roll_yaw = function(exif) {
   camera_roll = exif$GimbalRollDegree
 
   camera_yaw = exif$GimbalYawDegree
+  
+  camera_pitch = round(camera_pitch, 2)
+  camera_roll = round(camera_roll, 2)
+  camera_yaw = round(camera_yaw, 2)
 
-  pitch_roll_yaw = data.frame (camera_pitch, camera_roll, camera_yaw)
+  pitch_roll_yaw = list(camera_pitch = camera_pitch,
+                        camera_roll = camera_roll,
+                        camera_yaw = camera_yaw)
 
   return(pitch_roll_yaw)
 }
@@ -179,9 +177,8 @@ extract_pitch_roll_yaw = function(exif) {
 #' extract_exposure(exif)
 #'
 #' @export
-
 extract_exposure = function (exif) {
-  exposure = exif$ExposureTime
+  exposure = exif$ExposureTime |> round(6)
   return(exposure)
 }
 
@@ -199,8 +196,7 @@ extract_exposure = function (exif) {
 #' extract_aperture(exif)
 #'
 #' @export
-
-extract_aperture = function (exif) {
+extract_aperture = function(exif) {
   aperture = (exif$Aperture)
   return(aperture)
 }
@@ -219,7 +215,6 @@ extract_aperture = function (exif) {
 #' extract_iso(exif)
 #'
 #' @export
-
 extract_iso = function(exif) {
   iso = exif$ISO
   return(iso)
@@ -239,7 +234,6 @@ extract_iso = function(exif) {
 #' extract_white_balance(exif)
 #'
 #' @export
-
 extract_white_balance = function(exif) {
 
   white_balance = dplyr::case_when(
@@ -269,9 +263,9 @@ extract_received_image_path = function(exif) {
 
   received_image_path = stringr::str_split_fixed(exif$SourceFile, stringr::fixed(exif$dataset_id), 2)
 
-  received_image_path <- received_image_path[,2]
+  received_image_path <- received_image_path[, 2]
 
-  received_image_path <- with(exif, paste0(exif$dataset_id, received_image_path))
+  received_image_path <- paste0(exif$dataset_id, received_image_path)
 
   return(received_image_path)
 }
@@ -290,17 +284,14 @@ extract_received_image_path = function(exif) {
 #' extract_altitude_asl(exif)
 #'
 #' @export
-
 extract_altitude_asl = function(exif) {
 
-  altitude_asl = exif$AbsoluteAltitude
+  altitude_asl = exif$AbsoluteAltitude |> round()
 
   return(altitude_asl)
 }
 
-#### Step 2: Create wrapper for metadata extraction functions. Preps the EXIF data for passing to the extraction functions, then calls all the individual extraction functions to extract the respective attributes. ####
-
-#' Returns a collection of image-level metadata parameters
+#' Extract image-level metadata parameters from EXIF datafram
 #'
 #' @param exif_file the exif filepath (before being prepared to pass to the functions in the wrapper)
 #'
@@ -310,36 +301,36 @@ extract_altitude_asl = function(exif) {
 #' extract_metadata_emp(exif)
 #'
 #' @export
+extract_imagery_perimage_metadata = function(exif_filepath) {
 
-extract_metadata_emp = function(exif_file) {
+  exif = prep_exif(exif_filepath)
 
-  exif = prep_exif(exif_file)
-
-  dataset_id_image_level = extract_dataset_id_image_level(exif)
-  datatime_local = extract_datatime_local(exif)
-  lat_lon = extract_lat_lon(exif)
+  dataset_id_image_level = extract_dataset_id_summary(exif)
+  datatime_local = extract_datetime_local(exif)
+  lon_lat = extract_lon_lat(exif)
   rtk_fix = extract_rtk_fix(exif)
   accuracy = extract_accuracy(exif)
   pitch_roll_yaw = extract_pitch_roll_yaw(exif)
   exposure = extract_exposure(exif)
-  aperture = extract_aperture (exif)
+  aperture = extract_aperture(exif)
   iso = extract_iso(exif)
   white_balance = extract_white_balance(exif)
   received_image_path = extract_received_image_path(exif)
-  altitude_asl = extract_altitude_asl(exif)
+  altitude_asl_drone = extract_altitude_asl(exif)
 
-  metadata = data.frame(dataset_id_image_level = dataset_id_image_level,
-                        datatime_local = datatime_local,
-                        lat_lon,
-                        rtk_fix = rtk_fix,
-                        accuracy,
-                        pitch_roll_yaw,
-                        exposure = exposure,
-                        aperture = aperture,
-                        iso = iso,
-                        white_balance = white_balance,
-                        received_image_path = received_image_path,
-                        altitude_asl = altitude_asl
+  metadata = data.frame(
+    dataset_id_image_level = dataset_id_image_level,
+    datatime_local = datatime_local,
+    lon_lat,
+    rtk_fix = rtk_fix,
+    accuracy,
+    pitch_roll_yaw,
+    exposure = exposure,
+    aperture = aperture,
+    iso = iso,
+    white_balance = white_balance,
+    received_image_path = received_image_path,
+    altitude_asl_drone = altitude_asl_drone
   )
 
   return(metadata)
