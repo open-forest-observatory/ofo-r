@@ -9,16 +9,12 @@
 #' @examples
 #'
 #' @export
+detect_trees <- function(chm, ws) {
 
+  algorithm = lidR::lmf(ws = ws)
 
-
-detect_trees <- function(chm,ws) {
-
-  algorithm = lmf(ws = ws)
-
-  function (chm, algorithm, uniqueness = "incremental")
-  {
-    res <- locate_trees(las, algorithm, uniqueness)
+  function(chm, algorithm, uniqueness = "incremental") {
+    res <- lidr::locate_trees(las, algorithm, uniqueness)
     if (is(res, "sf")) {
       if (nrow(res) == 0L) {
         coords <- matrix(0, ncol = 2)
@@ -34,11 +30,4 @@ detect_trees <- function(chm,ws) {
     }
     return(res)
   }
-
-
-
-
 }
-
-
-
