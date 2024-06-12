@@ -31,3 +31,18 @@ detect_trees <- function(chm, ws) {
     return(res)
   }
 }
+
+
+detect_trees2 = function(chm,
+                         ws,
+                         algorithm = lidR::lmf(ws = ws),
+                         uniqueness = "incremental",
+                         min_ht = 5) {
+
+  ttops <- lidR::locate_trees(chm, algorithm, uniqueness)
+
+  # Keep only trees over the minimum height
+  ttops[ttops$Z >= min_ht, ]
+
+  return(ttops)
+}
