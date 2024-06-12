@@ -11,19 +11,27 @@
 #' @export
 
 
-chm_from_coregistered_dsm_dtm = function(dsm, dtm) {
+chm_from_coregistered_dsm_dtm = function(dsm, dtm, res = 0.12) {
 
-  if (!identical(res(dsm), res(dtm))){
-    # check if both raster files have the same spatial resolution
-    dtm_resampled <- resample(dtm, dsm, method="bilinear")
-  } else {
-
-    dtm_resampled <- dtm
+  # Ensure units are in m
+  if (terra::is.lonlat(dsm)) {
+    stop("DSM must be in a projected coordinate system. Current coordinate system: ", terra::crs(dsm))
   }
 
-  chm = dsm - dtm_resampled
+  if (terra::is.lonlat(dtm)) {
+    stop("DTM must be in a projected coordinate system. Current coordinate system: ", terra::crs(dtm))
+  }
+
+  ## Resample to specified res
+  dsm_resamp = terra::project(dsm, terra::crs(dsm), res = res, method = "bilinear")
+
+  ## Interpolate the the DTM to the res, extent, etc of the DSM
+  dtm_resamp = terra::resample(dtm, dsm_resamp, method = "bilinear")
+
+  chm = dsm_resamp - dtm_resamp
 
   # can add smoothing step if need smoothing chm before removing zeros
+
   chm[chm < 0] = 0
   return(chm)
 }
