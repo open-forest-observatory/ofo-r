@@ -2,6 +2,7 @@
 
 export(chm_from_coregistered_dsm_dtm)
 export(detect_trees)
+export(detect_trees2)
 export(extract_accuracy)
 export(extract_altitude_asl)
 export(extract_aperture)
