@@ -14,12 +14,12 @@
 chm_from_coregistered_dsm_dtm = function(dsm, dtm, res = 0.12) {
 
   # Ensure units are in m
-  if (terra::is.lonlat(dsm)) {
-    stop("DSM must be in a projected coordinate system. Current coordinate system: ", terra::crs(dsm))
+  if (identical(terra::linearUnits(dsm), 1)) {
+    stop("DSM must be in a projected (meters) coordinate system. Current coordinate system: ", terra::crs(dsm))
   }
 
-  if (terra::is.lonlat(dtm)) {
-    stop("DTM must be in a projected coordinate system. Current coordinate system: ", terra::crs(dtm))
+  if (identical(terra::linearUnits(dtm), 1)) {
+    stop("DTM must be in a projected (meters) coordinate system. Current coordinate system: ", terra::crs(dtm))
   }
 
   ## Resample to specified res
