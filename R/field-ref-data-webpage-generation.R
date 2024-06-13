@@ -50,6 +50,9 @@ read_and_merge_plot_boundaries = function(plot_boundaries_dir) {
 
   bounds = bind_rows(bounds_sf_list)
 
+  # Remove Z dim if it exists
+  bounds = sf::st_zm(bounds)
+
   ## Standardize boundary plot ID formatting and compute area
   bounds = bounds |>
     mutate(plot_id = str_pad(plot_id, 4, pad = "0", side = "left"))
@@ -88,7 +91,7 @@ check_field_ref_data = function(tabular_data, plot_bounds) {
   table = table(codes_in_use_not_defined) |> sort(decreasing = TRUE)
   code_list = names(table) |> paste(collapse = ", ")
   if (code_list != "") {
-    warning("The following numeric species codes are in use but not defined in the species codes table (in order or decreasing frequency): ", code_list)
+    warning("The following numeric species codes are in use but not defined in the species codes table (in order or decreasing frequency); using the codes as they appear here: ", code_list)
     print(table)
   }
 
@@ -407,6 +410,7 @@ save_widget_html = function(widget,
 
 make_plot_catalog_map = function(plot_summary,
                                  plot_centroids,
+                                 plot_bounds,
                                  website_static_path,
                                  leaflet_header_files_dir,
                                  plot_catalog_map_dir,
@@ -414,9 +418,9 @@ make_plot_catalog_map = function(plot_summary,
 
   d_map = left_join(plot_centroids, plot_summary, by = "plot_id")
 
-  m = leaflet() %>%
+  m = leaflet() |>
     addMarkers(data = d_map, popup = ~plot_id_link) |>
-    addPolygons(data = bounds, group = "bounds") |>
+    addPolygons(data = plot_bounds, group = "bounds") |>
     addProviderTiles(providers$Esri.WorldTopoMap, group = "Topo") |>
     addProviderTiles(providers$Esri.WorldImagery, group = "Imagery") |>
     groupOptions("bounds", zoomLevels = 13:20) |>

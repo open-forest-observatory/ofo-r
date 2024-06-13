@@ -85,7 +85,7 @@ plot_summary = compile_plot_summary_table(plots = plots,
                                           base_ofo_url = BASE_OFO_URL,
                                           plot_details_dir = PLOT_DETAILS_PAGE_DIR)
 
-# Write the plot-level data to a csv
+# Write the plot-level data to a csv (for use otside the website purposes)
 readr::write_csv(plot_summary, file.path(datadir, "field-plot-summaries", "field-plot-summary.csv"))
 
 # Make a HTML data table of plot catalog
@@ -99,11 +99,14 @@ dt = make_plot_catalog_datatable(plot_summary = plot_summary,
 plot_centroids = sf::st_centroid(bounds)
 m = make_plot_catalog_map(plot_summary = plot_summary,
                       plot_centroids = plot_centroids,
+                      plot_bounds = bounds,
                       website_static_path = WEBSITE_STATIC_PATH,
                       leaflet_header_files_dir = LEAFLET_HEADER_FILES_DIR,
                       plot_catalog_map_dir = PLOT_CATALOG_MAP_DIR,
                       plot_catalog_map_filename = PLOT_CATALOG_MAP_FILENAME)
 
+# For website directories that house plot-level page components, delete existing directories and
+# create new empty directory
 reset_plot_detail_dirs(WEBSITE_STATIC_PATH,
                        WEBSITE_CONTENT_PATH,
                        PLOT_DETAILS_PAGE_DIR,
