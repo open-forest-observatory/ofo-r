@@ -209,8 +209,8 @@ find_best_shift_grid = function(pred, obs,
       sf::st_convex_hull() |>
       sf::st_as_sf()
   } else {
-
-    # If an observed bound is provided, shift it by the same amount as the trial shift being applied to the observed stem map, then make sure it's in the same CRS
+    # If we're using provided bounds, shift them by the same amount as the trial shift being applied
+    # to the observed stem map, then make sure it's in the same CRS
 
     shift_df = data.frame(x = base_shift_x, y = base_shift_y)
     shift_geom = sf::st_as_sf(shift_df, coords = c("x", "y"))
@@ -588,7 +588,7 @@ vis1 = function(trees) {
 # Visualize two hypothetica tree maps (predicted and observed) overlaid. obs_foc: zoom in to focus
 # on the observed trees, with some buffer. Assumes the observed tree map is 50 x 50 and that both
 # tree maps are centered at 0,0.
-vis2 = function(pred, obs, obs_foc = FALSE) {
+vis2 = function(pred, obs, obs_foc = FALSE, coords_arbitrary = FALSE, zoom_to_obs = FALSE, obs_buffer = 75) {
   pred = pred |> dplyr::mutate(layer = "predicted")
   obs = obs |> dplyr::mutate(layer = "observed")
 
@@ -596,11 +596,41 @@ vis2 = function(pred, obs, obs_foc = FALSE) {
 
   lim = ifelse(obs_foc, 100, 200)
 
+  if(coords_arbitrary) {
+    lim = NA
+  }
+
+  lim_xmin = -lim
+  lim_xmax = lim
+  lim_ymin = -lim
+  lim_ymax = lim
+
+  # Should we constrain the coords to the observed trees plus some buffer?
+  if (zoom_to_obs) {
+
+    # get the coord extremes
+    xmin = min(obs$x)
+    ymin = min(obs$y)
+    xmax = max(obs$x)
+    ymax = max(obs$y)
+
+    # get the range
+    xrange = xmax - xmin
+    yrange = ymax - ymin
+
+    # set the limits as the observed lims +- a buffer
+    lim_xmin = xmin - obs_buffer
+    lim_xmax = xmax + obs_buffer
+    lim_ymin = ymin - obs_buffer
+    lim_ymax = ymax + obs_buffer
+
+  }
+
   p = ggplot2::ggplot(trees, ggplot2::aes(x, y, size = z, color = layer)) +
     ggplot2::geom_point() +
     ggplot2::scale_size_continuous(range = c(0.5, 3)) +
     ggplot2::theme_bw() +
-    ggplot2::coord_cartesian(xlim = c(-lim, lim), ylim = c(-lim, lim))
+    ggplot2::coord_cartesian(xlim = c(lim_xmin, lim_xmax), ylim = c(lim_ymin, lim_ymax))
 
   print(p)
 }
