@@ -109,6 +109,7 @@ crop_pred_to_obs = function(pred, obs) {
 
 # Objective function: the mean x,y,z distance between each observed tree and its nearest predicted
 # tree. Note that obs_bound is not used by this objective function logic, but it needs to be included for compatibility with objective functions that do require it.
+#' @export
 obj_mean_dist_to_closest = function(pred, obs, obs_bound) {
   # For each predicted point, get the closest observed point in x, y, z space
 
@@ -300,6 +301,7 @@ find_best_shift_grid = function(pred, obs,
 
 # Find the overall best shift using the specified method.
 # Currently only works for grid search
+#' @export
 find_best_shift = function(pred, obs,
                            obs_bounds,
                            objective_fn = obj_mean_dist_to_closest,
@@ -588,6 +590,7 @@ vis1 = function(trees) {
 # Visualize two hypothetica tree maps (predicted and observed) overlaid. obs_foc: zoom in to focus
 # on the observed trees, with some buffer. Assumes the observed tree map is 50 x 50 and that both
 # tree maps are centered at 0,0.
+#' @export
 vis2 = function(pred, obs, obs_foc = FALSE, coords_arbitrary = FALSE, zoom_to_obs = FALSE, obs_buffer = 75) {
   pred = pred |> dplyr::mutate(layer = "predicted")
   obs = obs |> dplyr::mutate(layer = "observed")
