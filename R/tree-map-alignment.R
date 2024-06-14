@@ -110,11 +110,13 @@ crop_pred_to_obs = function(pred, obs) {
 # Objective function: the mean x,y,z distance between each observed tree and its nearest predicted
 # tree. Note that obs_bound is not used by this objective function logic, but it needs to be included for compatibility with objective functions that do require it.
 #' @export
-obj_mean_dist_to_closest = function(pred, obs, obs_bound) {
-  # For each predicted point, get the closest observed point in x, y, z space
+obj_mean_dist_to_closest = function(pred, obs, ...) {
 
+  # Crop the predicted points to the x-y extent of the observed points +- 25%, so we don't waste
+  # time if the user provided a predicted tree map that is much larger than the observed tree map
   pred_crop = crop_pred_to_obs(pred, obs)
-
+  
+  ## For each predicted point, get the closest observed point in x, y, z space
   # For each observed point, get the distance to every predicted point
   # TODO: Is it OK that multiple observed points may be matched to the same predicted point? Maybe
   # keep it simple for the sake of speed, if it can recover the correct shift
@@ -281,7 +283,7 @@ find_best_shift_grid = function(pred, obs,
 
   if (parallel) {
     future::plan(future::multicore, workers = parallelly::availableCores())
-    shifts$objective = furrr::future_map_dbl(transform_params, eval_shift, pred, obs, obs_bound = obs_bounds, objective_fn)
+    shifts$objective = furrr::future_map_dbl(transform_params, eval_shift, pred, obs, obs_bound = obs_bounds, objective_fn, .options = furrr::furrr_options(seed = TRUE))
     future::plan(future::sequential)
   } else {
     shifts$objective = purrr::map_dbl(transform_params, eval_shift, pred, obs, obs_bound = obs_bounds, objective_fn)
@@ -303,7 +305,7 @@ find_best_shift_grid = function(pred, obs,
 # Currently only works for grid search
 #' @export
 find_best_shift = function(pred, obs,
-                           obs_bounds,
+                           obs_bounds = NULL,
                            objective_fn = obj_mean_dist_to_closest,
                            method = "grid",
                            parallel = TRUE) {
@@ -319,7 +321,7 @@ find_best_shift = function(pred, obs,
                                          obs_bounds = obs_bounds,
                                          objective_fn = objective_fn,
                                          search_window = 50,
-                                         search_increment = 2, # TODO TEMP was 2
+                                         search_increment = 2,
                                          return_full_grid = TRUE,
                                          parallel = parallel)
 
@@ -329,7 +331,7 @@ find_best_shift = function(pred, obs,
                                        obs_bounds = obs_bounds,
                                        objective_fn = objective_fn,
                                        search_window = 3,
-                                       search_increment = 0.25, # TODO TEMP was 0.25
+                                       search_increment = 0.25,
                                        base_shift_x = result_coarse$best_shift$shift_x,
                                        base_shift_y = result_coarse$best_shift$shift_y,
                                        parallel = parallel)
@@ -383,7 +385,7 @@ find_best_shift = function(pred, obs,
 }
 
 
-# Find the overall best shift using PDAL's grid search
+# Find the overall best shift using PDAL's iterative closest point implementation
 find_best_shift_icp = function(pred, obs) {
 
   # Keep track of execution time
@@ -392,11 +394,11 @@ find_best_shift_icp = function(pred, obs) {
 
   # Business logic
 
-  coords_pred = pred |> select(X = x, Y = y, Z = z)
+  coords_pred = pred |> dplyr::select(X = x, Y = y, Z = z)
   pred_las = lidR::LAS(coords_pred)
 
   obs = sim$obs
-  coords_obs = obs |> select(X = x, Y = y, Z = z)
+  coords_obs = obs |> dplyr::select(X = x, Y = y, Z = z)
   obs_unaligned_las = lidR::LAS(coords_obs)
 
   # Write to temp dir

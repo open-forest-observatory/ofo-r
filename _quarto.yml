@@ -1,0 +1,3 @@
+project:
+  execute-dir: project
+  output-dir: "html"
