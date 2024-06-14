@@ -4,7 +4,7 @@
 \alias{chm_from_coregistered_dsm_dtm}
 \title{Calculate Canopy Height Model (CHM) from a coregistered DSM and DTM}
 \usage{
-chm_from_coregistered_dsm_dtm(dsm, dtm)
+chm_from_coregistered_dsm_dtm(dsm, dtm, res = 0.12)
 }
 \arguments{
 \item{dsm}{A terra SpatRaster representing the Digital Surface Model.}
