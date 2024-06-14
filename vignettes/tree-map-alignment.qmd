@@ -1,19 +1,22 @@
 ---
 title: "Aligning an observed (field) to a predicted (drone) stem map with the `ofo` package"
 author: "Derek Young"
-date: "6/13/2024"
+date: "6/14/2024"
 format: 
   html:
     code-fold: show
     embed-resources: true
-    fig-height: 3
-project:
-  execute-dir: project
+    fig-height: 5.5
+
 ---
+
+## Purpose
+
+To determine the accuracy of a "predicted" (drone-derived) stem map, we need to compare it to an "observed" (field inventory) stem map. Each of these datasets is collected in such a way that internally, the tree positions should be accurate relative to each other. However, the datasets may not have *globally* accurate georegistratation, which means that the predicted and observed tree maps may not be aligned. In turn, this means that any comparison between the two (e.g., to evaluate the accuracy of the predicted map) may be biased due to misalignment. Thus, we first need to align the two maps before we can compare them. This vignette demonstrates how to align the two maps using the `ofo` package.
 
 ## Setup
 
-Load the required R libraries, including the `ofo` package.
+Load the the `ofo` package (which is the repo that this vignette's source file is in, so we can use `devtools::load_all()` to load all the package's functions).
 
 ```{r}
 #| warning: false
@@ -43,7 +46,7 @@ sim = simulate_tree_maps(trees_per_ha = 300,
                          obs_extent = 60,
                          pred_extent = 300,
                          horiz_jitter = 3,
-                         vert_jitter = 5, # max of 5
+                         vert_jitter = 5, # max of 5 or some simulated trees will be below ground
                          false_pos = 0.25,
                          false_neg = 0.25,
                          drop_observed_understory = TRUE,
@@ -74,16 +77,131 @@ noise.
 
 ## Defining the alignment algorithm
 
+### Objective function
+
 The alignment algorithm is a grid search that accepts any objective function that can be applied to
-two data frames with x, y, and z columns. The objective function I have been using so far simply
+two data frames with x, y, and z columns representing tree positions. The objective function I have been using so far simply
 returns the mean distance to the nearest predicted point from each observed point (in 3D space),
 across all observed points. Note that this assumes we have heights for the observed trees, which
 will not always be the case. Here's the definition:
 
 ```{r}
-#|
 #| class-output: R
 
 obj_mean_dist_to_closest
 
 ```
+
+Here's an example of applying the objective function to the simulated data, without any shifting.
+
+```{r}
+
+obj_mean_dist_to_closest(sim$pred, sim$obs)
+```
+
+Now let's shift the observed data by the known offset and see if the objective function improves.
+
+```{r}
+
+obs_unshifted = sim$obs |>
+  dplyr::mutate(x = x + 9.25,
+                y = y - 15.5)
+
+obj_mean_dist_to_closest(sim$pred, obs_unshifted)
+```
+
+It should be lower!
+
+### Grid search
+
+The grid search is defined by `find_best_shift_grid`. It uses a customizable search window and search increment. It is wrapped by the user-facing function `find_best_shift`, which allows the user to specify either a grid search or an optimizer. (I didn't have any luck with optimizers due to the discontinuous nature of the objective function.) When `grid` is selected as the method for `find_best_shift`, a two-stage grid search is performed, where the first stage is a coarse search (search window of 50 m with an increment of 2 m), and the second stage is a fine search (search window of 3 m with an increment of 0.25 m, centered on the optimal shift identified by the coarse search).
+
+First we demonstrate the underlying single-stage `find_best_shift_grid` function. It runs the computation of the objective function for each grid point, in parallel.
+
+```{r}
+
+shift = find_best_shift_grid(sim$pred, sim$obs,
+                     objective_fn = obj_mean_dist_to_closest,
+                     search_window = 50,
+                     search_increment = 2)
+shift
+
+```
+
+As a reminder, the true shift is 9.25, -15.5.
+
+We could now run another single-stage grid search, but centered on this shift, with a smaller search window and increment.
+
+```{r}
+
+find_best_shift_grid(sim$pred, sim$obs,
+                     objective_fn = obj_mean_dist_to_closest,
+                     search_window = 3,
+                     search_increment = 0.25,
+                     base_shift_x = shift$best_shift$shift_x,
+                     base_shift_y = shift$best_shift$shift_y)
+```
+
+Hopefully the result is closer to the true shift.
+
+We can run the two-stage grid search all at once with `find_best_shift`.
+
+```{r}
+
+find_best_shift(sim$pred, sim$obs,
+                objective_fn = obj_mean_dist_to_closest,
+                method = "grid")
+
+```
+
+## Quantifying the success rate
+
+Each simulated tree map is a random draw, so we can't read much into the alignment success (or failure) on a single simulated map to tell us whether our algorithm is good at recovering the shift. The function `calc_alignment_success_rate` runs the alignment algorithm on `n_tries` simulated maps and returns the proportion of times the true shift is recovered (within a 3 m tolerance). The argument has a `...` argument that takes all the arguments to be passed to `simulate_tree_maps`.
+
+```{r}
+set.seed(123)
+result = calc_alignment_success_rate(n_tries = 4, # set to at least 100 except for testing
+                                     parallel = TRUE,
+                                     trees_per_ha = 300,
+                                     trees_per_clust = 5,
+                                     cluster_radius = 5,
+                                     obs_extent = 60,
+                                     horiz_jitter = 3,
+                                     vert_jitter = 5, # max of 5
+                                     height_bias = 0,
+                                     false_pos = 0.25,
+                                     false_neg = 0.25,
+                                     drop_observed_understory = TRUE)
+result
+```
+
+Ideally we'd want to run this with at least 100 tries to get a good estimate of the success rate. But it takes a long time due to how slow the grid search is. This function may serve as a basis for evaluating different objective functions or optimizers against each other to see which is best (and fastest) at recovering the shift.
+
+## Other approaches
+
+### ICP
+
+I implemented PDAL's ICP algorithm here. It is fast but does not work very well in this context. It requires PDAL to be installed and accessible via the command line, as this function makes a system call to PDAL.
+
+```{r}
+
+find_best_shift_icp(sim$pred, sim$obs)
+```
+
+If we thought this algorithm had potential, we could add it as a option for the `method` argument of `find_best_shift` (which currently only accepts "grid" or "optim" (with any arbitrary function)).
+
+### CPD (Coherent Point Drift) for point cloud matching.
+
+I think the CPD algorithm has the greatest potential to work well in this context. I [could not get](https://github.com/PDAL/PDAL/issues/2100) the [PDAL implementation](https://pdal.io/en/2.6.0/stages/filters.cpd.html) to work due to the need to build PDAL with additional dependencies that appear to have their own dependency challenges. However, there is a [Python implemention of CPD](https://github.com/siavashk/pycpd) that I think we should test. If we want to integrate it with the `ofo` R package, we could either use `reticulate` to call Python from R, or we could write a command line binding for the CPD Python script and make a system call from R.
+
+The biggest challenge I see with using a predefined poing cloud matching algorithm for this task is what we do with datasets where the observed trees do not have heights. When we are writing custom objective functions, we could optimize a parameter to estimate height from DBH (which should always be measured). But I'm not sure how we would do this with a predefined algorithm like CPD. The best solution I can think of is to use some "global average" height~DBH relationship to convert DBHs to heights before running the algorithm.
+
+### MEE-based matching & F-score
+
+As an alternative objective function, I also implemented the tree matching algorithm from the [MEE paper](https://besjournals.onlinelibrary.wiley.com/doi/10.1111/2041-210X.13860), which ultimately yields an F-score summarizing the recall and precision. However, it is (comparatively) very slow and impractical to use within the grid search approach. It is defined in the function `obj_mee_matching`.
+
+
+## Next steps
+
+- Implement CPD
+- Implement an approach to align an oberved tree map that does not have heights, instead relying on DBH and somehow translating it into height, either as a component of the optimization or as a preprocessing step, assuming some global average height~DBH relationship.
