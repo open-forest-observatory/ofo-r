@@ -111,10 +111,12 @@ crop_pred_to_obs = function(pred, obs) {
 # tree. Note that obs_bound is not used by this objective function logic, but it needs to be included for compatibility with objective functions that do require it.
 #' @export
 obj_mean_dist_to_closest = function(pred, obs, obs_bound) {
-  # For each predicted point, get the closest observed point in x, y, z space
 
+  # Crop the predicted points to the x-y extent of the observed points +- 25%, so we don't waste
+  # time if the user provided a predicted tree map that is much larger than the observed tree map
   pred_crop = crop_pred_to_obs(pred, obs)
-
+  
+  ## For each predicted point, get the closest observed point in x, y, z space
   # For each observed point, get the distance to every predicted point
   # TODO: Is it OK that multiple observed points may be matched to the same predicted point? Maybe
   # keep it simple for the sake of speed, if it can recover the correct shift

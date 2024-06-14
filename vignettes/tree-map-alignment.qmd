@@ -1,0 +1,89 @@
+---
+title: "Aligning an observed (field) to a predicted (drone) stem map with the `ofo` package"
+author: "Derek Young"
+date: "6/13/2024"
+format: 
+  html:
+    code-fold: show
+    embed-resources: true
+    fig-height: 3
+project:
+  execute-dir: project
+---
+
+## Setup
+
+Load the required R libraries, including the `ofo` package.
+
+```{r}
+#| warning: false
+#| code-fold: show
+
+devtools::load_all()
+```
+
+## Generating simulated tree maps
+
+To demonstrate alignment, we will simulate a predicted (drone-derived) and observed (traditional
+field inventory) stem map. The field-based map is more spatially constrained. The stem map
+simulation function has arguments to control the plot size, tree density, tree clumping, rate of
+false positives (drone-detected trees that are not real), rate of false negatives (real trees that
+are not detected by drone), horizontal noise, and vertical noise. There is an option to exclude the
+simulated observed trees that are underneath a neighbor tree, as these are presumably not observed
+by drone (in fact, they are always removed from the simulated drone dataset) and thus excluding them
+likely improves alignment. Finally, the user supplies a known x-y offset by which the observed map
+is shifted relative to the predicted map. This is the offset we will attempt to recover with the
+alignment function.
+
+```{r}
+
+sim = simulate_tree_maps(trees_per_ha = 300,
+                         trees_per_clust = 5,
+                         cluster_radius = 5,
+                         obs_extent = 60,
+                         pred_extent = 300,
+                         horiz_jitter = 3,
+                         vert_jitter = 5, # max of 5
+                         false_pos = 0.25,
+                         false_neg = 0.25,
+                         drop_observed_understory = TRUE,
+                         shift_x = -9.25,
+                         shift_y = 15.5)
+```
+
+The result is a list with two data frames, `obs` and `pred`, each with columns `x`, `y`,
+and `z` (plus some others relating to determineing whether a tree is in the understory or overstory).
+
+```{r}
+
+head(sim$obs)
+head(sim$pred)
+```
+
+We can visualize them with the `vis2` function.
+
+```{r}
+
+vis2(sim$pred, sim$obs)
+```
+
+Based on the shift we specified to the simulator, the observed map needs to be shifted ~9 units
+east and ~15 units south to align with the predicted map. Visually, you will be unlikely to find a
+perfect match because of the detection noise (false positives and false negatives) and spatial
+noise.
+
+## Defining the alignment algorithm
+
+The alignment algorithm is a grid search that accepts any objective function that can be applied to
+two data frames with x, y, and z columns. The objective function I have been using so far simply
+returns the mean distance to the nearest predicted point from each observed point (in 3D space),
+across all observed points. Note that this assumes we have heights for the observed trees, which
+will not always be the case. Here's the definition:
+
+```{r}
+#|
+#| class-output: R
+
+obj_mean_dist_to_closest
+
+```
