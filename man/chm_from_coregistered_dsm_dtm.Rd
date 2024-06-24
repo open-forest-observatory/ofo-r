@@ -4,12 +4,16 @@
 \alias{chm_from_coregistered_dsm_dtm}
 \title{Calculate Canopy Height Model (CHM) from a coregistered DSM and DTM}
 \usage{
-chm_from_coregistered_dsm_dtm(dsm, dtm, res = 0.12)
+chm_from_coregistered_dsm_dtm(dsm, dtm, res = 0.12, bounds = NULL)
 }
 \arguments{
 \item{dsm}{A terra SpatRaster representing the Digital Surface Model.}
 
 \item{dtm}{A terra SpatRaster representing the Digital Terrain Model.}
+
+\item{res}{The desired resolution of the CHM. Default is 0.12 m.}
+
+\item{bounds}{An sf object representing the bounds to crop the CHM to.}
 }
 \value{
 A terra SpatRaster representing the Canopy Height Model.

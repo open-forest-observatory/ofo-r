@@ -5,13 +5,13 @@
 #'
 #' @param dsm A terra SpatRaster representing the Digital Surface Model.
 #' @param dtm A terra SpatRaster representing the Digital Terrain Model.
+#' @param res The desired resolution of the CHM. Default is 0.12 m.
+#' @param bounds An sf object representing the bounds to crop the CHM to.
 #' @return A terra SpatRaster representing the Canopy Height Model.
 #' @examples
 #' chm_from_coregistered_dsm_dtm(dsm_raster, dtm_raster)
 #' @export
-
-
-chm_from_coregistered_dsm_dtm = function(dsm, dtm, res = 0.12) {
+chm_from_coregistered_dsm_dtm = function(dsm, dtm, res = 0.12, bounds = NULL) {
 
   # Ensure units are in m
   if (!identical(terra::linearUnits(dsm), 1)) {
@@ -29,6 +29,13 @@ chm_from_coregistered_dsm_dtm = function(dsm, dtm, res = 0.12) {
   dtm_resamp = terra::resample(dtm, dsm_resamp, method = "bilinear")
 
   chm = dsm_resamp - dtm_resamp
+  
+  # If specified, crop and mask to the bounds
+  if (!is.null(bounds)) {
+    bounds = sf::st_transform(bounds, terra::crs(dsm))
+    chm = terra::crop(chm, bounds)
+    chm = terra::mask(chm, bounds)
+  }
 
   # can add smoothing step if need smoothing chm before removing zeros
 
