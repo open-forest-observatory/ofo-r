@@ -58,7 +58,7 @@ prep_pred_map = function(pred, obs_bound, edge_buffer) {
 
 match_obs_to_pred_mee = function(obs, pred, search_distance_fun_intercept, search_distance_fun_slope, search_height_proportion) {
 
-  dist_mat <- sf::st_distance(obs, pred)
+  dist_mat <- sf::st_distance(obs, pred) |> units::drop_units()
 
   colnames(dist_mat) = pred$pred_tree_id
   rownames(dist_mat) = obs$obs_tree_id
