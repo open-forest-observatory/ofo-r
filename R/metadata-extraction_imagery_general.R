@@ -8,11 +8,6 @@ prep_exif = function(exif_filepath, plot_flightpath = FALSE) {
   # Read in the EXIF data from file for the provided dataset filepath, as a data frame
   exif = read.csv(exif_filepath)
 
-  # Get the dataset ID from the filename (knowing the naming convention is "exif_<dataset_id>.csv")
-  exif$dataset_id = stringr::str_extract(basename(exif_filepath), "(?<=exif_)(.*)(?=\\.csv)")
-  # Alternatively, if we wanted to match the convention for the dataset_id, it would be
-  # "(([0-9]){8}-([0-9]){4})"   # nolint
-
   # Standardize column names across different drone models
   candidate_pitch_cols = c("CameraPitch", "GimbalPitchDegree")
 
