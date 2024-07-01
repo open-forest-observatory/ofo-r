@@ -33,7 +33,7 @@ extract_mission_polygon = function(exif, image_merge_distance) {
   exif = sf::st_transform(exif, 3310)
   ptbuff = sf::st_buffer(exif, image_merge_distance)
   polybuff = sf::st_union(ptbuff)
-  poly = sf::st_buffer(polybuff, -image_merge_distance + 1)
+  poly = sf::st_buffer(polybuff, -image_merge_distance + 5) # Add 5 so simplified poly will contain all images
 
   # Check if multipolygon and if so, return warning and keep only largest polygon
   n_polys = length(sf::st_geometry(poly)[[1]])
@@ -180,12 +180,13 @@ centroid_sf_to_lonlat = function(centroid) {
 
 solarnoon_from_centroid_and_date = function(centroid, date) {
 
-  # Seperat the date from the time, since we only need the date to run this function
+  # Seperate the date from the time, since we only need the date to run this function
   date = stringr::str_split(date, " ", simplify = TRUE)[1]
 
   sncalc <- suntools::solarnoon(sf::st_as_sf(centroid), as.POSIXct(date), POSIXct.out = TRUE)
 
   solarnoon = sncalc$time |> format("%H:%M:%S")
+  # The time is in UTC
 
   return(solarnoon)
 }
