@@ -4,7 +4,7 @@ library(dplyr)
 
 IMAGERY_PROJECT_NAME = "2022-early-regen"
 
-DATASET_DIR = "/ofo-share/drone-imagery-organization/2z_sorted-notcleaned-combined"
+DATASET_DIR = "/ofo-share/drone-imagery-organization/3_sorted-notcleaned-combined" # Ultimately, will want to move this run on to 3_sorted_cleaned, but can run it on this upstream folder if we need data from the photogrammetry outputs (e.g. altitude AGL) in the interim
 BASE_YAML_FILEPATH = "/ofo-share/repos-derek/ofo-r/sandbox/drone-imagery-ingestion/full-run-configs/base.yml"
 DERIVED_YAML_OUTFOLDER = "/ofo-share/repos-derek/ofo-r/sandbox/drone-imagery-ingestion/full-run-configs"
 AUTOMATE_METASHAPE_PATH = "/ofo-share/repos-derek/automate-metashape"
