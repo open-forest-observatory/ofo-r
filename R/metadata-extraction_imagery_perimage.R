@@ -4,26 +4,6 @@
 
 #### dataset ID ####
 
-#' Extract dataset id
-#'
-#' Pulls the dataset id, to include in image-level metadata collation
-#'
-#' @param exif the exif metadata file
-#'
-#' @return dataset id
-#'
-#' @examples
-#' extract_dataset_id(exif)
-#'
-#' @export
-extract_dataset_id_perimage = function (exif) {
-
-  dataset_id_image_level = exif$dataset_id
-
-  return(dataset_id_image_level)
-
-}
-
 #' Extract local date and time of image collection
 #'
 #' Pulls the local date and time of image collection (Format: YYYYMMDD HHMMSS) to include in image-level metadata collation
@@ -293,20 +273,27 @@ extract_altitude_asl = function(exif) {
 
 #' Extract image-level metadata parameters from EXIF datafram
 #'
-#' @param exif_file the exif filepath (before being prepared to pass to the functions in the wrapper)
+#' @param exif_file the exif filepath (before being prepared to pass to the functions in the
+#' wrapper)
+#' @param input_type the type of input, either "dataframe" or "filepath" to a .csv file
 #'
-#' @return a data.frame of dataset_id_image_level, datatime_local, lat, lon, rtk_fix, accuracy_x, accuracy_y, camera_pitch, camera_roll, camera_yaw, exposure, aperture, iso, white_balance, received_image_path, and altitude_asl
+#' @return a data.frame of dataset_id_image_level, datetime_local, lat, lon, rtk_fix, accuracy_x, accuracy_y, camera_pitch, camera_roll, camera_yaw, exposure, aperture, iso, white_balance, received_image_path, and altitude_asl
 #'
 #' @examples
 #' extract_metadata_emp(exif)
 #'
 #' @export
-extract_imagery_perimage_metadata = function(exif_filepath) {
+extract_imagery_perimage_metadata = function(input,
+                                             input_type = "dataframe") {
 
-  exif = prep_exif(exif_filepath)
+  if (input_type == "filepath") {
+    exif = prep_exif(input)
+  } else if (input_type == "dataframe") {
+    exif = input
+  }
 
   dataset_id_image_level = extract_dataset_id_summary(exif)
-  datatime_local = extract_datetime_local(exif)
+  datetime_local = extract_datetime_local(exif)
   lon_lat = extract_lon_lat(exif)
   rtk_fix = extract_rtk_fix(exif)
   accuracy = extract_accuracy(exif)
@@ -320,7 +307,7 @@ extract_imagery_perimage_metadata = function(exif_filepath) {
 
   metadata = data.frame(
     dataset_id_image_level = dataset_id_image_level,
-    datatime_local = datatime_local,
+    datetime_local = datetime_local,
     lon_lat,
     rtk_fix = rtk_fix,
     accuracy,
