@@ -1,13 +1,15 @@
 # Purpose: There are many datasets that are composed of subdatasets (e.g., the E-W and N-S flights
-# of an oblique grid mission). Combine those into a single dataset.
+# of an oblique grid mission). AT this stage, they have been identified an are stored in the top
+# level of the folder `2_sorted-notcleaned` as, e.g., 000345-01 and 000345-02. Combine those into a
+# single dataset "superfolder", with the subdataset folders beneath it.
 
 library(tidyverse)
 library(furrr)
 
-IMAGERY_PROJECT_NAME = "2022-early-regen" # 2023-ny-ofo, 2022-early-regen
+IMAGERY_PROJECT_NAME = "2023-tahoe-aspen" # 2023-ny-ofo, 2022-early-regen
 
 SORTED_IMAGERY_FOLDER = "/ofo-share/drone-imagery-organization/2_sorted-notcleaned"
-COMBINED_IMAGERY_FOLDER = "/ofo-share/drone-imagery-organization/2z_sorted-notcleaned-combined"
+COMBINED_IMAGERY_FOLDER = "/ofo-share/drone-imagery-organization/3_sorted-notcleaned-combined"
 
 sorted_imagery_folder = file.path(SORTED_IMAGERY_FOLDER, IMAGERY_PROJECT_NAME)
 combined_imagery_folder = file.path(COMBINED_IMAGERY_FOLDER, IMAGERY_PROJECT_NAME)

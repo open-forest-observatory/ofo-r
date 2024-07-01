@@ -5,14 +5,16 @@
 
 library(tidyverse)
 
-IMAGERY_PROJECT_NAME = "2022-early-regen" # 2023-ny-ofo, 2022-early-regen
+IMAGERY_PROJECT_NAME = "2021-early-regen" # 2023-ny-ofo, 2022-early-regen
 
 BASEROW_DATA_PATH = "/ofo-share/drone-imagery-organization/ancillary/baserow-snapshots"
 EXIF_INPUT_PATH = "/ofo-share/drone-imagery-organization/1b_exif-unprocessed"
 PROCESSED_EXIF_OUTPUT_PATH = "/ofo-share/drone-imagery-organization/1c_exif-for-sorting"
 
-# What is the padding width for the dataset ID in the folder name? (New format)
-FOLDER_DATASET_ID_PADDING = 4
+# What is the padding width for the dataset ID in the folder names of the imagery folders to be ingested? (New format) This is used to
+# force the Baserow dataset ID column to conform to the image folder names, so this should reflect
+# the padding used when naming the image folders in the 1_manually-cleaned folder.
+FOLDER_DATASET_ID_PADDING = 6
 
 ## END CONSTANTS
 
@@ -26,7 +28,9 @@ crosswalk_output_path = file.path(PROCESSED_EXIF_OUTPUT_PATH, paste0(IMAGERY_PRO
 
 # Load baserow records
 baserow = read_csv(file.path(BASEROW_DATA_PATH, "export - datasets-imagery.csv"))
-dataset_associations = read_csv(file.path(BASEROW_DATA_PATH, "export - dataset-associations - Grid.csv"))
+dataset_associations = read.csv(file.path(BASEROW_DATA_PATH, "export - dataset-associations - Grid.csv"))
+# ^ Needed to use the base R read.csv because read_csv was removing the comma from column values
+# when the values were numeric.
 if ("notes" %in% colnames(dataset_associations)) stop("You need to export the dataset associations table without comments because they screw up the cell delimitations for some reason.")
 
 split_to_list = function(x) {
@@ -95,8 +99,8 @@ b = baserow |>
   mutate(dataset_id = str_pad(dataset_id, 6, pad = "0"))
 
 # There may be baserow records that are identical except for the date or base station location or
-# aircraft (because a data curator duplicated the entry to accommodate the multiple dates). Assign
-# the associated records a group ID that is unique for each group.
+# aircraft (because a data curator duplicated the entry to accommodate the multiple dates, base
+# locations, or aircrafts). Assign the associated records a group ID that is unique for each group.
 b2 = b |>
   group_by(contributor_dataset_name, submission_id, project_id, aircraft_model_id, sensor_id, flight_planner_id, flight_pattern, overlap_front_nominal,
            overlap_side_nominal, camera_pitch_nominal, terrain_follow, altitude_agl_nominal) |>
@@ -114,7 +118,9 @@ image_data = image_data |>
   filter(!is.na(date))
 
 # Standardize date and separate the folder name into its components (if it is a composite dataset
-# with names separated by "_and_")
+# with names separated by "_and_" because the imagery in the folder corresponds to multiple baserow
+# records and the imagery folder could not be split into multiple folders with unique dataset IDs
+# based on the information available to the curator)
 image_data = image_data |>
   mutate(date = str_split(date, " ", simplify = TRUE)[, 1] |>
            str_replace_all(fixed(":"), "-") |>
@@ -122,20 +128,12 @@ image_data = image_data |>
   mutate(folder_in = str_replace_all(folder_in, fixed("/"), "")) |>
   separate_wider_delim(delim = "_and_", cols = "folder_in", names = c("folder_in", "folder_in_2", "folder_in_3"), too_few = "align_start") |>
   filter(!is.na(date))
-  # mutate(dataset_id_old_format = grepl("[0-9]{8}-[0-9]{4}", folder_in)) |>
-  # mutate(dataset_id = ifelse(dataset_id_old_format, str_sub(folder_in, -4, -1), folder_in) |>
-  #          str_pad(6, "left", pad = "0")) |>  mutate(dataset_id_old_format = grepl("[0-9]{8}-[0-9]{4}", folder_in)) |>
-  # mutate(dataset_id_old_format_2 = grepl("[0-9]{8}-[0-9]{4}", folder_in_2)) |>
-  # mutate(dataset_id_2 = ifelse(dataset_id_old_format_2, str_sub(folder_in_2, -4, -1), folder_in_2) |>
-  #          str_pad(6, "left", pad = "0")) |>
-  # mutate(dataset_id_old_format_3 = grepl("[0-9]{8}-[0-9]{4}", folder_in_3)) |>
-  # mutate(dataset_id_3 = ifelse(dataset_id_old_format_3, str_sub(folder_in_3, -4, -1), folder_in_3) |>
-  #          str_pad(6, "left", pad = "0")) |>
-  # select(-dataset_id_old_format, -dataset_id_old_format_2, -dataset_id_old_format_3) |>
-  # Images without a date are corrupted
 
 
-# Bring in the dataset ID (as listed in Baserow) corresponding to each image folder name (for the older format)
+# Bring in the dataset ID (as listed in Baserow) corresponding to each image folder name (this is
+# needed to accommodate folder names with the older format ({date}-{id}), to accommodate those names
+# created before we were using the canonical baserow ID to name the folders). If there were multiple
+# dataset IDs, then bring in all of them (up to 3)
 crosswalk = b |>
   select(dataset_id_baserow = dataset_id, folder_name)
 image_data = image_data |>
@@ -155,7 +153,10 @@ datasets = image_data |>
   filter(n_images > 30) |>
   ungroup()
 
-# Check for any folders unmatched to dataset IDs
+# Check for any folders unmatched to dataset IDs (in either the primary dataset ID, or the secondary
+# or tertiary, if the dataset was composed of multiple IDs (i.e. multiple baserow records, i.e. the
+# folder name had "_and_" in it to designate that the images corresponded to multiple Baserow
+# records and could not be split out based on the information available to the curator))
 
 if (any(is.na(datasets$dataset_id))) {
   folders_no_id = datasets |>
@@ -196,7 +197,8 @@ if (any(is.na(a$dataset_id_3))) {
 }
 
 
-# When does the same dataset ID (image folder) show up for more than one date or serial number?
+# Split out datasets that have more than one date or drone serial number.
+# When does the same dataset ID (image folder) contain more than one date or serial number?
 combos_by_exif = datasets |>
   group_by(dataset_id) |>
   summarize(n_dates = n_distinct(date),
@@ -326,7 +328,7 @@ for (i in seq_len(nrow(combos_by_exif))) {
 
   # Make sure that exif info agrees with baserow on the number of dates
   if (exif_unique_record_count != baserow_unique_record_count) {
-    warning("For combo dataset IDs ", paste(ids_by_foldername, collapse = ", "), ", there are ", exif_unique_record_count, " unique exif dates and ", baserow_unique_record_count, " unique baserow dates. Impossible to split the composite photo folder to each baserow record. Naming by the first dataset ID.")
+    warning("For combo dataset IDs ", paste(ids_by_foldername, collapse = ", "), ", there are ", exif_unique_record_count, " unique exif dates/serialnumbers and ", baserow_unique_record_count, " unique baserow dates/drone models. Impossible to split the composite photo folder to each baserow record. Naming by the first dataset ID and splitting into subdatasets by date/serialnumber.")
     dataset_not_separable = data.frame(dataset_id = ids_by_foldername[1],
                                       dataset_id_2 = ids_by_foldername[2],
                                       dataset_id_3 = ids_by_foldername[3],
@@ -371,9 +373,10 @@ for (i in seq_len(nrow(combos_by_exif))) {
 }
 
 
-# Any remaining combo by folder name ("_and_") cannot be split out to unique baserow records, so assign them the first dataset ID and
-# record a record that they contain additional values for one or more columns. May not need the
-# "datasets_not_separable" dataframe created above if it can be created here.
+# Any remaining combo by folder name ("_and_") cannot be split out to unique baserow records, so
+# assign them the first dataset ID and record a record that they contain additional values for one
+# or more columns that cannot be looked up from Baserow. May not need the "datasets_not_separable"
+# dataframe created above if it can be created here.
 
 composites_not_split = image_data |>
   filter(is.na(dataset_id_out) & (!is.na(dataset_id_2) | !is.na(dataset_id_3))) |>
