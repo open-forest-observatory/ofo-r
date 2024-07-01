@@ -208,6 +208,10 @@ solarnoon_from_centroid_and_date = function(centroid, date) {
 #'
 #' @export
 extract_dataset_id_summary = function (exif) {
+  
+  if(is.null(exif$dataset_id[1])) {
+    stop("Dataset ID not set in exif dataframe. Set the dataset_id column in the exif dataframe before calling this function.")
+  }
 
   dataset_id_dataset_level = exif$dataset_id[1]
 
@@ -464,12 +468,18 @@ extract_file_format_summary <- function(exif) {
 
 # Preps the EXIF data for passing to the
 # extraction functions, then calls all the individual extraction functions to extract the respecive attributes.
-# crop_to_contiguous: Keeps only the images within the largest contiguoug patch of images (which is
+# crop_to_contiguous: Keeps only the images within the largest contiguous patch of images (which is
 # what is returned by create_mission_polygon)
-extract_imagery_dataset_metadata = function(exif_filepath, plot_flightpath, crop_to_contiguous) {
+extract_imagery_dataset_metadata = function(input,
+                                            input_type = "dataframe",
+                                            plot_flightpath,
+                                            crop_to_contiguous) {
 
-  # Prep the EXIF data for extraction of metadata attributes
-  exif = prep_exif(exif_filepath, plot_flightpath = plot_flightpath)
+  if (input_type == "filepath") {
+    exif = prep_exif(exif_filepath, plot_flightpath = plot_flightpath)
+  } else if (input_type == "dataframe") {
+    exif = input
+  }
 
   # Compute geospatial features
   mission_polygon = extract_mission_polygon(exif, image_merge_distance = 50)
@@ -480,7 +490,13 @@ extract_imagery_dataset_metadata = function(exif_filepath, plot_flightpath, crop
     polygon_proj_buffer = mission_polygon |> sf::st_transform(3310) |> sf::st_buffer(1)
     exif_proj = sf::st_transform(exif, 3310)
     intersection_idxs = sf::st_intersects(exif_proj, polygon_proj_buffer, sparse = FALSE)
+    full_exif_length = nrow(exif)
     exif = exif[intersection_idxs[, 1], ]
+    cropped_exif_length = nrow(exif)
+    if (cropped_exif_length < full_exif_length) {
+      n_cropped = full_exif_length - cropped_exif_length
+      message("Cropped ", n_cropped, " images that were not within the largest contiguous patch of images for dataset ", exif$dataset_id[1], ".")
+    }
   }
 
   # Extract/compute metadata attributes
