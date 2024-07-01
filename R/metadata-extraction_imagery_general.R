@@ -1,4 +1,3 @@
-
 # Prep the EXIF data for extraction of metadata attributes. Speficially, load the EXIF CSV file into
 # a dataframe, add a dataset_id attribute based on the filename, compute image capture datetime,
 # order the images by capture time, and optionally plot the flight path for visual inspection,
@@ -58,4 +57,16 @@ prep_exif = function(exif_filepath, plot_flightpath = FALSE) {
 
   return(exif)
 
+}
+
+# Read in the EXIF data from a set of absolute image paths and drop the ThumbnailImage and
+# PreviewImage attributes if they exist, and convert all cols to character
+read_exif_drop_thumbnails = function(image_paths) {
+  exif = exifr::read_exif(image_paths)
+
+  exif = exif |>
+    # Remove thumbnail data
+    dplyr::select(-dplyr::any_of(c("ThumbnailImage", "PreviewImage"))) |>
+    # Convert all cols to character
+    dplyr::mutate(dplyr::across(dplyr::everything(), as.character))
 }
