@@ -4,6 +4,26 @@
 
 #### dataset ID ####
 
+#' Extract dataset id
+#'
+#' Pulls the dataset id, to include in image-level metadata collation
+#'
+#' @param exif the exif metadata file
+#'
+#' @return dataset id
+#'
+#' @examples
+#' extract_dataset_id(exif)
+#'
+#' @export
+extract_dataset_id_perimage = function (exif) {
+
+  dataset_id_image_level = exif$dataset_id
+
+  return(dataset_id_image_level)
+
+}
+
 #' Extract local date and time of image collection
 #'
 #' Pulls the local date and time of image collection (Format: YYYYMMDD HHMMSS) to include in image-level metadata collation
@@ -292,7 +312,7 @@ extract_imagery_perimage_metadata = function(input,
     exif = input
   }
 
-  dataset_id_image_level = extract_dataset_id_summary(exif)
+  dataset_id_image_level = extract_dataset_id_perimage(exif)
   datetime_local = extract_datetime_local(exif)
   lon_lat = extract_lon_lat(exif)
   rtk_fix = extract_rtk_fix(exif)
