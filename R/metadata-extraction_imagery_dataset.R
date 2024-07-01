@@ -208,8 +208,8 @@ solarnoon_from_centroid_and_date = function(centroid, date) {
 #'
 #' @export
 extract_dataset_id_summary = function (exif) {
-  
-  if(is.null(exif$dataset_id[1])) {
+
+  if (is.null(exif$dataset_id[1])) {
     stop("Dataset ID not set in exif dataframe. Set the dataset_id column in the exif dataframe before calling this function.")
   }
 
