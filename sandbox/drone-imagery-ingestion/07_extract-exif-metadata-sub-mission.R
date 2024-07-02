@@ -4,6 +4,7 @@
 # sub-mission level using the metadata extraction functions of the ofo package.
 
 library(tidyverse)
+library(sf)
 
 devtools::document(); devtools::install(); library(ofo)
 
@@ -13,11 +14,17 @@ BASEROW_DATA_PATH = "/ofo-share/drone-imagery-organization/ancillary/baserow-sna
 FOLDER_BASEROW_CROSSWALK_PATH = "/ofo-share/drone-imagery-organization/1c_exif-for-sorting/"
 EXIF_PATH = "/ofo-share/drone-imagery-organization/3b_exif-unprocessed/"
 
+EXTRACTED_METADATA_PATH = "/ofo-share/drone-imagery-organization/3c_metadata-extracted/"
+EXTRACTED_POLYGONS_PATH = "/ofo-share/drone-imagery-organization/3d_polygons/"
+
 
 # Derived constants
 exif_filepath = file.path(EXIF_PATH, paste0("exif_", IMAGERY_PROJECT_NAME, ".csv"))
 crosswalk_filepath = file.path(FOLDER_BASEROW_CROSSWALK_PATH, paste0(IMAGERY_PROJECT_NAME, "_crosswalk.csv"))
 
+metadata_perimage_filepath = file.path(EXTRACTED_METADATA_PATH, paste0("sub-mission-metadata_perimage_", IMAGERY_PROJECT_NAME, ".csv"))
+metadata_perdataset_filepath = file.path(EXTRACTED_METADATA_PATH, paste0("sub-mission-metadata_perdataset_", IMAGERY_PROJECT_NAME, ".csv"))
+polygons_filepath = file.path(EXTRACTED_POLYGONS_PATH, paste0("sub-mission-polygons_", IMAGERY_PROJECT_NAME, ".gpkg"))
 
 ## Workflow
 
@@ -39,10 +46,13 @@ exif$dataset_id = exif$submission_id
 metadata_perimage = extract_imagery_perimage_metadata(exif,
                                                       input_type = "dataframe")
 
+# Assign image_id to the exif dataframe so it can be used in the dataset-level metadata extraction
+exif$image_id = metadata_perimage$image_id
+
 # For sub-mission-level metadata, run sub-mission by sub-mission
 submissions = unique(exif$submission_id)
 
-# For parallelizing, make a list of subsets of the exif dataframe, one for each submission
+# For parallelizing, make a list of subsets of the exif dataframe, one for each sub-mission
 exif_list <- lapply(submissions, function(submission) {
   exif_foc <- exif |>
     filter(submission_id == submission)
@@ -58,8 +68,27 @@ res = furrr::future_map(exif_list,
                         plot_flightpath = FALSE,
                         crop_to_contiguous = TRUE)
 
-metadata_perdataset = bind_rows(res)
+metadata_list = map(res, ~.x$dataset_metadata)
+polygon_list = map(res, ~.x$mission_polygon)
+images_retained_list = map(res, ~.x$images_retained)
 
-## Above, return mission polygon and use it to crop the image-level exif to the mission polygon (or also return a list of the images and use that to subset)
+metadata_perdataset = bind_rows(metadata_list)
+polygon_perdataset = bind_rows(polygon_list)
+images_retained = unlist(images_retained_list)
 
+# Filter the extracted metadata to only include images that were retained in the dataset-level
+# metadata extraction based on intersection with the mission polygon
+metadata_perimage = metadata_perimage |>
+  filter(image_id %in% images_retained)
 
+# Save the metadata
+
+folders = c(metadata_perimage_filepath, metadata_perdataset_filepath, polygons_filepath)
+folders = dirname(folders)
+
+purrr::walk(folders,
+            create_dir)
+
+write_csv(metadata_perimage, metadata_perimage_filepath)
+write_csv(metadata_perdataset, metadata_perdataset_filepath)
+st_write(polygon_perdataset, polygons_filepath)
