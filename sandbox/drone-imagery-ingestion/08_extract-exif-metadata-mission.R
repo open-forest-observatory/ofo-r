@@ -22,13 +22,17 @@ EXTRACTED_METADATA_PATH = "/ofo-share/drone-imagery-organization/3c_metadata-ext
 EXTRACTED_POLYGONS_PATH = "/ofo-share/drone-imagery-organization/3d_polygons/"
 
 
-# Derived constants
+## Derived constants
 exif_filepath = file.path(EXIF_PATH, paste0("exif_", IMAGERY_PROJECT_NAME, ".csv"))
 crosswalk_filepath = file.path(FOLDER_BASEROW_CROSSWALK_PATH, paste0(IMAGERY_PROJECT_NAME, "_crosswalk.csv"))
 
 metadata_perimage_filepath = file.path(EXTRACTED_METADATA_PATH, paste0("mission-metadata_perimage_", IMAGERY_PROJECT_NAME, ".csv"))
 metadata_perdataset_filepath = file.path(EXTRACTED_METADATA_PATH, paste0("mission-metadata_perdataset_", IMAGERY_PROJECT_NAME, ".csv"))
 polygons_filepath = file.path(EXTRACTED_POLYGONS_PATH, paste0("mission-polygons_", IMAGERY_PROJECT_NAME, ".gpkg"))
+
+# The already exported sub-mission image-level metadata from previous workflow step (to select only
+# those images that were retained as a part of a sub-mission)
+metadata_perimage_sub_mission_filepath = file.path(EXTRACTED_METADATA_PATH, paste0("sub-mission-metadata_perimage_", IMAGERY_PROJECT_NAME, ".csv"))
 
 ## Workflow
 
@@ -52,6 +56,16 @@ metadata_perimage = extract_imagery_perimage_metadata(exif,
 
 # Assign image_id to the exif dataframe so it can be used in the dataset-level metadata extraction
 exif$image_id = metadata_perimage$image_id
+
+# Filter the exif dataframe and extracted per-image metadata to include only images that were
+# retained in the previous workflow step of sub-mission-level metadata extraction
+metadata_perimage_sub_mission = read_csv(metadata_perimage_sub_mission_filepath)
+image_ids_retained = metadata_perimage_sub_mission$image_id
+exif = exif |>
+  filter(image_id %in% image_ids_retained)
+metadata_perimage = metadata_perimage |>
+  filter(image_id %in% image_ids_retained)
+
 
 # For sub-mission-level metadata, run sub-mission by sub-mission
 missions = unique(exif$mission_id)
@@ -94,4 +108,4 @@ purrr::walk(folders,
 
 write_csv(metadata_perimage, metadata_perimage_filepath)
 write_csv(metadata_perdataset, metadata_perdataset_filepath)
-st_write(polygon_perdataset, polygons_filepath)
+st_write(polygon_perdataset, polygons_filepath, delete_dsn = TRUE)
