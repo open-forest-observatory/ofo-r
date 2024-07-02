@@ -478,7 +478,7 @@ extract_imagery_dataset_metadata = function(input,
                                             crop_to_contiguous = TRUE) {
 
   if (input_type == "filepath") {
-    exif = prep_exif(exif_filepath, plot_flightpath = plot_flightpath)
+    exif = prep_exif(input, plot_flightpath = plot_flightpath)
   } else if (input_type == "dataframe") {
     exif = input
   }
@@ -500,7 +500,10 @@ extract_imagery_dataset_metadata = function(input,
       n_cropped = full_exif_length - cropped_exif_length
       message("Cropped ", n_cropped, " images that were not within the largest contiguous patch of images for dataset ", exif$dataset_id[1], ".")
     }
+
   }
+
+  images_retained = extract_image_id(exif)
 
   # Extract/compute metadata attributes
   dataset_id = extract_dataset_id_summary(exif)
@@ -541,6 +544,9 @@ extract_imagery_dataset_metadata = function(input,
     file_format_derived
   )
 
-  return(dataset_metadata)
+  mission_polygon = sf::st_as_sf(mission_polygon)
+  mission_polygon$dataset_id = dataset_id
+
+  return(list(dataset_metadata = dataset_metadata, mission_polygon = mission_polygon, images_retained = images_retained))
 
 }

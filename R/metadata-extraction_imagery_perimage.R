@@ -16,11 +16,21 @@
 #' extract_dataset_id(exif)
 #'
 #' @export
-extract_dataset_id_perimage = function (exif) {
+extract_dataset_id_perimage = function(exif) {
 
   dataset_id_image_level = exif$dataset_id
 
   return(dataset_id_image_level)
+
+}
+
+# Image ID, from filename
+#' @export
+extract_image_id = function(exif) {
+
+  image_id = tools::file_path_sans_ext(exif$FileName)
+
+  return(image_id)
 
 }
 
@@ -312,6 +322,7 @@ extract_imagery_perimage_metadata = function(input,
     exif = input
   }
 
+  image_id = extract_image_id(exif)
   dataset_id_image_level = extract_dataset_id_perimage(exif)
   datetime_local = extract_datetime_local(exif)
   lon_lat = extract_lon_lat(exif)
@@ -326,6 +337,7 @@ extract_imagery_perimage_metadata = function(input,
   altitude_asl_drone = extract_altitude_asl(exif)
 
   metadata = data.frame(
+    image_id = image_id,
     dataset_id_image_level = dataset_id_image_level,
     datetime_local = datetime_local,
     lon_lat,
