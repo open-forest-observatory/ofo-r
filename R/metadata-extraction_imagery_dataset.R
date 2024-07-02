@@ -33,8 +33,8 @@ extract_mission_polygon = function(exif, image_merge_distance) {
   exif = sf::st_transform(exif, 3310)
   ptbuff = sf::st_buffer(exif, image_merge_distance)
   polybuff = sf::st_union(ptbuff)
-  poly = sf::st_buffer(polybuff, -image_merge_distance + 5) # Add 5 so simplified poly will contain all images
-
+  poly = sf::st_buffer(polybuff, -image_merge_distance + 1)
+  
   # Check if multipolygon and if so, return warning and keep only largest polygon
   n_polys = length(sf::st_geometry(poly)[[1]])
   if (n_polys > 1) {
@@ -471,10 +471,11 @@ extract_file_format_summary <- function(exif) {
 # extraction functions, then calls all the individual extraction functions to extract the respecive attributes.
 # crop_to_contiguous: Keeps only the images within the largest contiguous patch of images (which is
 # what is returned by create_mission_polygon)
+#' @export
 extract_imagery_dataset_metadata = function(input,
                                             input_type = "dataframe",
-                                            plot_flightpath,
-                                            crop_to_contiguous) {
+                                            plot_flightpath = FALSE,
+                                            crop_to_contiguous = TRUE) {
 
   if (input_type == "filepath") {
     exif = prep_exif(exif_filepath, plot_flightpath = plot_flightpath)
@@ -487,8 +488,9 @@ extract_imagery_dataset_metadata = function(input,
 
   if (crop_to_contiguous) {
 
-    # Keep only the images within the largest contiguous patch of images
-    polygon_proj_buffer = mission_polygon |> sf::st_transform(3310) |> sf::st_buffer(1)
+    # Keep only the images within the largest contiguous patch of images, buffered to 10 m to
+    # account for the simplified polygon
+    polygon_proj_buffer = mission_polygon |> sf::st_transform(3310) |> sf::st_buffer(10)
     exif_proj = sf::st_transform(exif, 3310)
     intersection_idxs = sf::st_intersects(exif_proj, polygon_proj_buffer, sparse = FALSE)
     full_exif_length = nrow(exif)
