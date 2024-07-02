@@ -22,8 +22,8 @@ EXTRACTED_POLYGONS_PATH = "/ofo-share/drone-imagery-organization/3d_polygons/"
 exif_filepath = file.path(EXIF_PATH, paste0("exif_", IMAGERY_PROJECT_NAME, ".csv"))
 crosswalk_filepath = file.path(FOLDER_BASEROW_CROSSWALK_PATH, paste0(IMAGERY_PROJECT_NAME, "_crosswalk.csv"))
 
-metadata_perimage_filepath = file.path(EXTRACTED_METADATA_PATH, paste0("sub-mission-metadata_perimage_", IMAGERY_PROJECT_NAME, ".csv"))
-metadata_perdataset_filepath = file.path(EXTRACTED_METADATA_PATH, paste0("sub-mission-metadata_perdataset_", IMAGERY_PROJECT_NAME, ".csv"))
+metadata_perimage_filepath = file.path(EXTRACTED_METADATA_PATH, paste0("sub-mission-exif-metadata_perimage_", IMAGERY_PROJECT_NAME, ".csv"))
+metadata_perdataset_filepath = file.path(EXTRACTED_METADATA_PATH, paste0("sub-mission-exif-metadata_perdataset_", IMAGERY_PROJECT_NAME, ".csv"))
 polygons_filepath = file.path(EXTRACTED_POLYGONS_PATH, paste0("sub-mission-polygons_", IMAGERY_PROJECT_NAME, ".gpkg"))
 
 ## Workflow
@@ -91,4 +91,4 @@ purrr::walk(folders,
 
 write_csv(metadata_perimage, metadata_perimage_filepath)
 write_csv(metadata_perdataset, metadata_perdataset_filepath)
-st_write(polygon_perdataset, polygons_filepath)
+st_write(polygon_perdataset, polygons_filepath, delete_dsn = TRUE)

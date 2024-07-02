@@ -26,13 +26,13 @@ EXTRACTED_POLYGONS_PATH = "/ofo-share/drone-imagery-organization/3d_polygons/"
 exif_filepath = file.path(EXIF_PATH, paste0("exif_", IMAGERY_PROJECT_NAME, ".csv"))
 crosswalk_filepath = file.path(FOLDER_BASEROW_CROSSWALK_PATH, paste0(IMAGERY_PROJECT_NAME, "_crosswalk.csv"))
 
-metadata_perimage_filepath = file.path(EXTRACTED_METADATA_PATH, paste0("mission-metadata_perimage_", IMAGERY_PROJECT_NAME, ".csv"))
-metadata_perdataset_filepath = file.path(EXTRACTED_METADATA_PATH, paste0("mission-metadata_perdataset_", IMAGERY_PROJECT_NAME, ".csv"))
+metadata_perimage_filepath = file.path(EXTRACTED_METADATA_PATH, paste0("mission-exif-metadata_perimage_", IMAGERY_PROJECT_NAME, ".csv"))
+metadata_perdataset_filepath = file.path(EXTRACTED_METADATA_PATH, paste0("mission-exif-metadata_perdataset_", IMAGERY_PROJECT_NAME, ".csv"))
 polygons_filepath = file.path(EXTRACTED_POLYGONS_PATH, paste0("mission-polygons_", IMAGERY_PROJECT_NAME, ".gpkg"))
 
 # The already exported sub-mission image-level metadata from previous workflow step (to select only
 # those images that were retained as a part of a sub-mission)
-metadata_perimage_sub_mission_filepath = file.path(EXTRACTED_METADATA_PATH, paste0("sub-mission-metadata_perimage_", IMAGERY_PROJECT_NAME, ".csv"))
+metadata_perimage_sub_mission_filepath = file.path(EXTRACTED_METADATA_PATH, paste0("sub-mission-exif-metadata_perimage_", IMAGERY_PROJECT_NAME, ".csv"))
 
 ## Workflow
 
