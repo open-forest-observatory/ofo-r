@@ -13,7 +13,7 @@ library(sf)
 # devtools::document(); devtools::install()
 library(ofo)
 
-IMAGERY_PROJECT_NAME = "2019-focal"
+IMAGERY_PROJECT_NAME = "2020-dispersal"
 
 BASEROW_DATA_PATH = "/ofo-share/drone-imagery-organization/ancillary/baserow-snapshots"
 FOLDER_BASEROW_CROSSWALK_PATH = "/ofo-share/drone-imagery-organization/1c_exif-for-sorting/"
@@ -84,7 +84,9 @@ res = furrr::future_map(exif_list,
                         extract_imagery_dataset_metadata,
                         input_type = "dataframe",
                         plot_flightpath = FALSE,
-                        crop_to_contiguous = TRUE)
+                        crop_to_contiguous = TRUE,
+                        min_contig_area = 10000,
+                        .options = furrr_options(seed = TRUE))
 
 metadata_list = map(res, ~.x$dataset_metadata)
 polygon_list = map(res, ~.x$mission_polygon)
