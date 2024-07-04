@@ -10,7 +10,8 @@
 library(tidyverse)
 library(sf)
 
-devtools::document(); devtools::install(); library(ofo)
+# devtools::document(); devtools::install()
+library(ofo)
 
 IMAGERY_PROJECT_NAME = "2019-focal"
 
@@ -19,7 +20,6 @@ FOLDER_BASEROW_CROSSWALK_PATH = "/ofo-share/drone-imagery-organization/1c_exif-f
 EXIF_PATH = "/ofo-share/drone-imagery-organization/3b_exif-unprocessed/"
 
 EXTRACTED_METADATA_PATH = "/ofo-share/drone-imagery-organization/3c_metadata-extracted/"
-EXTRACTED_POLYGONS_PATH = "/ofo-share/drone-imagery-organization/3d_polygons/"
 
 
 ## Derived constants
@@ -28,7 +28,7 @@ crosswalk_filepath = file.path(FOLDER_BASEROW_CROSSWALK_PATH, paste0(IMAGERY_PRO
 
 metadata_perimage_filepath = file.path(EXTRACTED_METADATA_PATH, paste0("mission-exif-metadata_perimage_", IMAGERY_PROJECT_NAME, ".csv"))
 metadata_perdataset_filepath = file.path(EXTRACTED_METADATA_PATH, paste0("mission-exif-metadata_perdataset_", IMAGERY_PROJECT_NAME, ".csv"))
-polygons_filepath = file.path(EXTRACTED_POLYGONS_PATH, paste0("mission-polygons_", IMAGERY_PROJECT_NAME, ".gpkg"))
+polygons_filepath = file.path(EXTRACTED_METADATA_PATH, paste0("mission-polygons_", IMAGERY_PROJECT_NAME, ".gpkg"))
 
 # The already exported sub-mission image-level metadata from previous workflow step (to select only
 # those images that were retained as a part of a sub-mission)
