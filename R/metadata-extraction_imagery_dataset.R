@@ -106,13 +106,18 @@ extract_dates_times = function(exif) {
 
   latest_time = format(exif$capture_datetime, "%H:%M:%S") |>
     max()
+    
+  earliest_year = exif$capture_datetime |>
+    format("%Y") |>
+    min()
 
   ret = list(earliest_date_derived = earliest_date,
              earliest_datetime_local_derived = earliest_datetime,
              latest_datetime_local_derived = latest_datetime,
              single_date_derived = single_date,
              earliest_time_local_derived = earliest_time,
-             latest_time_local_derived = latest_time)
+             latest_time_local_derived = latest_time,
+             earliest_year_derived = earliest_year)
 
   return(ret)
 
@@ -513,7 +518,7 @@ extract_imagery_dataset_metadata = function(input,
   dates_times = extract_dates_times(exif)
   centroid_internal = extract_mission_centroid_sf(exif)
   centroid_lonlat = centroid_sf_to_lonlat(centroid_internal)
-  solarnoon_local_derived = solarnoon_from_centroid_and_date(centroid_internal, dates_times$earliest_date_derived)
+  solarnoon_utc_derived = solarnoon_from_centroid_and_date(centroid_internal, dates_times$earliest_date_derived)
   image_count_derived = extract_image_count(exif)
   file_size_derived = extract_file_size_summary(exif)
   percent_images_rtk_derived = extract_pct_images_rtk(exif)
@@ -532,7 +537,7 @@ extract_imagery_dataset_metadata = function(input,
     camera_pitch, # this is a multi-column dataframe; preserving its column names
     dates_times,
     centroid_lonlat, # this is a multi-column dataframe; preserving its column names
-    solarnoon_local_derived,
+    solarnoon_utc_derived,
     image_count_derived,
     file_size_derived,
     percent_images_rtk_derived,
