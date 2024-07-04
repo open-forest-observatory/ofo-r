@@ -13,7 +13,7 @@
 
 library(tidyverse)
 
-IMAGERY_PROJECT_NAME = "2019-focal"
+IMAGERY_PROJECT_NAME = "2020-dispersal"
 
 BASEROW_DATA_PATH = "/ofo-share/drone-imagery-organization/ancillary/baserow-snapshots"
 FOLDER_BASEROW_CROSSWALK_PATH = "/ofo-share/drone-imagery-organization/1c_exif-for-sorting/"

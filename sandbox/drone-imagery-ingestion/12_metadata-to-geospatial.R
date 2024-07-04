@@ -4,7 +4,7 @@
 library(tidyverse)
 library(sf)
 
-IMAGERY_PROJECT_NAME = "2019-focal"
+IMAGERY_PROJECT_NAME = "2020-dispersal"
 
 EXTRACTED_METADATA_PATH = "/ofo-share/drone-imagery-organization/3c_metadata-extracted/"
 
