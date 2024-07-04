@@ -26,30 +26,47 @@ extract_flight_speed = function(exif) {
 
 # Get a polygon of the mission
 # image_merge_distance: The horizontal distance between images below which they are merged into one
-# mission polygon
+# mission polygon. Keep only contiguous patches > min_contig_area.
 #' @export
-extract_mission_polygon = function(exif, image_merge_distance) {
+extract_mission_polygon = function(exif, image_merge_distance, min_contig_area = 1600) {
 
   exif = sf::st_transform(exif, 3310)
   ptbuff = sf::st_buffer(exif, image_merge_distance)
   polybuff = sf::st_union(ptbuff)
-  poly = sf::st_buffer(polybuff, -image_merge_distance + 1)
-  
-  # Check if multipolygon and if so, return warning and keep only largest polygon
-  n_polys = length(sf::st_geometry(poly)[[1]])
-  if (n_polys > 1) {
+  poly = sf::st_buffer(polybuff, -image_merge_distance + 1) |> sf::st_cast("MULTIPOLYGON")
 
-    warning("Non-contiguous images in dataset ", exif$dataset_id[1], ". Dropping all but largest contiguous set.")
+  n_polys = length(sf::st_geometry(poly)[[1]])
+
+  if (n_polys == 0) {
+    stop("No contiguous images in dataset ", exif$dataset_id[1])
+  }
+
+
+  # Check if multipolygon and if so, keep only the poly parts > min aea, and if any removed, return
+  # warning of how many removed
+  if (n_polys > 1) {
 
     parts = sf::st_cast(poly, "POLYGON")
     areas = sf::st_area(parts)
-    part = parts[which.max(areas)]
-    poly = part
+    max_area = max(areas)
+    parts_keep_idx = which(areas == max_area | areas > units::set_units(min_contig_area, "m2"))
+    parts_filtered = parts[parts_keep_idx]
+    poly = parts_filtered |> sf::st_union() |> sf::st_cast("MULTIPOLYGON")
+
+    n_polys_filtered = length(parts_filtered)
+
+    if (n_polys_filtered < n_polys) {
+      warning(n_polys, " non-contiguous image clusters in dataset ", exif$dataset_id[1], ". Retaining only the ", n_polys_filtered, " clusters with area > ", min_contig_area, " m^2.")
+    } else {
+      warning(n_polys, " non-contiguous image clusters in dataset ", exif$dataset_id[1], ". Retaining all becaus all have area > ", min_contig_area, " m^2.")
+    }
+
   } else if (n_polys == 0) {
     stop("No contiguous images in dataset ", exif$dataset_id[1])
   }
 
-  polysimp = sf::st_simplify(poly, dTolerance = 10)
+
+  polysimp = sf::st_simplify(poly, dTolerance = 10) |> sf::st_cast("MULTIPOLYGON")
 
   return(polysimp)
 
@@ -474,13 +491,15 @@ extract_file_format_summary <- function(exif) {
 
 # Preps the EXIF data for passing to the
 # extraction functions, then calls all the individual extraction functions to extract the respecive attributes.
-# crop_to_contiguous: Keeps only the images within the largest contiguous patch of images (which is
-# what is returned by create_mission_polygon)
+# crop_to_contiguous: Keeps only the images within the sets of contiguous images that are larger
+# than min_contig_areain m^2 (could be multiple clumps). It will always include the largest clump, even if
+# it is smaller than min_contig_area.
 #' @export
 extract_imagery_dataset_metadata = function(input,
                                             input_type = "dataframe",
                                             plot_flightpath = FALSE,
-                                            crop_to_contiguous = TRUE) {
+                                            crop_to_contiguous = TRUE,
+                                            min_contig_area = 1600) {
 
   if (input_type == "filepath") {
     exif = prep_exif(input, plot_flightpath = plot_flightpath)
@@ -489,7 +508,7 @@ extract_imagery_dataset_metadata = function(input,
   }
 
   # Compute geospatial features
-  mission_polygon = extract_mission_polygon(exif, image_merge_distance = 50)
+  mission_polygon = extract_mission_polygon(exif, image_merge_distance = 50, min_contig_area = min_contig_area)
 
   if (crop_to_contiguous) {
 
@@ -503,7 +522,7 @@ extract_imagery_dataset_metadata = function(input,
     cropped_exif_length = nrow(exif)
     if (cropped_exif_length < full_exif_length) {
       n_cropped = full_exif_length - cropped_exif_length
-      message("Cropped ", n_cropped, " images that were not within the largest contiguous patch of images for dataset ", exif$dataset_id[1], ".")
+      message("Dropped ", n_cropped, " images that were not within the largest contiguous patch(es) of images retained for dataset ", exif$dataset_id[1], ".")
     }
 
   }
