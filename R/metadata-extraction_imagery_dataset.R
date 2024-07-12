@@ -26,30 +26,47 @@ extract_flight_speed = function(exif) {
 
 # Get a polygon of the mission
 # image_merge_distance: The horizontal distance between images below which they are merged into one
-# mission polygon
+# mission polygon. Keep only contiguous patches > min_contig_area.
 #' @export
-extract_mission_polygon = function(exif, image_merge_distance) {
+extract_mission_polygon = function(exif, image_merge_distance, min_contig_area = 1600) {
 
   exif = sf::st_transform(exif, 3310)
   ptbuff = sf::st_buffer(exif, image_merge_distance)
   polybuff = sf::st_union(ptbuff)
-  poly = sf::st_buffer(polybuff, -image_merge_distance + 1)
+  poly = sf::st_buffer(polybuff, -image_merge_distance + 1) |> sf::st_cast("MULTIPOLYGON")
 
-  # Check if multipolygon and if so, return warning and keep only largest polygon
   n_polys = length(sf::st_geometry(poly)[[1]])
-  if (n_polys > 1) {
 
-    warning("Non-contiguous images in dataset ", exif$dataset_id[1], ". Dropping all but largest contiguous set.")
+  if (n_polys == 0) {
+    stop("No contiguous images in dataset ", exif$dataset_id[1])
+  }
+
+
+  # Check if multipolygon and if so, keep only the poly parts > min aea, and if any removed, return
+  # warning of how many removed
+  if (n_polys > 1) {
 
     parts = sf::st_cast(poly, "POLYGON")
     areas = sf::st_area(parts)
-    part = parts[which.max(areas)]
-    poly = part
+    max_area = max(areas)
+    parts_keep_idx = which(areas == max_area | areas > units::set_units(min_contig_area, "m2"))
+    parts_filtered = parts[parts_keep_idx]
+    poly = parts_filtered |> sf::st_union() |> sf::st_cast("MULTIPOLYGON")
+
+    n_polys_filtered = length(parts_filtered)
+
+    if (n_polys_filtered < n_polys) {
+      warning(n_polys, " non-contiguous image clusters in dataset ", exif$dataset_id[1], ". Retaining only the ", n_polys_filtered, " clusters with area > ", min_contig_area, " m^2.")
+    } else {
+      warning(n_polys, " non-contiguous image clusters in dataset ", exif$dataset_id[1], ". Retaining all becaus all have area > ", min_contig_area, " m^2.")
+    }
+
   } else if (n_polys == 0) {
     stop("No contiguous images in dataset ", exif$dataset_id[1])
   }
 
-  polysimp = sf::st_simplify(poly, dTolerance = 10)
+
+  polysimp = sf::st_simplify(poly, dTolerance = 10) |> sf::st_cast("MULTIPOLYGON")
 
   return(polysimp)
 
@@ -106,13 +123,18 @@ extract_dates_times = function(exif) {
 
   latest_time = format(exif$capture_datetime, "%H:%M:%S") |>
     max()
+    
+  earliest_year = exif$capture_datetime |>
+    format("%Y") |>
+    min()
 
   ret = list(earliest_date_derived = earliest_date,
              earliest_datetime_local_derived = earliest_datetime,
              latest_datetime_local_derived = latest_datetime,
              single_date_derived = single_date,
              earliest_time_local_derived = earliest_time,
-             latest_time_local_derived = latest_time)
+             latest_time_local_derived = latest_time,
+             earliest_year_derived = earliest_year)
 
   return(ret)
 
@@ -180,12 +202,13 @@ centroid_sf_to_lonlat = function(centroid) {
 
 solarnoon_from_centroid_and_date = function(centroid, date) {
 
-  # Seperat the date from the time, since we only need the date to run this function
+  # Seperate the date from the time, since we only need the date to run this function
   date = stringr::str_split(date, " ", simplify = TRUE)[1]
 
   sncalc <- suntools::solarnoon(sf::st_as_sf(centroid), as.POSIXct(date), POSIXct.out = TRUE)
 
   solarnoon = sncalc$time |> format("%H:%M:%S")
+  # The time is in UTC
 
   return(solarnoon)
 }
@@ -208,6 +231,10 @@ solarnoon_from_centroid_and_date = function(centroid, date) {
 #'
 #' @export
 extract_dataset_id_summary = function (exif) {
+
+  if (is.null(exif$dataset_id[1])) {
+    stop("Dataset ID not set in exif dataframe. Set the dataset_id column in the exif dataframe before calling this function.")
+  }
 
   dataset_id_dataset_level = exif$dataset_id[1]
 
@@ -464,24 +491,43 @@ extract_file_format_summary <- function(exif) {
 
 # Preps the EXIF data for passing to the
 # extraction functions, then calls all the individual extraction functions to extract the respecive attributes.
-# crop_to_contiguous: Keeps only the images within the largest contiguoug patch of images (which is
-# what is returned by create_mission_polygon)
-extract_imagery_dataset_metadata = function(exif_filepath, plot_flightpath, crop_to_contiguous) {
+# crop_to_contiguous: Keeps only the images within the sets of contiguous images that are larger
+# than min_contig_areain m^2 (could be multiple clumps). It will always include the largest clump, even if
+# it is smaller than min_contig_area.
+#' @export
+extract_imagery_dataset_metadata = function(input,
+                                            input_type = "dataframe",
+                                            plot_flightpath = FALSE,
+                                            crop_to_contiguous = TRUE,
+                                            min_contig_area = 1600) {
 
-  # Prep the EXIF data for extraction of metadata attributes
-  exif = prep_exif(exif_filepath, plot_flightpath = plot_flightpath)
+  if (input_type == "filepath") {
+    exif = prep_exif(input, plot_flightpath = plot_flightpath)
+  } else if (input_type == "dataframe") {
+    exif = input
+  }
 
   # Compute geospatial features
-  mission_polygon = extract_mission_polygon(exif, image_merge_distance = 50)
+  mission_polygon = extract_mission_polygon(exif, image_merge_distance = 50, min_contig_area = min_contig_area)
 
   if (crop_to_contiguous) {
 
-    # Keep only the images within the largest contiguous patch of images
-    polygon_proj_buffer = mission_polygon |> sf::st_transform(3310) |> sf::st_buffer(1)
+    # Keep only the images within the largest contiguous patch of images, buffered to 10 m to
+    # account for the simplified polygon
+    polygon_proj_buffer = mission_polygon |> sf::st_transform(3310) |> sf::st_buffer(10)
     exif_proj = sf::st_transform(exif, 3310)
     intersection_idxs = sf::st_intersects(exif_proj, polygon_proj_buffer, sparse = FALSE)
+    full_exif_length = nrow(exif)
     exif = exif[intersection_idxs[, 1], ]
+    cropped_exif_length = nrow(exif)
+    if (cropped_exif_length < full_exif_length) {
+      n_cropped = full_exif_length - cropped_exif_length
+      message("Dropped ", n_cropped, " images that were not within the largest contiguous patch(es) of images retained for dataset ", exif$dataset_id[1], ".")
+    }
+
   }
+
+  images_retained = extract_image_id(exif)
 
   # Extract/compute metadata attributes
   dataset_id = extract_dataset_id_summary(exif)
@@ -491,7 +537,7 @@ extract_imagery_dataset_metadata = function(exif_filepath, plot_flightpath, crop
   dates_times = extract_dates_times(exif)
   centroid_internal = extract_mission_centroid_sf(exif)
   centroid_lonlat = centroid_sf_to_lonlat(centroid_internal)
-  solarnoon_local_derived = solarnoon_from_centroid_and_date(centroid_internal, dates_times$earliest_date_derived)
+  solarnoon_utc_derived = solarnoon_from_centroid_and_date(centroid_internal, dates_times$earliest_date_derived)
   image_count_derived = extract_image_count(exif)
   file_size_derived = extract_file_size_summary(exif)
   percent_images_rtk_derived = extract_pct_images_rtk(exif)
@@ -510,7 +556,7 @@ extract_imagery_dataset_metadata = function(exif_filepath, plot_flightpath, crop
     camera_pitch, # this is a multi-column dataframe; preserving its column names
     dates_times,
     centroid_lonlat, # this is a multi-column dataframe; preserving its column names
-    solarnoon_local_derived,
+    solarnoon_utc_derived,
     image_count_derived,
     file_size_derived,
     percent_images_rtk_derived,
@@ -522,6 +568,9 @@ extract_imagery_dataset_metadata = function(exif_filepath, plot_flightpath, crop
     file_format_derived
   )
 
-  return(dataset_metadata)
+  mission_polygon = sf::st_as_sf(mission_polygon)
+  mission_polygon$dataset_id = dataset_id
+
+  return(list(dataset_metadata = dataset_metadata, mission_polygon = mission_polygon, images_retained = images_retained))
 
 }

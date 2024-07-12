@@ -5,7 +5,7 @@
 
 library(tidyverse)
 
-IMAGERY_PROJECT_NAME = "2021-early-regen" # 2023-ny-ofo, 2022-early-regen
+IMAGERY_PROJECT_NAME = "2019-focal" # 2023-ny-ofo, 2022-early-regen
 
 BASEROW_DATA_PATH = "/ofo-share/drone-imagery-organization/ancillary/baserow-snapshots"
 EXIF_INPUT_PATH = "/ofo-share/drone-imagery-organization/1b_exif-unprocessed"
@@ -563,7 +563,7 @@ folderid_baserow_crosswalk = image_data_w_outnames |>
   group_by(dataset_id_baserow, dataset_id_imagefolder) |>
   summarize(n_images = n())
 
-if(nrow(datasets_not_separable) > 0) {
+if (nrow(datasets_not_separable) > 0) {
 
   datasets_not_separable2 = datasets_not_separable |>
     unite(addl_dataset_ids_baserow, dataset_id_2, dataset_id_3, sep = ",", na.rm = TRUE) |>

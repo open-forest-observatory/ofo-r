@@ -1,0 +1,2 @@
+Next step: in the post-curation creation of the final dataset, only copy the image files that have
+an exif record, remove images specified by the curator, and possibly remove whole subdatasets if all their images were removed
