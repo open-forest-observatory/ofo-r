@@ -1,12 +1,16 @@
 # Prep the EXIF data for extraction of metadata attributes. Speficially, load the EXIF CSV file into
-# a dataframe, add a dataset_id attribute based on the filename, compute image capture datetime,
+# a dataframe (or accept a dataframe directly), add a dataset_id attribute based on the filename, compute image capture datetime,
 # order the images by capture time, and optionally plot the flight path for visual inspection,
 # standardize column names across different drone models, and remove any rows with missing GPS data.
 #' @export
-prep_exif = function(exif_filepath, plot_flightpath = FALSE) {
+prep_exif = function(exif_in, plot_flightpath = FALSE) {
 
-  # Read in the EXIF data from file for the provided dataset filepath, as a data frame
-  exif = read.csv(exif_filepath)
+  if ("data.frame" %in% class(exif_in)) {
+    exif = exif_in
+  } else {
+    exif = read.csv(exif_filepath)
+    exif = exif_in
+  }
 
   # Standardize column names across different drone models
   candidate_pitch_cols = c("CameraPitch", "GimbalPitchDegree")
@@ -56,6 +60,7 @@ prep_exif = function(exif_filepath, plot_flightpath = FALSE) {
 
 # Read in the EXIF data from a set of absolute image paths and drop the ThumbnailImage and
 # PreviewImage attributes if they exist, and convert all cols to character
+#' @export
 read_exif_drop_thumbnails = function(image_paths) {
   exif = exifr::read_exif(image_paths)
 
@@ -63,5 +68,7 @@ read_exif_drop_thumbnails = function(image_paths) {
     # Remove thumbnail data
     dplyr::select(-dplyr::any_of(c("ThumbnailImage", "PreviewImage"))) |>
     # Convert all cols to character
-    dplyr::mutate(dplyr::across(dplyr::everything(), as.character))
+    dplyr::mutate(dplyr::across(dplyr::everything(), as.character)) |>
+    # Make sure SourceFile is in R-friendly format
+    dplyr::mutate(SourceFile = image_paths)
 }
