@@ -42,10 +42,11 @@ read_and_merge_plot_boundaries = function(plot_boundaries_dir) {
   bounds_sf_list = lapply(bound_files, sf::st_read)
 
   for (i in seq_along(bounds_sf_list)) {
-    # remove all cols except geometry and assign plot_id based on the filename
+    # remove all cols except geometry and assign plot_id based on the filename, and project to 4326
     bounds_sf_list[[i]] = bounds_sf_list[[i]] |>
       select() |>
-      mutate(plot_id = gsub(".gpkg", "", basename(bound_files[i])))
+      mutate(plot_id = gsub(".gpkg", "", basename(bound_files[i]))) |>
+      st_transform(4326)
   }
 
   bounds = bind_rows(bounds_sf_list)
@@ -478,6 +479,13 @@ prep_trees_for_stem_map = function(trees, plot_summary) {
 
 # Scale tree point sizes so they look nice on the leaflet map
 rescale_size = function(x, min_size = 5, max_size = 20) {
+
+  # If there's only one tree, the math below won't work, so just return the mean of the min and max
+  # disaplay sizes
+  if(length(x) == 1) {
+    return(mean(c(min_size, max_size)))
+  }
+
   x = (x - min(x, na.rm = TRUE)) / (max(x, na.rm = TRUE) - min(x, na.rm = TRUE))
   x = x * (max_size - min_size) + min_size
   return(x)

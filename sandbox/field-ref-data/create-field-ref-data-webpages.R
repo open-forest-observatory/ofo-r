@@ -18,14 +18,14 @@ datadir = readLines("sandbox/data-dirs/derek-fieldref-laptop.txt", n = 1)
 plot_boundaries_data_dir = file.path(datadir, "field-plot-boundaries")
 google_sheet_id = "1GjDseDCR1BX_EIkJAni7rk2zvK6nHmZz1nOFBd1d6k4"
 
-BASE_OFO_URL = "https://openforestobservatory.netlify.app/"
+BASE_OFO_URL = "https://openforestobservatory.org/"
 #BASE_OFO_URL = "http://localhost:1313/"
 WEBSITE_REPO_PATH = "~/repos/ofo-website-3/"
 
 # Path to the plot details template page within theis repo
 PLOT_DETAILS_TEMPLATE_FILEPATH = fs::path(file.path("sandbox", "field-ref-data", "templates", "field-ref-plot-details.md"))
 
-# Path to plot details dir relative to the 'content' dir in the website repo. No leading slach but
+# Path to plot details dir relative to the 'content' dir in the website repo. No leading slash but
 # trailing slash
 PLOT_DETAILS_PAGE_DIR = "data-field-ref-plot-details/"
 
@@ -50,13 +50,13 @@ WEBSITE_CONTENT_PATH = file.path(WEBSITE_REPO_PATH, "content", "")
 # - ******* Johnston plot cleaning
 
 # --- TODO:
-# - Options to color markers by project? Plot size? Etc. https://stackoverflow.com/questions/47966375/how-to-create-leaflet-markers-colored-by-a-numeric-variable
+# - Options to color markers by project? Plot size? Etc.:
+#   https://stackoverflow.com/questions/47966375/how-to-create-leaflet-markers-colored-by-a-numeric-variable
+# - Make sure plots with zero trees are not being removed
+
+
 
 # ---- Processing
-
-
-
-
 
 # Load and prep field ref data
 
