@@ -1,24 +1,105 @@
+CANDIDATE_HEIGHT_COLNAMES = c("Height", "height", "z")
+
+# Function to look for one or more columns matching a provided set of names, select the first
+# matching one, and rename it to a provided standard name
+standardize_colname = function(d, candadate_colnames, new_colname) {
+
+  # Which of the candidate height column names is present in the data frame?
+  candidate_colnames_idxs = which(names(d) %in% CANDIDATE_HEIGHT_COLNAMES)
+  candidate_colnames = names(d)[candidate_colnames_idxs]
+
+  # If there are no height cols, return an error
+  if (length(candidate_colnames) == 0) {
+    stop("No height column found in the data frame")
+  }
+
+  # If more than one height col found, select the first and issue a warning
+  if (length(candidate_colnames) > 1) {
+    warning("Multiple height columns found in the data frame (",
+            paste(candidate_colnames, collapse = ", "),
+            "); using the first one")
+  }
+
+  src_height_colname = candidate_colnames[1]
+
+  d = d |>
+    dplyr::rename(!!new_colname := src_height_colname)
+
+  return(d)
+
+}
+
+# Take a lon/lat coordinates dataframe and convert to the local UTM zone EPSG code
+lonlat_to_utm_epsg = function(lonlat) {
+  utm = (floor((lonlat[, 1] + 180) / 6) %% 60) + 1
+  utms = ifelse(lonlat[, 2] > 0, utm + 32600, utm + 32700)
+
+  utms_unique = unique(utms)
+
+  if (length(utms_unique) > 2) {
+    stop("The geometry spans 3 or more UTM zones")
+  } else if (length(utms_unique) > 1) {
+    if (abs(diff(utms_unique)) > 1) {
+      stop("The geometry spans 2 non-adjacent UTM zones.")
+    }
+  }
+
+  return(utms_unique[1])
+}
+
+# Reproject a sf object into the CRS representing its local UTM zone
+transform_to_local_utm = function(sf) {
+  geo = sf::st_transform(sf, 4326)
+  lonlat = sf::st_centroid(geo) |> sf::st_coordinates()
+  utm = lonlat_to_utm_epsg(lonlat)
+
+  sf_transf = sf::st_transform(sf, utm)
+
+  return(sf_transf)
+
+}
+
+
 prep_obs_map = function(obs, obs_bound, edge_buffer) {
 
-  # TODO: Ensure predicted tree map is projected to same CRS as the observed tree map
-
-  # Convert the maps to sf objects
-  obs = sf::st_as_sf(obs, coords = c("x", "y"))
+  # Convert the maps to sf objects (without a real CRS) if they are not already. This is to enable
+  # tree map comparison in an arbitrary "local" crs, and in this case we assume all other files are in
+  # the same local CRS
+  if (!inherits(obs, "sf")) {
+    obs = sf::st_as_sf(obs, coords = c("x", "y"))
+  } else {
+    # Ensure the CRS is the local UTM zone
+    obs = transform_to_local_utm(obs)
+    obs_bound = st_transform(obs_bound, st_crs(obs))
+  }
 
   # Prep an internally buffered region (to accommodate edge uncertainty)
   obs_bound_core = sf::st_buffer(obs_bound, -edge_buffer)
-  obs_bound_core$core_area = TRUE
 
   # Assign an incremental unique ID to each observed tree
   obs$obs_tree_id = 1:nrow(obs)
 
   # Assign the trees an attribute that designates whether they are within the internally-buffered region
-  obs$core_area = sf::st_intersects(obs, obs_bound_core, sparse = FALSE) |> as.vector()
+  obs$obs_tree_core_area = sf::st_intersects(obs, obs_bound_core, sparse = FALSE) |> as.vector()
 
-  # Assign a more descriptive name to the height column and core area column
-  obs = obs |>
-    rename(obs_tree_height = z,
-           obs_tree_core_area = core_area)
+  # Assign a more descriptive name to the height column, tolerating a variety of names for height
+  obs = standardize_colname(obs, CANDIDATE_HEIGHT_COLNAMES, "obs_tree_height")
+
+  # Ensure all trees have heights; if < 1% are missing heights, drop them, otherwise throw an error
+  n_missing_height = sum(is.na(obs$obs_tree_height))
+  if (n_missing_height > 0) {
+    pct_missing_height = ((n_missing_height / nrow(obs)) |> round(3)) * 100
+    if (pct_missing_height > 1) {
+      stop("More than 1% of observed trees are missing heights")
+    } else {
+      warning("There are ",
+              n_missing_height,
+              " observed trees missing heights (",
+              pct_missing_height,
+              "%); dropping them")
+      obs = obs |> dplyr::filter(!is.na(obs_tree_height))
+    }
+  }
 
   # Add an (empty for now) attribute that will store which predicted tree the observed tree is matched to
   obs$matched_pred_tree_id = NA
@@ -29,34 +110,57 @@ prep_obs_map = function(obs, obs_bound, edge_buffer) {
 
 prep_pred_map = function(pred, obs_bound, edge_buffer) {
 
-  # TODO: Ensure predicted tree map is projected to same CRS as the observed tree map
-
-  # Convert the maps to sf objects
-  pred = sf::st_as_sf(pred, coords = c("x", "y"))
+  # Convert the maps to sf objects (without a real CRS) if they are not already. This is to enable
+  # tree map comparison in an arbitrary "local" crs, and in this case we assume all other files are in
+  # the same local CRS
+  if (!inherits(pred, "sf")) {
+    pred = sf::st_as_sf(pred, coords = c("x", "y"))
+  } else {
+    # Ensure the CRS is the local UTM zone
+    pred = transform_to_local_utm(pred)
+    obs_bound = st_transform(obs_bound, st_crs(pred))
+  }
 
   # Prep an internally buffered region (to accommodate edge uncertainty)
   obs_bound_core = obs_bound |> sf::st_buffer(-edge_buffer)
-  obs_bound_core$core_area = TRUE
 
   # Crop the predicted map to the observed map
   pred = sf::st_intersection(pred, obs_bound)
 
-  # Assign an incremental unique ID to each observed tree
+  # Assign an incremental unique ID to each predicted tree
   pred$pred_tree_id = 1:nrow(pred)
 
   # Assign the trees an attribute that designates whether they are within the internally-buffered region
-  pred$core_area = sf::st_intersects(pred, obs_bound_core, sparse = FALSE) |> as.vector()
+  pred$pred_tree_core_area = sf::st_intersects(pred, obs_bound_core, sparse = FALSE) |> as.vector()
 
   # Assign a more descriptive name to the height column and core area column
-  pred = pred |>
-    rename(pred_tree_height = z,
-           pred_tree_core_area = core_area)
+  pred = standardize_colname(pred, CANDIDATE_HEIGHT_COLNAMES, "pred_tree_height")
+  
+  # Ensure all trees have heights; if < 1% are missing heights, drop them, otherwise throw an error
+  n_missing_height = sum(is.na(pred$pred_tree_height))
+  if (n_missing_height > 0) {
+    pct_missing_height = ((n_missing_height / nrow(pred)) |> round(3)) * 100
+    if (pct_missing_height > 1) {
+      stop("More than 1% of observed trees are missing heights")
+    } else {
+      warning("There are ",
+              n_missing_height,
+              " predicted trees missing heights (",
+              pct_missing_height,
+              "%); dropping them")
+      pred = pred |> dplyr::filter(!is.na(pred_tree_height))
+    }
+  }
 
   return(pred)
 
 }
 
 match_obs_to_pred_mee = function(obs, pred, search_distance_fun_intercept, search_distance_fun_slope, search_height_proportion) {
+
+  if(st_crs(obs) != st_crs(pred)) {
+    stop("The observed and predicted tree maps are not in the same UTM zone.")
+  }
 
   dist_mat <- sf::st_distance(obs, pred) |> units::drop_units()
 
@@ -74,7 +178,7 @@ match_obs_to_pred_mee = function(obs, pred, search_distance_fun_intercept, searc
   tallest_obs_tree = max(obs$obs_tree_height)
   max_dist_window = search_distance_fun_intercept + search_distance_fun_slope * tallest_obs_tree
   dist_graph = dist_graph |>
-    filter(dist <= max_dist_window)
+    dplyr::filter(dist <= max_dist_window)
 
   # Pull in each tree's height into the distance graph
   pred_height = pred |>
@@ -82,11 +186,11 @@ match_obs_to_pred_mee = function(obs, pred, search_distance_fun_intercept, searc
   sf::st_geometry(pred_height) = NULL
 
   obs_height = obs %>%
-    select(obs_tree_id, obs_tree_height)
+    dplyr::select(obs_tree_id, obs_tree_height)
   sf::st_geometry(obs_height) = NULL
 
-  dist_graph = left_join(dist_graph, obs_height)
-  dist_graph = left_join(dist_graph, pred_height)
+  dist_graph = dplyr::left_join(dist_graph, obs_height)
+  dist_graph = dplyr::left_join(dist_graph, pred_height)
 
   # Take every possible pairing of trees and filter to those within matching distance (horiz and vert)
   dist_graph = dist_graph |>
@@ -136,17 +240,16 @@ match_obs_to_pred_mee = function(obs, pred, search_distance_fun_intercept, searc
 count_total_and_matched_trees = function(obs_pred_match, pred_obs_match, min_height) {
 
   obs_pred_match_counts <- obs_pred_match |>
-    filter(obs_tree_height >= min_height,
-           obs_tree_core_area == TRUE) |>
-    summarize(n_obs_match_pred = sum(!is.na(pred_tree_id) & !is.na(obs_tree_id)),
-              n_obs = n())
+    dplyr::filter(obs_tree_height >= min_height,
+                  obs_tree_core_area == TRUE) |>
+    dplyr::summarize(n_obs_match_pred = sum(!is.na(pred_tree_id) & !is.na(obs_tree_id)),
+                     n_obs = dplyr::n())
 
   pred_obs_match_counts <- pred_obs_match |>
-    filter(pred_tree_height >= min_height,
-           pred_tree_core_area == TRUE) |>
-    summarize(n_pred_match_obs = sum(!is.na(pred_tree_id) & !is.na(obs_tree_id)),
-              n_pred = n()
-    )
+    dplyr::filter(pred_tree_height >= min_height,
+                  pred_tree_core_area == TRUE) |>
+    dplyr::summarize(n_pred_match_obs = sum(!is.na(pred_tree_id) & !is.na(obs_tree_id)),
+                     n_pred = dplyr::n())
 
   matched_counts = cbind(obs_pred_match_counts, pred_obs_match_counts)
   matched_counts$min_height = min_height
@@ -179,13 +282,13 @@ compute_match_stats = function(pred, obs_matched, min_height = 10) {
   sf::st_geometry(obs_simple) <- NULL
   sf::st_geometry(pred_simple) <- NULL
 
-  pred_obs_match <- left_join(pred_simple,
-                              obs_simple,
-                              by = c("pred_tree_id" = "matched_pred_tree_id"))
+  pred_obs_match <- dplyr::left_join(pred_simple,
+                                     obs_simple,
+                                     by = c("pred_tree_id" = "matched_pred_tree_id"))
 
-  obs_pred_match <- right_join(pred_simple,
-                               obs_simple,
-                               by = c("pred_tree_id" = "matched_pred_tree_id"))
+  obs_pred_match <- dplyr::right_join(pred_simple,
+                                      obs_simple,
+                                      by = c("pred_tree_id" = "matched_pred_tree_id"))
 
 
   # Sum the tree counts (number of predicted trees, number of predicted trees matched, number of
@@ -195,9 +298,39 @@ compute_match_stats = function(pred, obs_matched, min_height = 10) {
 
   # Compute recall, precision, f_score for individual tree detection
   match_stats <- match_counts |>
-    mutate(recall = n_obs_match_pred / n_obs,
+    dplyr::mutate(recall = n_obs_match_pred / n_obs,
            precision = n_pred_match_obs / n_pred) |>
-    mutate(f_score = 2 * recall * precision / (recall + precision))
+    dplyr::mutate(f_score = 2 * recall * precision / (recall + precision))
+
+  return(match_stats)
+}
+
+# A wrapper for the above functions that performs the prep, matching, and stats computation
+match_trees_compute_stats = function(obs,
+                                     pred,
+                                     obs_boundary,
+                                     edge_buffer = 5,
+                                     search_distance_fun_intercept = 1,
+                                     search_distance_fun_slope = 0.1,
+                                     search_height_proportion = 0.5,
+                                     min_height = 10) {
+
+  # Get the predicted and observed tree points into the standardized format needed for the accuracy
+  # assessment
+  obs_prepped = prep_obs_map(obs, obs_boundary, edge_buffer = edge_buffer)
+  pred_prepped = prep_pred_map(pred, obs_boundary, edge_buffer = edge_buffer)
+
+  # Match the predicted and observed trees
+  obs_matched = match_obs_to_pred_mee(obs = obs_prepped,
+                                      pred = pred_prepped,
+                                      search_distance_fun_intercept = search_distance_fun_intercept,
+                                      search_distance_fun_slope = search_distance_fun_slope,
+                                      search_height_proportion = search_height_proportion)
+
+  # Compute recall, precision, F-score, etc.
+  match_stats = compute_match_stats(pred_prepped,
+                                    obs_matched,
+                                    min_height = min_height)
 
   return(match_stats)
 }
