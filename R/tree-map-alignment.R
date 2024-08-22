@@ -115,7 +115,7 @@ obj_mean_dist_to_closest = function(pred, obs, ...) {
   # Crop the predicted points to the x-y extent of the observed points +- 25%, so we don't waste
   # time if the user provided a predicted tree map that is much larger than the observed tree map
   pred_crop = crop_pred_to_obs(pred, obs)
-  
+
   ## For each predicted point, get the closest observed point in x, y, z space
   # For each observed point, get the distance to every predicted point
   # TODO: Is it OK that multiple observed points may be matched to the same predicted point? Maybe
@@ -166,7 +166,7 @@ obj_mee_matching = function(pred, obs, obs_bound) {
 # Test a given x-y shift and compute the objective function for it, using the objective
 # function supplied to it
 # transform_params: contains (in order): x_shift, y_shift
-eval_shift = function(transform_params, pred, obs, obs_bound, objective_fn) {
+eval_shift = function(transform_params, pred, obs, obs_bound, objective_fn, visualize = FALSE) {
 
   obs_shifted = obs |>
     dplyr::mutate(x = obs$x + transform_params[[1]], y = obs$y + transform_params[[2]])
@@ -178,6 +178,10 @@ eval_shift = function(transform_params, pred, obs, obs_bound, objective_fn) {
   obs_bound_shifted = sf::st_as_sf(obs_bound_shifted, crs = sf::st_crs(obs_bound))
 
   objective = objective_fn(pred, obs_shifted, obs_bound_shifted)
+
+  if (visualize){
+    vis2(pred, obs, shift=transform_params)
+  }
 
   return(objective)
 }
@@ -424,7 +428,7 @@ find_best_shift_icp = function(pred, obs) {
   pipeline_file = tempfile(fileext = ".json")
   writeLines(pipeline, pipeline_file)
 
-  cmd_call = paste0("pdal pipeline ", pipeline_file)
+  cmd_call = paste0("/home/russelldj/anaconda3/envs/pdal/bin/pdal pipeline ", pipeline_file)
   cmd_call
   system(cmd_call)
 
@@ -593,9 +597,15 @@ vis1 = function(trees) {
 # on the observed trees, with some buffer. Assumes the observed tree map is 50 x 50 and that both
 # tree maps are centered at 0,0.
 #' @export
-vis2 = function(pred, obs, obs_foc = FALSE, coords_arbitrary = FALSE, zoom_to_obs = FALSE, obs_buffer = 75) {
+vis2 = function(pred, obs, shift=c(0, 0), obs_foc = FALSE, coords_arbitrary = FALSE, zoom_to_obs = FALSE, obs_buffer = 75) {
   pred = pred |> dplyr::mutate(layer = "predicted")
   obs = obs |> dplyr::mutate(layer = "observed")
+
+  if (! identical(shift, c(0, 0))){
+    pred = pred |> dplyr::mutate(x = x + shift[1])
+    pred = pred |> dplyr::mutate(y = y + shift[2])
+  }
+
 
   trees = dplyr::bind_rows(pred, obs)
 
