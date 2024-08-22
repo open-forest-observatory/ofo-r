@@ -471,6 +471,39 @@ find_best_shift_icp = function(pred, obs) {
 
 }
 
+# Implementation of the following MATLAB function
+# https://gitlab.com/fgi_nls/public/2d-registration/-/blob/main/fit_euclidean_transformation.m?ref_type=heads
+find_best_shift_hyyppa = function(pred, obs, R_local=10, k = 20, r_thresh=1.0, max_iters = 200){
+  # Rename the variables for consistency with the reference code
+  xy_mat1 = pred
+  xy_mat2 = obs
+
+  # Centering the coordinates before matching to improve numerical stability
+  xy_mat1_mean = colMeans(xy_mat1[c("x", "y")])
+  xy_mat2_mean = colMeans(xy_mat2[c("x", "y")])
+
+  # TODO clean up this so it's only one row
+  xy_mat1 = xy_mat1 |> dplyr::mutate(x = x - xy_mat1_mean["x"])
+  xy_mat1 = xy_mat1 |> dplyr::mutate(y = y - xy_mat1_mean["y"])
+  xy_mat2 = xy_mat2 |> dplyr::mutate(x = x - xy_mat2_mean["x"])
+  xy_mat2 = xy_mat2 |> dplyr::mutate(y = y - xy_mat2_mean["y"])
+
+  # Number of objects detected from each point cloud
+  N_objects_vect = c(nrow(xy_mat1), nrow(xy_mat2))
+
+  if (N_objects_vect[2] < k){
+    k = N_objects_vect[2]
+    msg = paste0(
+      'Number of objects in dataset 2 (and thus the potential number of matches) ',
+      'is smaller than given parameter k. k was set to ',
+      N_objects_vect[2]
+    )
+    # TODO make this a warning
+    print(msg)
+  }
+  return(c(0, 0))
+}
+
 # Generate one pair of random tree maps (pred and observed) with observed shifted a known amt, test
 # alignment, and return the result
 make_map_and_align = function(method, ...) {
@@ -602,6 +635,7 @@ vis2 = function(pred, obs, shift=c(0, 0), obs_foc = FALSE, coords_arbitrary = FA
   obs = obs |> dplyr::mutate(layer = "observed")
 
   if (! identical(shift, c(0, 0))){
+    print(shift)
     pred = pred |> dplyr::mutate(x = x + shift[1])
     pred = pred |> dplyr::mutate(y = y + shift[2])
   }
@@ -649,3 +683,5 @@ vis2 = function(pred, obs, shift=c(0, 0), obs_foc = FALSE, coords_arbitrary = FA
 
   print(p)
 }
+
+
