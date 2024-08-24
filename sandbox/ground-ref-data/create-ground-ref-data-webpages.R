@@ -13,7 +13,7 @@ library(jinjar)
 devtools::load_all()
 
 
-datadir = readLines("sandbox/data-dirs/derek-fieldref-laptop.txt", n = 1)
+datadir = readLines("sandbox/data-dirs/derek-groundref-laptop.txt", n = 1)
 
 plot_boundaries_data_dir = file.path(datadir, "field-plot-boundaries")
 google_sheet_id = "1GjDseDCR1BX_EIkJAni7rk2zvK6nHmZz1nOFBd1d6k4"
@@ -23,22 +23,22 @@ BASE_OFO_URL = "https://openforestobservatory.org/"
 WEBSITE_REPO_PATH = "~/repos/ofo-website-3/"
 
 # Path to the plot details template page within theis repo
-PLOT_DETAILS_TEMPLATE_FILEPATH = fs::path(file.path("sandbox", "field-ref-data", "templates", "field-ref-plot-details.md"))
+PLOT_DETAILS_TEMPLATE_FILEPATH = fs::path(file.path("sandbox", "ground-ref-data", "templates", "ground-ref-plot-details.md"))
 
 # Path to plot details dir relative to the 'content' dir in the website repo. No leading slash but
 # trailing slash
-PLOT_DETAILS_PAGE_DIR = "data-field-ref-plot-details/"
+PLOT_DETAILS_PAGE_DIR = "data/ground-ref/plot-details/"
 
 # Path to static website files dirs within website repo relative to 'static'. Leading slash but no
 # trailing slash
 DATATABLE_HEADER_FILES_DIR = "/datatable-header-files"
 LEAFLET_HEADER_FILES_DIR = "/leaflet-header-files"
-PLOT_CATALOG_DATATABLE_DIR = "/field-plot-catalog-datatable/"
-PLOT_CATALOG_DATATABLE_FILENAME = "field-plot-catalog-datatable.html"
-PLOT_CATALOG_MAP_DIR = "/field-plot-catalog-map/"
-PLOT_CATALOG_MAP_FILENAME = "field-plot-catalog-map.html"
-PLOT_DETAILS_DATATABLE_DIR = "/field-plot-details-datatables"
-PLOT_DETAILS_MAP_DIR = "/field-plot-details-maps"
+PLOT_CATALOG_DATATABLE_DIR = "/ground-plot-catalog-datatable/"
+PLOT_CATALOG_DATATABLE_FILENAME = "ground-plot-catalog-datatable.html"
+PLOT_CATALOG_MAP_DIR = "/ground-plot-catalog-map/"
+PLOT_CATALOG_MAP_FILENAME = "ground-plot-catalog-map.html"
+PLOT_DETAILS_DATATABLE_DIR = "/ground-plot-details-datatables"
+PLOT_DETAILS_MAP_DIR = "/ground-plot-details-maps"
 
 WEBSITE_STATIC_PATH = file.path(WEBSITE_REPO_PATH, "static", "")
 WEBSITE_CONTENT_PATH = file.path(WEBSITE_REPO_PATH, "content", "")
@@ -84,6 +84,12 @@ plot_summary = compile_plot_summary_table(plots = plots,
                                           bounds = bounds,
                                           base_ofo_url = BASE_OFO_URL,
                                           plot_details_dir = PLOT_DETAILS_PAGE_DIR)
+
+
+# Imprecise test for whether the data is still in the process of entry and should be skipped. TODO:
+# Consider turning into a function
+plot_summary = plot_summary |>
+  dplyr::filter(!is.na(plot_id) & !is.na(survey_date))
 
 # Write the plot-level data to a csv (for use otside the website purposes)
 readr::write_csv(plot_summary, file.path(datadir, "field-plot-summaries", "field-plot-summary.csv"))
