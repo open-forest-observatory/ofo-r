@@ -2,7 +2,6 @@
 # page
 
 library(dplyr)
-library(googlesheets4)
 library(leaflet)
 library(stringr)
 library(sf)
