@@ -1,7 +1,7 @@
 ---
 title: Plot {{ plot_id }}
 
-date: 2022-01-01
+date:
 show_date: false
 profile: false
 ---
