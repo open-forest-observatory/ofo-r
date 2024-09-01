@@ -27,6 +27,7 @@ make_mission_catalog_datatable = function(mission_summary,
                                        mission_catalog_datatable_filename) {
 
   d = mission_summary |>
+    sf::st_drop_geometry() |>
     select("ID" = dataset_id_link,
            "Area (ha)" = area_derived,
            "Date" = earliest_date_derived,
@@ -61,5 +62,36 @@ make_mission_catalog_datatable = function(mission_summary,
                    delete_folder_first = TRUE)
 
   return(dt)
+
+}
+
+
+
+make_mission_catalog_map = function(mission_summary,
+                                 website_static_path,
+                                 leaflet_header_files_dir,
+                                 mission_catalog_map_dir,
+                                 mission_catalog_map_filename) {
+
+  mission_centroids = sf::st_centroid(mission_summary)
+
+  m = leaflet() |>
+    addTiles(options = providerTileOptions(maxZoom = 16)) |>
+    addMarkers(data = mission_centroids, popup = ~dataset_id_link, clusterOptions = markerClusterOptions(freezeAtZoom = 16)) |>
+    addPolygons(data = mission_summary, group = "bounds") |>
+    addProviderTiles(providers$Esri.WorldTopoMap, group = "Topo", options = providerTileOptions(maxZoom = 16)) |>
+    addProviderTiles(providers$Esri.WorldImagery, group = "Imagery") |>
+    groupOptions("bounds", zoomLevels = 13:20) |>
+    addLayersControl(baseGroups = c("Topo", "Imagery"),
+                    options = layersControlOptions(collapsed = FALSE))
+
+  save_widget_html(m,
+                   website_static_path = website_static_path,
+                   header_files_dir = leaflet_header_files_dir,
+                   html_dir = mission_catalog_map_dir,
+                   html_filename = mission_catalog_map_filename,
+                   delete_folder_first = TRUE)
+
+  return(m)
 
 }

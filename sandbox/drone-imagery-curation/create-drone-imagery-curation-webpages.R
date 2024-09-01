@@ -45,46 +45,42 @@ MISSION_POINTS_PATH = "/ofo-share/drone-imagery-organization/3c_metadata-extract
 # ---- Processing
 
 # Load and prep metadata
-mission_polygons = st_read(MISSION_POLYGONS_PATH)
+mission_polygons_w_metadata = st_read(MISSION_POLYGONS_PATH)
 mission_points = st_read(MISSION_POINTS_PATH)
 
 # Save header library files required by embedded HTML datatables and leaflet maps
 save_dt_header_files(WEBSITE_STATIC_PATH, DATATABLE_HEADER_FILES_DIR)
 save_leaflet_header_files(WEBSITE_STATIC_PATH, LEAFLET_HEADER_FILES_DIR)
 
-mission_level_metadata = st_drop_geometry(mission_polygons)
-
-# Compile relevant and human-readable values from mission attributes
-mission_summary = compile_mission_summary_table(mission_level_metadata,
+# Compile relevant and human-readable values from mission attributes as additional columns of the
+# mission polygons object
+mission_polygons_w_summary_data = compile_mission_summary_table(mission_polygons_w_metadata,
                                                 base_ofo_url = BASE_OFO_URL,
                                                 mission_details_dir = MISSION_DETAILS_PAGE_DIR)
 
 # Make a HTML data table of plot catalog
-dt = make_mission_catalog_datatable(mission_summary = mission_summary,
+dt = make_mission_catalog_datatable(mission_summary = mission_polygons_w_summary_data,
                             website_static_path = WEBSITE_STATIC_PATH,
                             datatable_header_files_dir = DATATABLE_HEADER_FILES_DIR,
                             mission_catalog_datatable_dir = MISSION_CATALOG_DATATABLE_DIR,
                             mission_catalog_datatable_filename = MISSION_CATALOG_DATATABLE_FILENAME)
 
 
-### RESUME HERE
-
 
 # Make leaflet map of field data catalog
-plot_centroids = sf::st_centroid(bounds)
-m = make_plot_catalog_map(plot_summary = plot_summary,
-                      plot_centroids = plot_centroids,
-                      plot_bounds = bounds,
+m = make_mission_catalog_map(mission_summary = mission_polygons_w_summary_data,
                       website_static_path = WEBSITE_STATIC_PATH,
                       leaflet_header_files_dir = LEAFLET_HEADER_FILES_DIR,
-                      plot_catalog_map_dir = PLOT_CATALOG_MAP_DIR,
-                      plot_catalog_map_filename = PLOT_CATALOG_MAP_FILENAME)
+                      mission_catalog_map_dir = MISSION_CATALOG_MAP_DIR,
+                      mission_catalog_map_filename = MISSION_CATALOG_MAP_FILENAME)
+m
+
 
 # For website directories that house plot-level page components, delete existing directories and
 # create new empty directory
 reset_plot_detail_dirs(WEBSITE_STATIC_PATH,
                        WEBSITE_CONTENT_PATH,
-                       PLOT_DETAILS_PAGE_DIR,
+                       MISSION_DETAILS_PAGE_DIR,
                        PLOT_DETAILS_MAP_DIR,
                        PLOT_DETAILS_DATATABLE_DIR)
 
