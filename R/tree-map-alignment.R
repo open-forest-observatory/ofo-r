@@ -474,13 +474,14 @@ find_best_shift_icp = function(pred, obs) {
 # Implementation of the following MATLAB function
 # https://gitlab.com/fgi_nls/public/2d-registration/-/blame/main/fit_euclidean_transformation.m?ref_type=heads#L231
 compute_feature_descriptors = function(xy_mat, R_local){
+  {r}
   xy_mat = as.matrix(xy_mat)
   # Convert the pairwise distances between each row
   pdist = dist(xy_mat, method = "euclidean")
   # Convert from a dist object into a matrix
   pdist = as.matrix(pdist)
   # Set the diagnal to the max value so it will never be the minimum
-  diag(pdist) <- max(pdist)
+  diag(pdist) = max(pdist)
   # Finding the closest neighboring object for each object
   # Invert the sign so we can use max.col
   indices_of_closest_points = max.col(-pdist)
@@ -530,8 +531,13 @@ compute_feature_descriptors = function(xy_mat, R_local){
   # (-pi/2, 0).
   eps = 10^(-6) # used to exclude the closest object from the 1st/4th quadrant
 
+  # Bounds for the quadrants
   lower_bounds = c(eps, pi/2, -pi, -pi/2)
   upper_bounds = c(pi/2, pi, -pi/2, -eps)
+
+  # Pre-allocating the feature descriptor matrix
+  feat_desc_mat = matrix(0, n_points, 8);
+
 
   for (i_quadrant in 1:4){
     lower_bound = lower_bounds[i_quadrant]
@@ -546,8 +552,24 @@ compute_feature_descriptors = function(xy_mat, R_local){
     # For each object, find the closest object within the current quadrant
     summed_matrices = pdist + not_quadrant_i_mat
     idx_closest_i = as.matrix(apply(summed_matrices, 2, which.min))
-    min_dist_i = summed_matrices[1:n_points, idx_closest_i]
+    min_dist_i = as.matrix(summed_matrices[cbind(1:n_points, idx_closest_i)])
+    # For each object, determine the angle of the closest object in the
+    # current quadrant w.r.t. the characteristic direction.
+    angle_closest_quad_i = as.matrix(angle_mat[cbind(1:n_points, idx_closest_i)])
+    # Normalizing the distances and angles
+    min_dist_i_norm = min_dist_i / R_local
+    angle_quad_i_norm = (angle_closest_quad_i - lower_bound)/(pi/2)
+    # If the min distance in a given quadrant is larger than R_local, we set
+    # the normalized distance and angle to -1.
+    min_dist_i_norm[min_dist_i > R_local] = -1
+    angle_quad_i_norm[min_dist_i > R_local] = -1
+    # Storing the normalized min distance and the angle to the pre-allocated
+    # feature descriptor matrix
+    feat_desc_mat[, i_quadrant] = min_dist_i_norm;
+    feat_desc_mat[, i_quadrant+4] = angle_quad_i_norm;
   }
+
+  return(feature_desc_mat)
 }
 
 # Implementation of the following MATLAB function
