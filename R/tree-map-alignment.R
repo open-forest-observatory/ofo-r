@@ -530,6 +530,24 @@ compute_feature_descriptors = function(xy_mat, R_local){
   # (-pi/2, 0).
   eps = 10^(-6) # used to exclude the closest object from the 1st/4th quadrant
 
+  lower_bounds = c(eps, pi/2, -pi, -pi/2)
+  upper_bounds = c(pi/2, pi, -pi/2, -eps)
+
+  for (i_quadrant in 1:4){
+    lower_bound = lower_bounds[i_quadrant]
+    upper_bound = upper_bounds[i_quadrant]
+    quadrant_i_mat = angle_mat > lower_bound & angle_mat <= upper_bound
+
+    # Construct a matrix marking objects not belonging to the current
+    # quadrant with large values
+    not_quadrant_i_mat = matrix(0, n_points, n_points)
+    not_quadrant_i_mat[quadrant_i_mat == FALSE] = max(pdist) + eps
+
+    # For each object, find the closest object within the current quadrant
+    summed_matrices = pdist + not_quadrant_i_mat
+    idx_closest_i = as.matrix(apply(summed_matrices, 2, which.min))
+    min_dist_i = summed_matrices[1:n_points, idx_closest_i]
+  }
 }
 
 # Implementation of the following MATLAB function
