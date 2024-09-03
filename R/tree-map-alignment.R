@@ -569,7 +569,7 @@ compute_feature_descriptors = function(xy_mat, R_local){
     feat_desc_mat[, i_quadrant+4] = angle_quad_i_norm;
   }
 
-  return(feature_desc_mat)
+  return(feature_desc_mat, char_dirs)
 }
 
 # Implementation of the following MATLAB function
