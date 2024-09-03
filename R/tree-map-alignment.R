@@ -472,6 +472,67 @@ find_best_shift_icp = function(pred, obs) {
 }
 
 # Implementation of the following MATLAB function
+# https://gitlab.com/fgi_nls/public/2d-registration/-/blame/main/fit_euclidean_transformation.m?ref_type=heads#L231
+compute_feature_descriptors = function(xy_mat, R_local){
+  xy_mat = as.matrix(xy_mat)
+  # Convert the pairwise distances between each row
+  pdist = dist(xy_mat, method = "euclidean")
+  # Convert from a dist object into a matrix
+  pdist = as.matrix(pdist)
+  # Set the diagnal to the max value so it will never be the minimum
+  diag(pdist) <- max(pdist)
+  # Finding the closest neighboring object for each object
+  # Invert the sign so we can use max.col
+  indices_of_closest_points = max.col(-pdist)
+
+  # Coordinates of the closest neighboring object for each of the objects
+  closest_points = xy_mat[indices_of_closest_points, ]
+  # For each object, compute the normalized characteristic directions that
+  # are locally used as the 1st axis direction.
+
+  char_dirs = closest_points - xy_mat
+  distances = sqrt(char_dirs[,1]^ 2 + char_dirs[,2]^2)
+  char_dirs = char_dirs / distances
+
+  # Directions perpendicular to the characteristic directions. These are
+  # used as the local 2nd axis direction.
+  char_dirs_perp = cbind(-1 * char_dirs[,2], char_dirs[,1])
+
+
+  # For each object, we transform the coordinates of the other objects
+  # into the local coordinate frame of the given object. We denote the
+  # coordinate along the 1st axis direction by v and the coordinate along
+  # the 2nd axis direction by w. In the matrices below, the element at row
+  # i and column j means the coordinate of the jth object in the local
+  # coordinate frame of the ith object.
+
+  # Define intermediate variables
+  x_values = xy_mat[,1]
+  y_values = xy_mat[,2]
+
+  n_points = nrow(xy_mat)
+  x_tiled = matrix(rep(t(x_values), n_points), ncol=n_points)
+  y_tiled = matrix(rep(t(y_values), n_points), ncol=n_points)
+  x_minus_x_transposed = x_tiled - t(x_tiled)
+  y_minus_y_transposed = y_tiled - t(y_tiled)
+
+
+  v_mat = x_minus_x_transposed * char_dirs[,1] + y_minus_y_transposed * char_dirs[,2]
+  w_mat = x_minus_x_transposed * char_dirs_perp[,1] + y_minus_y_transposed * char_dirs_perp[,2]
+
+  # Use atan2 to compute the angles with respect to the characteristic
+  # directions. The angles are in the range [-pi, pi]
+  # TODO check if this atan2 has the same conventions as expected
+  angle_mat =  atan2(w_mat, v_mat)
+
+  # For each object, we then need to find the closest object in each of the
+  # four quadrants corresponding to angles (0, pi/2), (pi/2, pi), (-pi, -pi/2),
+  # (-pi/2, 0).
+  eps = 10^(-6) # used to exclude the closest object from the 1st/4th quadrant
+
+}
+
+# Implementation of the following MATLAB function
 # https://gitlab.com/fgi_nls/public/2d-registration/-/blob/main/fit_euclidean_transformation.m?ref_type=heads
 find_best_shift_hyyppa = function(pred, obs, R_local=10, k = 20, r_thresh=1.0, max_iters = 200){
   # Rename the variables for consistency with the reference code
@@ -501,6 +562,12 @@ find_best_shift_hyyppa = function(pred, obs, R_local=10, k = 20, r_thresh=1.0, m
     # TODO make this a warning
     print(msg)
   }
+
+
+  # First, we construct the feature descriptor for each object in each of
+  # the point clouds.
+  compute_feature_descriptors(xy_mat1, R_local)
+  compute_feature_descriptors(xy_mat2, R_local)
   return(c(0, 0))
 }
 
