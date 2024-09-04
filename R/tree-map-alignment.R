@@ -1,3 +1,4 @@
+library(rdist)
 ## TODO: how much better is the best match vs the  mean of the alternatives (but only those where there is complete overlap between predicted and observed)? This could be a way to quantify the confidence in the alignment.
 #### TODO: Make sure that the requested range of shifts is still completley within the predicted stem map.
 
@@ -459,22 +460,23 @@ find_best_shift_icp = function(pred, obs) {
   time_taken = toc$toc - toc$tic
 
   # Return the best shift and the ancillary data
-  result = data.frame(shift_x = mean(shifts$x),
-                      shift_y = mean(shifts$y),
-                      n_trees_obs = n_trees_obs,
-                      time_taken = time_taken)
+  result = data.frame(
+    shift_x = mean(shifts$x),
+    shift_y = mean(shifts$y),
+    n_trees_obs = n_trees_obs,
+    time_taken = time_taken
+  )
 
   row.names(result) = NULL
 
   # Return the best shift
   return(result)
-
 }
 
 # Implementation of the following MATLAB function
 # https://gitlab.com/fgi_nls/public/2d-registration/-/blame/main/fit_euclidean_transformation.m?ref_type=heads#L231
-compute_feature_descriptors = function(xy_mat, R_local){
-  xy_mat = as.matrix(xy_mat)
+compute_feature_descriptors = function(xy_mat, R_local) {
+  xy_mat = as.matrix(xy_mat)[, 1:2]
   # Convert the pairwise distances between each row
   pdist = dist(xy_mat, method = "euclidean")
   # Convert from a dist object into a matrix
@@ -486,12 +488,12 @@ compute_feature_descriptors = function(xy_mat, R_local){
   indices_of_closest_points = max.col(-pdist)
 
   # Coordinates of the closest neighboring object for each of the objects
-  closest_points = xy_mat[indices_of_closest_points, ]
+  closest_points = xy_mat[indices_of_closest_points]
   # For each object, compute the normalized characteristic directions that
   # are locally used as the 1st axis direction.
 
   char_dirs = closest_points - xy_mat
-  distances = sqrt(char_dirs[, 1]^ 2 + char_dirs[, 2]^2)
+  distances = sqrt(char_dirs[, 1]^2 + char_dirs[, 2]^2)
   char_dirs = char_dirs / distances
 
   # Directions perpendicular to the characteristic directions. These are
@@ -529,7 +531,7 @@ compute_feature_descriptors = function(xy_mat, R_local){
   # Use atan2 to compute the angles with respect to the characteristic
   # directions. The angles are in the range [-pi, pi]
   # TODO check if this atan2 has the same conventions as expected
-  angle_mat =  atan2(w_mat, v_mat)
+  angle_mat = atan2(w_mat, v_mat)
 
   # For each object, we then need to find the closest object in each of the
   # four quadrants corresponding to angles (0, pi/2), (pi/2, pi), (-pi, -pi/2),
@@ -543,7 +545,7 @@ compute_feature_descriptors = function(xy_mat, R_local){
   # Pre-allocating the feature descriptor matrix
   feat_desc_mat = matrix(0, n_points, 8)
 
-  for (i_quadrant in 1:4){
+  for (i_quadrant in 1:4) {
     lower_bound = lower_bounds[i_quadrant]
     upper_bound = upper_bounds[i_quadrant]
     quadrant_i_mat = angle_mat > lower_bound & angle_mat <= upper_bound
@@ -571,21 +573,75 @@ compute_feature_descriptors = function(xy_mat, R_local){
     angle_quad_i_norm[min_dist_i > R_local] = -1
     # Storing the normalized min distance and the angle to the pre-allocated
     # feature descriptor matrix
-    feat_desc_mat[, i_quadrant] = min_dist_i_norm;
-    feat_desc_mat[, i_quadrant + 4] = angle_quad_i_norm;
+    feat_desc_mat[, i_quadrant] = min_dist_i_norm
+    feat_desc_mat[, i_quadrant + 4] = angle_quad_i_norm
   }
 
-  return(feat_desc_mat, char_dirs)
+  char_theta = atan2(char_dirs[, 1], char_dirs[, 2])
+  return(list(feat_desc_mat, char_theta))
 }
+
+# function [from_idx2_to_closest_idx1, from_idx2_to_min_dist1, n_of_matches] ...
+get_closest_pairs_after_transformation = function(xy_mat1, xy_mat2, R_mat, t_vect, r_thres) {
+  # Helper function for obtaining a mapping from each object in dataset 2 to the
+  # index of the closest object in dataset 1 after transforming the object
+  # locations in dataset 1 as R_mat*xy_mat1' + t_vect.
+  # The function also evaluates the number of matching pairs by finding the
+  # the number of closest object pairs, for which the pair-wise distance is below
+  # r_thres.
+  #
+  # Args:
+  #   xy_mat1 = (x,y)-coordinates of objects (e.g. trees) found from point
+  #             cloud 1 as a N1-by-2 matrix. (N1=number of rows, 2= number of
+  #             columns)
+  #   xy_mat2 = (x,y)-coordinates of objects (e.g. trees) found from point
+  #             cloud 2 as N2-by-2 matrix
+  #   R_mat = 2-by-2 rotation matrix of the transformation
+  #   t_vect = 2-by-1 column vector corresponding to the translation vector
+  #           of the transformation
+  #   r_thres = distance threshold for deciding if the closest object in the
+  #           other point cloud is a match
+  # Returns:
+  #   from_idx2_to_closest_idx1 = N2-by-1 vector containing the indices of the closest
+  #           object in dataset 1 for each object in dataset 2.
+  #   from_idx2_to_min_dist1 = N2-by-1 vector containing the distances to the closest
+  #           object in dataset 1 for each object in dataset 2.
+  #   n_of_matches = number of matching object pairs based on r_thres.
+  xy_mat1 = as.matrix(xy_mat1)
+  xy_mat2 = as.matrix(xy_mat2)
+  colnames(xy_mat2) = NULL
+  xy_mat1_t = t(xy_mat1)
+  rotated_xy1 = t(R_mat %*% xy_mat1_t)
+  t_vect = as.vector(as.numeric(t_vect))
+  xy_mat1_transformed = t(t(rotated_xy1) + t_vect) # N-by-2
+  # Pair-wise locations between each object in dataset 1 and 2. Each row is
+  # one object in dataset 2 and each column in one object in dataset 1.
+  transformed_loc_p_dist = cdist(xy_mat2, xy_mat1_transformed)
+  # Finding the closest object in transformed point cloud 1 for each object
+  # in point cloud 2
+  from_idx2_to_closest_idx1 = apply(transformed_loc_p_dist, 1, which.min)
+  from_idx2_to_min_dist1 = transformed_loc_p_dist[
+    cbind(1:nrow(transformed_loc_p_dist), from_idx2_to_closest_idx1)
+  ]
+
+  # Computing the number of matches, i.e., object pairs whose distance is
+  # below the set criterion
+  n_of_matches = sum(from_idx2_to_min_dist1 < r_thres)
+  return(list(from_idx2_to_closest_idx1, from_idx2_to_min_dist1, n_of_matches))
+}
+
 
 # Implementation of the following MATLAB function
 # https://gitlab.com/fgi_nls/public/2d-registration/-/blob/main/fit_euclidean_transformation.m?ref_type=heads
-find_best_shift_hyyppa = function(pred, obs, R_local=10, k = 20, r_thresh=1.0, max_iters = 200){
+find_best_shift_hyyppa = function(pred, obs, R_local = 10, k = 20, r_thresh = 1.0, max_iters = 200) {
   # Rename the variables for consistency with the reference code
   xy_mat1 = pred
   xy_mat2 = obs
 
   # Centering the coordinates before matching to improve numerical stability
+  xy_mat1 = xy_mat1[c("x", "y")]
+  xy_mat2 = xy_mat2[c("x", "y")]
+
   xy_mat1_mean = colMeans(xy_mat1[c("x", "y")])
   xy_mat2_mean = colMeans(xy_mat2[c("x", "y")])
 
@@ -598,11 +654,11 @@ find_best_shift_hyyppa = function(pred, obs, R_local=10, k = 20, r_thresh=1.0, m
   # Number of objects detected from each point cloud
   N_objects_vect = c(nrow(xy_mat1), nrow(xy_mat2))
 
-  if (N_objects_vect[2] < k){
+  if (N_objects_vect[2] < k) {
     k = N_objects_vect[2]
     msg = paste0(
-      'Number of objects in dataset 2 (and thus the potential number of matches) ',
-      'is smaller than given parameter k. k was set to ',
+      "Number of objects in dataset 2 (and thus the potential number of matches) ",
+      "is smaller than given parameter k. k was set to ",
       N_objects_vect[2]
     )
     # TODO make this a warning
@@ -612,9 +668,100 @@ find_best_shift_hyyppa = function(pred, obs, R_local=10, k = 20, r_thresh=1.0, m
 
   # First, we construct the feature descriptor for each object in each of
   # the point clouds.
-  compute_feature_descriptors(xy_mat1, R_local)
-  compute_feature_descriptors(xy_mat2, R_local)
-  return(c(0, 0))
+  feature_info1 = compute_feature_descriptors(xy_mat1, R_local)
+  feature_info2 = compute_feature_descriptors(xy_mat2, R_local)
+  # Extract out the components of the result
+  feat_desc_mat1 = feature_info1[[1]]
+  char_thetas1 = feature_info1[[2]]
+  feat_desc_mat2 = feature_info2[[1]]
+  char_thetas2 = feature_info2[[2]]
+
+  # Preallocating matrix for storing pairwise distances between feature
+  # descriptors of the two point clouds -> rows correspond to objects detected
+  # from the point cloud 2 and columns correspond to objects detected from
+  # the point cloud 1.
+  feat_desc_pdist = cdist(feat_desc_mat2, feat_desc_mat1)
+
+  n_cloud_2 = nrow(feat_desc_pdist)
+
+  # Find the index per row with the lowest value
+  nn_indices = apply(feat_desc_pdist, 1, which.min)
+  lowest_dists = feat_desc_pdist[cbind(1:n_cloud_2, nn_indices)]
+
+  # For each object in point cloud 2, we find the 2nd nearest neighbor feature
+  # descriptor in point cloud 1.
+  feat_desc_pdist[cbind(1:n_cloud_2, nn_indices)] = NaN
+  second_nearest_inds = apply(feat_desc_pdist, 1, which.min)
+  second_lowest_dists = feat_desc_pdist[cbind(1:n_cloud_2, second_nearest_inds)]
+
+  # Sorting the nearest neighbor distance ratios so that we can rank the
+  # tentative matches from most reliable to least reliable
+  NNDR_vect = lowest_dists / second_lowest_dists
+  sorted_indices = sort(NNDR_vect, index.return = TRUE, decreasing = FALSE)$ix
+
+  # Then, we consider the k most promising tentative matches
+  max_n_of_matches = 0 # maximum number of matching objects
+  ## Initializing the parameters for the transformation of the best match.
+  t_best = c(0, 0)
+  theta_best = 0
+  idx_matches1_best = c() # ndices of matching objects in point cloud 1
+  idx_matches2_best = c() # indices of matching objects in point cloud 2
+
+  # Indices for each element in the second set
+  indices2 = 1:N_objects_vect[2]
+
+  for (i_iter in 1:k) {
+    # indices of objects corresponding to the current tentative match
+    idx_object_2 = sorted_indices[i_iter]
+    idx_object_1 = nn_indices[idx_object_2]
+
+    # Characteristic directions corresponding to these objects
+    char_theta1 = char_thetas1[idx_object_1]
+    char_theta2 = char_thetas2[idx_object_2]
+
+    # TODO figure out if this is the right convention
+    delta_theta = char_theta2 - char_theta1
+    # The corresponding rotation matrix, in column major order
+    R_mat = matrix(
+      as.numeric(
+        c(cos(delta_theta), sin(delta_theta), -sin(delta_theta), cos(delta_theta))
+      ),
+      nrow = 2,
+      ncol = 2
+    )
+
+    # Computing the translation vector based on the object locations in the two point
+    # clouds
+    xy_1 = xy_mat1[idx_object_1, c("x", "y")] # row vect.
+    xy_2 = xy_mat2[idx_object_2, c("x", "y")] # row vect.
+    # TODO ensure that matrix-vector multiplication works as expected
+    xy1_t_vec = as.vector(as.numeric(xy_1))
+    rotated_xy1 = R_mat %*% xy1_t_vec
+    t_vect = (xy_2 - rotated_xy1) # column vector
+
+    # For each object in point cloud 2, we find the closest object in the
+    # point cloud 1 after using the estimated transformation. We also compute
+    # the number of matches, i.e., object pairs whose distance is below the
+    # set criterion
+    res = get_closest_pairs_after_transformation(
+      xy_mat1, xy_mat2, R_mat, t_vect, r_thresh
+    )
+    from_idx2_to_closest_idx1 = res[[1]]
+    from_idx2_to_min_dist1 = res[[2]]
+    n_of_matches = res[[3]]
+
+    if (n_of_matches > max_n_of_matches) {
+      max_n_of_matches = n_of_matches
+
+      idx_matches2_best = indices2[from_idx2_to_min_dist1 < r_thresh]
+      idx_matches1_best = from_idx2_to_closest_idx1[idx_matches2_best]
+
+      t_best = t_vect
+      theta_best = delta_theta
+    }
+  }
+
+  return(c(t_best, theta_best))
 }
 
 # Generate one pair of random tree maps (pred and observed) with observed shifted a known amt, test
