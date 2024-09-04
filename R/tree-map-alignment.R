@@ -474,7 +474,6 @@ find_best_shift_icp = function(pred, obs) {
 # Implementation of the following MATLAB function
 # https://gitlab.com/fgi_nls/public/2d-registration/-/blame/main/fit_euclidean_transformation.m?ref_type=heads#L231
 compute_feature_descriptors = function(xy_mat, R_local){
-  {r}
   xy_mat = as.matrix(xy_mat)
   # Convert the pairwise distances between each row
   pdist = dist(xy_mat, method = "euclidean")
@@ -492,12 +491,12 @@ compute_feature_descriptors = function(xy_mat, R_local){
   # are locally used as the 1st axis direction.
 
   char_dirs = closest_points - xy_mat
-  distances = sqrt(char_dirs[,1]^ 2 + char_dirs[,2]^2)
+  distances = sqrt(char_dirs[, 1]^ 2 + char_dirs[, 2]^2)
   char_dirs = char_dirs / distances
 
   # Directions perpendicular to the characteristic directions. These are
   # used as the local 2nd axis direction.
-  char_dirs_perp = cbind(-1 * char_dirs[,2], char_dirs[,1])
+  char_dirs_perp = cbind(-1 * char_dirs[, 2], char_dirs[, 1])
 
 
   # For each object, we transform the coordinates of the other objects
@@ -508,18 +507,24 @@ compute_feature_descriptors = function(xy_mat, R_local){
   # coordinate frame of the ith object.
 
   # Define intermediate variables
-  x_values = xy_mat[,1]
-  y_values = xy_mat[,2]
+  x_values = xy_mat[, 1]
+  y_values = xy_mat[, 2]
 
   n_points = nrow(xy_mat)
-  x_tiled = matrix(rep(t(x_values), n_points), ncol=n_points)
-  y_tiled = matrix(rep(t(y_values), n_points), ncol=n_points)
+  x_tiled = matrix(rep(t(x_values), n_points), ncol = n_points)
+  y_tiled = matrix(rep(t(y_values), n_points), ncol = n_points)
   x_minus_x_transposed = x_tiled - t(x_tiled)
   y_minus_y_transposed = y_tiled - t(y_tiled)
 
 
-  v_mat = x_minus_x_transposed * char_dirs[,1] + y_minus_y_transposed * char_dirs[,2]
-  w_mat = x_minus_x_transposed * char_dirs_perp[,1] + y_minus_y_transposed * char_dirs_perp[,2]
+  v_mat = (
+    (x_minus_x_transposed * char_dirs[, 1])
+    + (y_minus_y_transposed * char_dirs[, 2])
+  )
+  w_mat = (
+    (x_minus_x_transposed * char_dirs_perp[, 1])
+    + (y_minus_y_transposed * char_dirs_perp[, 2])
+  )
 
   # Use atan2 to compute the angles with respect to the characteristic
   # directions. The angles are in the range [-pi, pi]
@@ -532,12 +537,11 @@ compute_feature_descriptors = function(xy_mat, R_local){
   eps = 10^(-6) # used to exclude the closest object from the 1st/4th quadrant
 
   # Bounds for the quadrants
-  lower_bounds = c(eps, pi/2, -pi, -pi/2)
-  upper_bounds = c(pi/2, pi, -pi/2, -eps)
+  lower_bounds = c(eps, pi / 2, -pi, -pi / 2)
+  upper_bounds = c(pi / 2, pi, -pi / 2, -eps)
 
   # Pre-allocating the feature descriptor matrix
-  feat_desc_mat = matrix(0, n_points, 8);
-
+  feat_desc_mat = matrix(0, n_points, 8)
 
   for (i_quadrant in 1:4){
     lower_bound = lower_bounds[i_quadrant]
@@ -555,10 +559,12 @@ compute_feature_descriptors = function(xy_mat, R_local){
     min_dist_i = as.matrix(summed_matrices[cbind(1:n_points, idx_closest_i)])
     # For each object, determine the angle of the closest object in the
     # current quadrant w.r.t. the characteristic direction.
-    angle_closest_quad_i = as.matrix(angle_mat[cbind(1:n_points, idx_closest_i)])
+    angle_closest_quad_i = as.matrix(
+      angle_mat[cbind(1:n_points, idx_closest_i)]
+    )
     # Normalizing the distances and angles
     min_dist_i_norm = min_dist_i / R_local
-    angle_quad_i_norm = (angle_closest_quad_i - lower_bound)/(pi/2)
+    angle_quad_i_norm = (angle_closest_quad_i - lower_bound) / (pi / 2)
     # If the min distance in a given quadrant is larger than R_local, we set
     # the normalized distance and angle to -1.
     min_dist_i_norm[min_dist_i > R_local] = -1
@@ -566,10 +572,10 @@ compute_feature_descriptors = function(xy_mat, R_local){
     # Storing the normalized min distance and the angle to the pre-allocated
     # feature descriptor matrix
     feat_desc_mat[, i_quadrant] = min_dist_i_norm;
-    feat_desc_mat[, i_quadrant+4] = angle_quad_i_norm;
+    feat_desc_mat[, i_quadrant + 4] = angle_quad_i_norm;
   }
 
-  return(feature_desc_mat, char_dirs)
+  return(feat_desc_mat, char_dirs)
 }
 
 # Implementation of the following MATLAB function
