@@ -759,8 +759,36 @@ find_best_shift_hyyppa = function(pred, obs, R_local = 10, k = 20, r_thresh = 1.
       theta_best = delta_theta
     }
   }
+  # It's going to be something like subtract mean of xy_1, then apply the R|t matrix, then add the mean of xy2
+  subtract_xy1_mean = matrix(
+    as.numeric(
+      c(1, 0, -xy_mat1_mean[[1]], 0, 1, -xy_mat1_mean[[2]], 0, 0, 1)
+    ),
+    nrow = 3,
+    ncol = 3,
+    byrow = TRUE
+  )
+  transform_by_R_t = matrix(
+    as.numeric(
+      c(
+        cos(theta_best), -sin(theta_best), t_best[1],
+        sin(theta_best), cos(theta_best), t_best[2],
+        0, 0, 1
+      )
+    ),
+    nrow = 3,
+    ncol = 3,
+    byrow = TRUE,
+  )
+  add_xy2_mean = matrix(
+    as.numeric(c(1, 0, xy_mat2_mean[[1]], 0, 1, xy_mat2_mean[[2]], 0, 0, 1)),
+    nrow = 3,
+    ncol = 3,
+    byrow = TRUE
+  )
 
-  return(c(t_best, theta_best))
+  composite_transform = add_xy2_mean %*% transform_by_R_t %*% subtract_xy1_mean
+  return(composite_transform)
 }
 
 # Generate one pair of random tree maps (pred and observed) with observed shifted a known amt, test
