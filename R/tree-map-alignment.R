@@ -639,12 +639,20 @@ find_best_shift_hyyppa = function(pred, obs, R_local = 10, k = 20, r_thresh = 1.
   xy_mat1 = pred[c("x", "y")]
   xy_mat2 = obs[c("x", "y")]
 
+  print(xy_mat1)
+  print(xy_mat2)
+
   # Centering the coordinates before matching to improve numerical stability
   xy_mat1_mean = colMeans(xy_mat1[c("x", "y")])
   xy_mat2_mean = colMeans(xy_mat2[c("x", "y")])
-  xy_mat1 = xy_mat1 - xy_mat1_mean
-  xy_mat2 = xy_mat2 - xy_mat2_mean
+  # The double transpose seems to be the easiest way to broadcast subtraction
+  # given the recycling rules
+  xy_mat1 = t(t(xy_mat1) - xy_mat1_mean)
+  xy_mat2 = t(t(xy_mat2) - xy_mat2_mean)
 
+  p = ggplot2::ggplot(xy_mat1, ggplot2::aes(x, y)) +
+    ggplot2::geom_point()
+  print(p)
   # Number of objects detected from each point cloud
   N_objects_vect = c(nrow(xy_mat1), nrow(xy_mat2))
 
