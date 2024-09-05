@@ -626,7 +626,8 @@ get_closest_pairs_after_transformation = function(xy_mat1, xy_mat2, R_mat, t_vec
 
   # Computing the number of matches, i.e., object pairs whose distance is
   # below the set criterion
-  n_of_matches = sum(from_idx2_to_min_dist1 < r_thres)
+  less_than_thresh = from_idx2_to_min_dist1 < r_thres
+  n_of_matches = sum(less_than_thresh)
   return(list(from_idx2_to_closest_idx1, from_idx2_to_min_dist1, n_of_matches))
 }
 
@@ -634,22 +635,15 @@ get_closest_pairs_after_transformation = function(xy_mat1, xy_mat2, R_mat, t_vec
 # Implementation of the following MATLAB function
 # https://gitlab.com/fgi_nls/public/2d-registration/-/blob/main/fit_euclidean_transformation.m?ref_type=heads
 find_best_shift_hyyppa = function(pred, obs, R_local = 10, k = 20, r_thresh = 1.0, max_iters = 200) {
-  # Rename the variables for consistency with the reference code
-  xy_mat1 = pred
-  xy_mat2 = obs
+  # Rename the variables for consistency with the reference code and remove unneeded columns
+  xy_mat1 = pred[c("x", "y")]
+  xy_mat2 = obs[c("x", "y")]
 
   # Centering the coordinates before matching to improve numerical stability
-  xy_mat1 = xy_mat1[c("x", "y")]
-  xy_mat2 = xy_mat2[c("x", "y")]
-
   xy_mat1_mean = colMeans(xy_mat1[c("x", "y")])
   xy_mat2_mean = colMeans(xy_mat2[c("x", "y")])
-
-  # TODO clean up this so it's only one row
-  xy_mat1 = xy_mat1 |> dplyr::mutate(x = x - xy_mat1_mean["x"])
-  xy_mat1 = xy_mat1 |> dplyr::mutate(y = y - xy_mat1_mean["y"])
-  xy_mat2 = xy_mat2 |> dplyr::mutate(x = x - xy_mat2_mean["x"])
-  xy_mat2 = xy_mat2 |> dplyr::mutate(y = y - xy_mat2_mean["y"])
+  xy_mat1 = xy_mat1 - xy_mat1_mean
+  xy_mat2 = xy_mat2 - xy_mat2_mean
 
   # Number of objects detected from each point cloud
   N_objects_vect = c(nrow(xy_mat1), nrow(xy_mat2))
@@ -665,7 +659,6 @@ find_best_shift_hyyppa = function(pred, obs, R_local = 10, k = 20, r_thresh = 1.
     print(msg)
   }
 
-
   # First, we construct the feature descriptor for each object in each of
   # the point clouds.
   feature_info1 = compute_feature_descriptors(xy_mat1, R_local)
@@ -676,23 +669,25 @@ find_best_shift_hyyppa = function(pred, obs, R_local = 10, k = 20, r_thresh = 1.
   feat_desc_mat2 = feature_info2[[1]]
   char_thetas2 = feature_info2[[2]]
 
-  # Preallocating matrix for storing pairwise distances between feature
+  # Compute a matrix of pairwise distances between feature
   # descriptors of the two point clouds -> rows correspond to objects detected
   # from the point cloud 2 and columns correspond to objects detected from
   # the point cloud 1.
   feat_desc_pdist = cdist(feat_desc_mat2, feat_desc_mat1)
 
-  n_cloud_2 = nrow(feat_desc_pdist)
-
   # Find the index per row with the lowest value
   nn_indices = apply(feat_desc_pdist, 1, which.min)
-  lowest_dists = feat_desc_pdist[cbind(1:n_cloud_2, nn_indices)]
+  lowest_dists = feat_desc_pdist[cbind(1:N_objects_vect[2], nn_indices)]
 
-  # For each object in point cloud 2, we find the 2nd nearest neighbor feature
-  # descriptor in point cloud 1.
-  feat_desc_pdist[cbind(1:n_cloud_2, nn_indices)] = NaN
+  # Now find the second nearest index for each point in the first point cloud
+  # Mask out the first highest value.
+  # Note this must be done after extracting the distances
+  feat_desc_pdist[cbind(1:N_objects_vect[2], nn_indices)] = NaN
+  # Find the closest remaining value
   second_nearest_inds = apply(feat_desc_pdist, 1, which.min)
-  second_lowest_dists = feat_desc_pdist[cbind(1:n_cloud_2, second_nearest_inds)]
+  second_lowest_dists = feat_desc_pdist[
+    cbind(1:N_objects_vect[2], second_nearest_inds)
+  ]
 
   # Sorting the nearest neighbor distance ratios so that we can rank the
   # tentative matches from most reliable to least reliable
@@ -707,9 +702,13 @@ find_best_shift_hyyppa = function(pred, obs, R_local = 10, k = 20, r_thresh = 1.
   idx_matches1_best = c() # ndices of matching objects in point cloud 1
   idx_matches2_best = c() # indices of matching objects in point cloud 2
 
+  if (length(sorted_indices) < k) {
+    k = length(sorted_indices)
+    print(paste("Not enough valid correspondences, setting k to ", k))
+  }
+
   # Indices for each element in the second set
   indices2 = 1:N_objects_vect[2]
-
   for (i_iter in 1:k) {
     # indices of objects corresponding to the current tentative match
     idx_object_2 = sorted_indices[i_iter]
