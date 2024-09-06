@@ -473,6 +473,13 @@ find_best_shift_icp = function(pred, obs) {
   return(result)
 }
 
+transform_points_by_homography = function(xy_mat, homography) {
+  homogenous_xy_mat = cbind(xy_mat, rep(1, nrow(xy_mat)))
+  transformed_xy_mat = t(homography %*% t(homogenous_xy_mat))
+  transformed_xy_mat = transformed_xy_mat[, 1:2]
+  return(transformed_xy_mat)
+}
+
 # Implementation of the following MATLAB function
 # https://gitlab.com/fgi_nls/public/2d-registration/-/blame/main/fit_euclidean_transformation.m?ref_type=heads#L231
 compute_feature_descriptors = function(xy_mat, R_local) {
