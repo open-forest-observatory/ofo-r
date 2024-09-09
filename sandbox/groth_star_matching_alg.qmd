@@ -97,6 +97,17 @@ compute_triangles = function(xy_matrix) {
 
 ```{r}
 points = matrix(data = runif(10), ncol = 2)
-derived_attributes = compute_triangles(points)
-print(derived_attributes)
+
+points_shifted = t(t(points) + c(1, 2))
+theta = 0.5
+# Note that this is column major
+rot_mat = matrix(c(cos(theta), sin(theta), -sin(theta), cos(theta)), ncol = 2)
+print(rot_mat)
+points_rotated = t(rot_mat %*% t(points))
+# Flip order to see if it's properly implemented
+points_rotated = points_rotated[dim(points_rotated)[1]:1, ]
+attributes = compute_triangles(points)
+attributes_for_shifted = compute_triangles(points_rotated)
+print(attributes[, c("C", "r")])
+print(attributes_for_shifted[, c("C", "r")])
 ```
