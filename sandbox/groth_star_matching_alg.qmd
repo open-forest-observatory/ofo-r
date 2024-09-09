@@ -1,0 +1,96 @@
+Define the data
+
+```{r}
+library(wordspace)
+```
+
+```{r}
+map_side_order_to_point_order = function(orders) {
+  n_rows = nrow(orders)
+
+  xi_inds_matrix = matrix(0, n_rows, 3)
+  for (i in 1:n_rows) {
+    row = orders[i, ]
+    if (row[1] == 1 && row[3] == 2) {
+      xi_inds = c(2, 1, 3)
+    } else if (row[1] == 1 && row[3] == 3) {
+      xi_inds = c(1, 2, 3)
+    } else if (row[1] == 2 && row[3] == 1) {
+      xi_inds = c(2, 3, 1)
+    } else if (row[1] == 2 && row[3] == 3) {
+      xi_inds = c(3, 2, 1)
+    } else if (row[1] == 3 && row[3] == 1) {
+      xi_inds = c(1, 3, 2)
+    } else if (row[1] == 3 && row[3] == 2) {
+      xi_inds = c(3, 1, 2)
+    } else {
+      print("Error")
+    }
+    xi_inds_matrix[i, ] = xi_inds
+  }
+  return(xi_inds_matrix)
+}
+
+compute_triangle_attributes = function(all_verts) {
+  # Compute the sides
+  # v1-v2
+  s1 = all_verts[, 3:4] - all_verts[, 1:2]
+  # v2-v3
+  s2 = all_verts[, 5:6] - all_verts[, 3:4]
+  # v3-v1
+  s3 = all_verts[, 1:2] - all_verts[, 5:6]
+  # Compute the lengths of each one
+  l1 = rowNorms(s1)
+  l2 = rowNorms(s2)
+  l3 = rowNorms(s3)
+  # Stack them by columns
+  side_lengths = t(rbind(l1, l2, l3))
+  side_length_orders = t(apply(side_lengths, 1, order))
+
+  # Compute the ratio of shortest to longest side
+  n_triangles = nrow(all_verts)
+  # Extract the shortest and longest sides
+  r2 = side_lengths[cbind(1:n_triangles, side_length_orders[, 1])]
+  r3 = side_lengths[cbind(1:n_triangles, side_length_orders[, 3])]
+  # Compute the ratio
+  r = r3 / r2
+
+  # Extract the vectors corresponding to the vertices, ordered the following convention descriped in
+  # the paper:
+  # "The shortest side is defined to lie between vertices 1 and 2, the intermediate side between
+  # vertices 2 and 3, and the longest side between vertices 1 and 3."
+  xi_inds = map_side_order_to_point_order(side_length_orders)
+
+  x1 = all_verts[cbind(1:n_triangles, 2 * xi_inds[, 1] - 1)]
+  y1 = all_verts[cbind(1:n_triangles, 2 * xi_inds[, 1])]
+  x2 = all_verts[cbind(1:n_triangles, 2 * xi_inds[, 2] - 1)]
+  y2 = all_verts[cbind(1:n_triangles, 2 * xi_inds[, 2])]
+  x3 = all_verts[cbind(1:n_triangles, 2 * xi_inds[, 3] - 1)]
+  y3 = all_verts[cbind(1:n_triangles, 2 * xi_inds[, 3])]
+
+  # Cosine of angle at vertex 1. Corresponds to equation (3) in the paper
+  unnormalized = ((x3 - x1) * (x2 - x1) + (y3 - y1) * (y2 - y1))
+  normalization_factor = (r2 * r3)
+  C = unnormalized / normalization_factor
+  return(cbind(C, r))
+}
+
+compute_triangles = function(xy_matrix) {
+  n_points = nrow(xy_matrix)
+  combinations = combn(n_points, 3)
+  v1 = xy_matrix[combinations[1, ], ]
+  v2 = xy_matrix[combinations[2, ], ]
+  v3 = xy_matrix[combinations[3, ], ]
+  all_verts = cbind(v1, v2, v3)
+  ret = compute_triangle_attributes(all_verts)
+  return(ret)
+}
+```
+
+```{r}
+points = matrix(data = runif(10), ncol = 2)
+ret = compute_triangles(points)
+print(ret)
+print(ret[, "C"])
+print(ret[, "r"])
+```
