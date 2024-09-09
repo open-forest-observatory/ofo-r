@@ -72,7 +72,9 @@ compute_triangle_attributes = function(all_verts) {
   unnormalized = ((x3 - x1) * (x2 - x1) + (y3 - y1) * (y2 - y1))
   normalization_factor = (r2 * r3)
   C = unnormalized / normalization_factor
-  return(cbind(C, r))
+
+  derived_attributes = cbind(x1, y1, x2, y2, x3, y3, C, r)
+  return(derived_attributes)
 }
 
 compute_triangles = function(xy_matrix) {
@@ -82,15 +84,19 @@ compute_triangles = function(xy_matrix) {
   v2 = xy_matrix[combinations[2, ], ]
   v3 = xy_matrix[combinations[3, ], ]
   all_verts = cbind(v1, v2, v3)
-  ret = compute_triangle_attributes(all_verts)
-  return(ret)
+  derived_attributes = compute_triangle_attributes(all_verts)
+  combinations_and_attributes = cbind(
+    derived_attributes,
+    i1 = combinations[1, ],
+    i2 = combinations[2, ],
+    i3 = combinations[3, ]
+  )
+  return(combinations_and_attributes)
 }
 ```
 
 ```{r}
 points = matrix(data = runif(10), ncol = 2)
-ret = compute_triangles(points)
-print(ret)
-print(ret[, "C"])
-print(ret[, "r"])
+derived_attributes = compute_triangles(points)
+print(derived_attributes)
 ```
