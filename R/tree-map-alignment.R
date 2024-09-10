@@ -824,6 +824,46 @@ find_best_shift_hyyppa = function(pred, obs, R_local = 10, k = 20, r_thresh = 1.
   return(result)
 }
 
+big_testing_function = function(map_params, registration_methods, registration_arguments = NULL) {
+  # Get the names of all arguments of the function and their default values
+  simulate_tree_maps_default_args = formals(simulate_tree_maps)
+
+  # Build the list of all provided values while using defaults for unspecified values
+  all_map_params = list()
+  for (name in names(simulate_tree_maps_default_args)) {
+    if (name %in% names(map_params)) {
+      all_map_params[name] = map_params[name]
+    } else {
+      all_map_params[name] = simulate_tree_maps_default_args[name]
+    }
+    if (!is.vector(all_map_params[[name]])) {
+      all_map_params[name] = c(all_map_params[[name]])
+    }
+  }
+
+  param_configurations = expand.grid(all_map_params)
+
+  for (i in 1:nrow(param_configurations)) {
+    row = param_configurations[i, ]
+    res = do.call(simulate_tree_maps, row)
+    print(res)
+  }
+
+  # Takes in
+  ## parameter ranges (or lists) for a variety of attributes of the map
+  ## potentially-multiple algorithms to test on the same datasets
+  ## convergence criteria or a convergence metric
+
+  # Create a cross product or sampling thereof from the map parameter space
+  ## If there aren't enough rows, redraw that configuration
+  # Run each of the algorithms on each of the maps
+  # Compute the metric for each run
+  # Plot the results, sliced by different metrics
+  ## Probably do a scatter plot for each repetition of a given configuration
+  ## Or average across all other params except for the one you are slicing by
+  ## Or just return data frame
+}
+
 # Generate one pair of random tree maps (pred and observed) with observed shifted a known amt, test
 # alignment, and return the result
 make_map_and_align = function(method, ...) {
