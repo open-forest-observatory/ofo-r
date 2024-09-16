@@ -882,17 +882,18 @@ big_testing_function = function(
   }
 
   # Iterate over the parameter configurations and conduct the registration for each one
-  for (i in 1:nrow(all_map_param_configurations)) {
+  for (param_ind in 1:nrow(all_map_param_configurations)) {
+    message(paste0("iteration: ", param_ind, " / ", nrow(all_map_param_configurations)))
     # Get one set of map parameters
-    map_params = all_map_param_configurations[i, ]
+    map_params = all_map_param_configurations[param_ind, ]
     # Create a simulated map based on these parameters
     simulated_map = do.call(simulate_tree_maps, map_params)
 
     # Iterate over the different registration methods
-    for (i in 1:length(registration_methods)) {
+    for (reg_ind in 1:length(registration_methods)) {
       # Extract the method and method name
-      registration_method = registration_methods[[i]]
-      registration_method_name = registration_method_names[[i]]
+      registration_method = registration_methods[[reg_ind]]
+      registration_method_name = registration_method_names[[reg_ind]]
 
       # EXPENSIVE LINE
       # This is where registration actually occurs
