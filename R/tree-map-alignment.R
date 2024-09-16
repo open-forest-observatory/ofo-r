@@ -860,7 +860,9 @@ big_testing_function = function(
   # Create the cross product of all parameter configurations
   all_map_param_configurations = expand.grid(all_map_params)
   # Randomize the order so it's more likely that we hit errors early if they exist
-  all_map_param_configurations = all_map_param_configurations[sample(1:nrow(param_configurations)), ]
+  all_map_param_configurations = all_map_param_configurations[
+    sample(nrow(all_map_param_configurations)),
+  ]
 
   # Create names for each method if not provided
   if (is.null(registration_method_names)) {
