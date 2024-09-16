@@ -878,11 +878,11 @@ big_testing_function = function(
   # The sub-lists for each registration method are indexed by the name of the method
   per_method_results = list()
   for (method_name in registration_method_names) {
-    per_method_results[[method_name]] = list()
+    per_method_results[[method_name]] = data.frame()
   }
 
   # Iterate over the parameter configurations and conduct the registration for each one
-  for (param_ind in 1:nrow(all_map_param_configurations)) {
+  for (param_ind in seq_len(nrow(all_map_param_configurations))) {
     message(paste0("iteration: ", param_ind, " / ", nrow(all_map_param_configurations)))
     # Get one set of map parameters
     map_params = all_map_param_configurations[param_ind, ]
@@ -890,7 +890,7 @@ big_testing_function = function(
     simulated_map = do.call(simulate_tree_maps, map_params)
 
     # Iterate over the different registration methods
-    for (reg_ind in 1:length(registration_methods)) {
+    for (reg_ind in seq_along(registration_methods)) {
       # Extract the method and method name
       registration_method = registration_methods[[reg_ind]]
       registration_method_name = registration_method_names[[reg_ind]]
@@ -899,12 +899,17 @@ big_testing_function = function(
       # This is where registration actually occurs
       predicted_shift = registration_method(simulated_map$pred, simulated_map$obs)
       # Save the result in the output dataframe
-      per_method_results[[registration_method_name]] = append(
-        per_method_results[[registration_method_name]], list(predicted_shift)
+      per_method_results[[registration_method_name]] = rbind(
+        per_method_results[[registration_method_name]], predicted_shift
       )
     }
   }
-  return(per_method_results)
+  return(
+    list(
+      per_method_results = per_method_results,
+      all_map_param_configurations = all_map_param_configurations
+    )
+  )
   # Takes in
   ## parameter ranges (or lists) for a variety of attributes of the map
   ## potentially-multiple algorithms to test on the same datasets
