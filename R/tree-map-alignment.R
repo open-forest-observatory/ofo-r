@@ -835,7 +835,7 @@ big_testing_function = function(
     map_params,
     registration_methods,
     eval_function,
-    registration_arguments = NULL,
+    per_method_registration_arguments = NULL,
     registration_method_names = NULL) {
   # Get the names of all arguments of the function and their default values
   simulate_tree_maps_default_args = formals(simulate_tree_maps)
@@ -878,7 +878,7 @@ big_testing_function = function(
   # The sub-lists for each registration method are indexed by the name of the method
   per_method_results = list()
   for (method_name in registration_method_names) {
-    per_method_results[[method_name]] = data.frame()
+    per_method_results[[method_name]] = vector(mode = "list", length = nrow(all_map_param_configurations))
   }
 
   # Iterate over the parameter configurations and conduct the registration for each one
@@ -894,14 +894,21 @@ big_testing_function = function(
       # Extract the method and method name
       registration_method = registration_methods[[reg_ind]]
       registration_method_name = registration_method_names[[reg_ind]]
+      registration_arguments = per_method_registration_arguments[[reg_ind]]
+      # TODO include additional arguments provided in registration_arguments
 
       # EXPENSIVE LINE
       # This is where registration actually occurs
-      predicted_shift = registration_method(simulated_map$pred, simulated_map$obs)
-      # Save the result in the output dataframe
-      per_method_results[[registration_method_name]] = rbind(
-        per_method_results[[registration_method_name]], predicted_shift
-      )
+
+      all_registration_args = simulated_map[cbind("pred", "obs", "obs_bounds")]
+      if (!is.null(per_method_registration_arguments)) {
+        all_registration_args = c(all_registration_args, registration_arguments)
+      }
+      all_registration_args = all_registration_args[!duplicated(names(all_registration_args))]
+
+      predicted_shift = do.call(registration_method, all_registration_args)
+      # Save the result in the output list for the appropriate method
+      per_method_results[[registration_method_name]][[param_ind]] = predicted_shift
     }
   }
   return(
