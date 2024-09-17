@@ -88,9 +88,9 @@ simulate_tree_maps = function(trees_per_ha = 250, trees_per_clust = 5, cluster_r
   # Compute the bounds of the observed tree map and return as 'sf' object
   obs_sf = sf::st_as_sf(obs, coords = c("x", "y"))
   obs_bbox = sf::st_bbox(obs_sf)
-  obs_bound = sf::st_as_sfc(obs_bbox) |> sf::st_as_sf()
+  obs_bounds = sf::st_as_sfc(obs_bbox) |> sf::st_as_sf()
 
-  return(list(pred = pred, obs = obs, obs_bound = obs_bound))
+  return(list(pred = pred, obs = obs, obs_bounds = obs_bounds))
 }
 
 # Crop the predicted points to the x-y extent of the observed points +- 25%, so we don't waste time
@@ -135,12 +135,12 @@ obj_mean_dist_to_closest = function(pred, obs, ...) {
 }
 
 
-obj_mee_matching = function(pred, obs, obs_bound) {
+obj_mee_matching = function(pred, obs, obs_bounds) {
   pred_crop = crop_pred_to_obs(pred, obs)
 
   # Prep predicted and observed tree maps for comparison
-  obs_prepped = prep_obs_map(obs, obs_bound = obs_bound, edge_buffer = 5)
-  pred_prepped = prep_pred_map(pred_crop, obs_bound = obs_bound, edge_buffer = 5)
+  obs_prepped = prep_obs_map(obs, obs_bounds = obs_bounds, edge_buffer = 5)
+  pred_prepped = prep_pred_map(pred_crop, obs_bounds = obs_bounds, edge_buffer = 5)
 
   # Match predicted and observed trees, following logic in MEE paper, and compute the match stats
 
@@ -175,8 +175,8 @@ eval_shift = function(transform_params, pred, obs, obs_bound, objective_fn, visu
   # Shift the obs bound by the same amount the obs tree map is being shifted
   shift_df = data.frame(x = transform_params[[1]], y = transform_params[[2]])
   shift_geom = sf::st_as_sf(shift_df, coords = c("x", "y"))
-  obs_bound_shifted = obs_bound + shift_geom
-  obs_bound_shifted = sf::st_as_sf(obs_bound_shifted, crs = sf::st_crs(obs_bound))
+  obs_bound_shifted = obs_bounds + shift_geom
+  obs_bound_shifted = sf::st_as_sf(obs_bound_shifted, crs = sf::st_crs(obs_bounds))
 
   objective = objective_fn(pred, obs_shifted, obs_bound_shifted)
 
@@ -292,10 +292,10 @@ find_best_shift_grid = function(pred, obs,
 
   if (parallel) {
     future::plan(future::multicore, workers = parallelly::availableCores())
-    shifts$objective = furrr::future_map_dbl(transform_params, eval_shift, pred, obs, obs_bound = obs_bounds, objective_fn, .options = furrr::furrr_options(seed = TRUE))
+    shifts$objective = furrr::future_map_dbl(transform_params, eval_shift, pred, obs, obs_bounds = obs_bounds, objective_fn, .options = furrr::furrr_options(seed = TRUE))
     future::plan(future::sequential)
   } else {
-    shifts$objective = purrr::map_dbl(transform_params, eval_shift, pred, obs, obs_bound = obs_bounds, objective_fn)
+    shifts$objective = purrr::map_dbl(transform_params, eval_shift, pred, obs, obs_bounds = obs_bounds, objective_fn)
   }
 
 
@@ -389,6 +389,7 @@ find_best_shift = function(pred, obs,
       gr = NULL,
       pred = pred,
       obs = obs,
+      obs_bounds = obs_bounds,
       objective_fn = obj_mean_dist_to_closest,
       method = "Nelder-Mead"
     )
