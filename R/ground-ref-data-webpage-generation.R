@@ -337,9 +337,9 @@ make_plot_catalog_map = function(plot_summary,
 
 }
 
-# For website directories that house plot-level page components, delete existing directories and
+# For website directories that house plot- or mission-level page components, delete existing directories and
 # create new empty directory
-reset_plot_detail_dirs = function(website_static_path,
+reset_detail_dirs = function(website_static_path,
                                   website_content_path,
                                   plot_details_page_dir,
                                   plot_details_map_dir,

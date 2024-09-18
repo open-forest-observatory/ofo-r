@@ -113,7 +113,7 @@ m = make_plot_catalog_map(plot_summary = plot_summary,
 
 # For website directories that house plot-level page components, delete existing directories and
 # create new empty directory
-reset_plot_detail_dirs(WEBSITE_STATIC_PATH,
+reset_detail_dirs(WEBSITE_STATIC_PATH,
                        WEBSITE_CONTENT_PATH,
                        PLOT_DETAILS_PAGE_DIR,
                        PLOT_DETAILS_MAP_DIR,
