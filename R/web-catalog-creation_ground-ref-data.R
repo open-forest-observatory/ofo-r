@@ -483,8 +483,6 @@ make_plot_details_datatable = function(plot_summary_foc,
   dt$sizingPolicy$browser$padding = 0
   dt$sizingPolicy$browser$fill = FALSE
 
-  datatable_html_path = paste0("/field-plot-datatables/", plot_summary_foc$plot_id, ".html")
-
   # Save the datatable HTML to the website repo
   plot_details_datatable_filename = paste0(plot_summary_foc$plot_id, ".html")
   save_widget_html(dt,
