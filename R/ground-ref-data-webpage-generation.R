@@ -337,32 +337,6 @@ make_plot_catalog_map = function(plot_summary,
 
 }
 
-# For website directories that house plot- or mission-level page components, delete existing directories and
-# create new empty directory
-reset_detail_dirs = function(website_static_path,
-                                  website_content_path,
-                                  plot_details_page_dir,
-                                  plot_details_map_dir,
-                                  plot_details_datatable_dir) {
-
-  plot_details_page_path = file.path(website_content_path, plot_details_page_dir)
-  plot_details_map_path = file.path(website_static_path, plot_details_map_dir)
-  plot_details_datatable_path = file.path(website_static_path, plot_details_datatable_dir)
-
-  if (dir.exists(plot_details_page_path)) unlink(plot_details_page_path, recursive = TRUE)
-  dir.create(plot_details_page_path)
-  file.create(file.path(plot_details_page_path, "_index.md"))
-
-  if (dir.exists(plot_details_map_path)) unlink(plot_details_map_path, recursive = TRUE)
-  dir.create(plot_details_map_path)
-
-  if (dir.exists(plot_details_datatable_path)) unlink(plot_details_datatable_path, recursive = TRUE)
-  dir.create(plot_details_datatable_path)
-
-  return(TRUE)
-
-}
-
 # Prepare the tree data for the stem map by pulling in plot summary data for each tree. To prevent
 # bad scaling of tree point sizes, supply tree data with anomalous outliers removed (though this
 # will result in the outlier trees not being displayed on the map)

@@ -103,3 +103,30 @@ save_widget_html = function(widget,
   return(TRUE)
 
 }
+
+
+# For website directories that house plot- or mission-level page components, delete existing directories and
+# create new empty directory
+reset_detail_dirs = function(website_static_path,
+                                  website_content_path,
+                                  plot_details_page_dir,
+                                  plot_details_map_dir,
+                                  plot_details_datatable_dir) {
+
+  plot_details_page_path = file.path(website_content_path, plot_details_page_dir)
+  plot_details_map_path = file.path(website_static_path, plot_details_map_dir)
+  plot_details_datatable_path = file.path(website_static_path, plot_details_datatable_dir)
+
+  if (dir.exists(plot_details_page_path)) unlink(plot_details_page_path, recursive = TRUE)
+  dir.create(plot_details_page_path)
+  file.create(file.path(plot_details_page_path, "_index.md"))
+
+  if (dir.exists(plot_details_map_path)) unlink(plot_details_map_path, recursive = TRUE)
+  dir.create(plot_details_map_path)
+
+  if (dir.exists(plot_details_datatable_path)) unlink(plot_details_datatable_path, recursive = TRUE)
+  dir.create(plot_details_datatable_path)
+
+  return(TRUE)
+
+}
