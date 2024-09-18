@@ -560,20 +560,22 @@ make_plot_details_pages = function(plot_summary,
     trees_foc = trees_vis |>
       filter(plot_id == plot_id_foc)
 
-    plot_details_map_path = make_plot_details_map(plot_summary_foc = plot_summary_foc,
-                              bound_foc = bound_foc,
-                              trees_foc = trees_foc,
-                              website_static_path = WEBSITE_STATIC_PATH,
-                              leaflet_header_files_dir = LEAFLET_HEADER_FILES_DIR,
-                              plot_details_map_dir = PLOT_DETAILS_MAP_DIR)
+    plot_details_map_path = make_plot_details_map(
+      plot_summary_foc = plot_summary_foc,
+      bound_foc = bound_foc,
+      trees_foc = trees_foc,
+      website_static_path = WEBSITE_STATIC_PATH,
+      leaflet_header_files_dir = LEAFLET_HEADER_FILES_DIR,
+      plot_details_map_dir = PLOT_DETAILS_MAP_DIR
+    )
 
-    plot_details_datatable_path = make_plot_details_datatable(plot_summary_foc = plot_summary_foc,
-                                    website_static_path = WEBSITE_STATIC_PATH,
-                                    datatable_header_files_dir = DATATABLE_HEADER_FILES_DIR,
-                                    plot_details_datatable_dir = PLOT_DETAILS_DATATABLE_DIR)
+    plot_details_datatable_path = make_plot_details_datatable(
+      plot_summary_foc = plot_summary_foc,
+      website_static_path = WEBSITE_STATIC_PATH,
+      datatable_header_files_dir = DATATABLE_HEADER_FILES_DIR,
+      plot_details_datatable_dir = PLOT_DETAILS_DATATABLE_DIR
+    )
 
-
-    # Render plot details page from template
     render_plot_page(template_filepath = PLOT_DETAILS_TEMPLATE_FILEPATH,
                     plot_summary_foc = plot_summary_foc,
                     plot_details_map_path = plot_details_map_path,
