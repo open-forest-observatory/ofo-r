@@ -41,8 +41,7 @@ make_mission_catalog_datatable = function(mission_summary,
            "RTK images (%)" = percent_images_rtk_derived,
            "Contributor dataset name" = contributor_dataset_name,
            "Project" = project_id,
-           "Aircraft" = aircraft_model_name,
-           "License" = license)
+           "Aircraft" = aircraft_model_name)
 
   # Prep formatting code to pass to datatable creation
   format_js = DT::JS("function(settings, json) {",
@@ -83,7 +82,7 @@ make_mission_catalog_map = function(mission_summary,
     addProviderTiles(providers$Esri.WorldImagery, group = "Imagery") |>
     groupOptions("bounds", zoomLevels = 13:20) |>
     addLayersControl(baseGroups = c("Topo", "Imagery"),
-                    options = layersControlOptions(collapsed = FALSE))
+                     options = layersControlOptions(collapsed = FALSE))
 
   save_widget_html(m,
                    website_static_path = website_static_path,
