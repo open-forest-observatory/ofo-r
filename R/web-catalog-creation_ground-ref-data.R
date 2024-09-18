@@ -535,7 +535,7 @@ render_plot_page = function(template_filepath,
 }
 
 ## Loop through each plot and make a details page, including its media (map and datatable)
-make_details_pages = function(plot_summary,
+make_plot_details_pages = function(plot_summary,
                               bounds,
                               trees_vis,
                               website_static_path,

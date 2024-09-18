@@ -122,7 +122,7 @@ reset_detail_dirs(WEBSITE_STATIC_PATH,
 trees_vis = prep_trees_for_stem_map(trees_for_plot_summary, plot_summary)
 
 
-make_details_pages(plot_summary = plot_summary,
+make_plot_details_pages(plot_summary = plot_summary,
                    bounds = bounds,
                    trees_vis = trees_vis,
                    website_static_path = WEBSITE_STATIC_PATH,
