@@ -1,5 +1,5 @@
 ---
-title: Plot {{ plot_id }}
+title: Mission {{ dataset_id }}
 
 date:
 show_date: false
@@ -14,7 +14,7 @@ profile: false
 
 <iframe src="{{ datatable_html_path }}" onload='javascript:(function(o){o.style.height=o.contentWindow.document.body.scrollHeight+"px";}(this));' style="height:200px;width:100%;border:none;overflow:hidden;padding:0;"></iframe>
 
-[Coming soon: Download plot data](#)
+[Coming soon: Download dataset](#)
 
 
 <!-- Script to make the datatable the height to fit the data -->
