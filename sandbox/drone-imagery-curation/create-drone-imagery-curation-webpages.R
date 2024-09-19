@@ -17,7 +17,7 @@ BASE_OFO_URL = "https://openforestobservatory.org/"
 WEBSITE_REPO_PATH = "/ofo-share/repos-derek/ofo-website-3"
 
 # Path to the plot details template page within theis repo
-MISSION_DETAILS_TEMPLATE_FILEPATH = fs::path(file.path("sandbox", "drone-imagery-curation", "templates", "drone-mission-details.md"))
+MISSION_DETAILS_TEMPLATE_FILEPATH = fs::path(file.path("sandbox", "drone-imagery-curation", "templates", "drone-mission-curation-details.md"))
 
 # Path to plot details dir relative to the 'content' dir in the website repo. No leading slash but
 # trailing slash
@@ -51,68 +51,50 @@ mission_points = st_read(MISSION_POINTS_PATH)
 # Save header library files required by embedded HTML datatables and leaflet maps
 save_dt_header_files(WEBSITE_STATIC_PATH, DATATABLE_HEADER_FILES_DIR)
 save_leaflet_header_files(WEBSITE_STATIC_PATH, LEAFLET_HEADER_FILES_DIR)
-
 # Compile relevant and human-readable values from mission attributes as additional columns of the
 # mission polygons object
-mission_polygons_w_summary_data = compile_mission_summary_table(mission_polygons_w_metadata,
-                                                base_ofo_url = BASE_OFO_URL,
-                                                mission_details_dir = MISSION_DETAILS_PAGE_DIR)
+mission_polygons_w_summary_data = compile_mission_summary_data(mission_polygons_w_metadata,
+  base_ofo_url = BASE_OFO_URL,
+  mission_details_dir = MISSION_DETAILS_PAGE_DIR
+)
 
 # Make a HTML data table of plot catalog
-dt = make_mission_catalog_datatable(mission_summary = mission_polygons_w_summary_data,
-                            website_static_path = WEBSITE_STATIC_PATH,
-                            datatable_header_files_dir = DATATABLE_HEADER_FILES_DIR,
-                            mission_catalog_datatable_dir = MISSION_CATALOG_DATATABLE_DIR,
-                            mission_catalog_datatable_filename = MISSION_CATALOG_DATATABLE_FILENAME)
-
-
+dt = make_mission_catalog_datatable(
+  mission_summary = mission_polygons_w_summary_data,
+  website_static_path = WEBSITE_STATIC_PATH,
+  datatable_header_files_dir = DATATABLE_HEADER_FILES_DIR,
+  mission_catalog_datatable_dir = MISSION_CATALOG_DATATABLE_DIR,
+  mission_catalog_datatable_filename = MISSION_CATALOG_DATATABLE_FILENAME
+)
 
 # Make leaflet map of field data catalog
-m = make_mission_catalog_map(mission_summary = mission_polygons_w_summary_data,
-                      website_static_path = WEBSITE_STATIC_PATH,
-                      leaflet_header_files_dir = LEAFLET_HEADER_FILES_DIR,
-                      mission_catalog_map_dir = MISSION_CATALOG_MAP_DIR,
-                      mission_catalog_map_filename = MISSION_CATALOG_MAP_FILENAME)
-
-
+m = make_mission_catalog_map(
+  mission_summary = mission_polygons_w_summary_data,
+  website_static_path = WEBSITE_STATIC_PATH,
+  leaflet_header_files_dir = LEAFLET_HEADER_FILES_DIR,
+  mission_catalog_map_dir = MISSION_CATALOG_MAP_DIR,
+  mission_catalog_map_filename = MISSION_CATALOG_MAP_FILENAME
+)
 
 # For website directories that house mission-level page components, delete existing directories and
 # create new empty directory
-reset_detail_dirs(WEBSITE_STATIC_PATH,
-                       WEBSITE_CONTENT_PATH,
-                       MISSION_DETAILS_PAGE_DIR,
-                       MISSION_DETAILS_MAP_DIR,
-                       MISSION_DETAILS_DATATABLE_DIR)
+reset_detail_dirs(
+  WEBSITE_STATIC_PATH,
+  WEBSITE_CONTENT_PATH,
+  MISSION_DETAILS_PAGE_DIR,
+  MISSION_DETAILS_MAP_DIR,
+  MISSION_DETAILS_DATATABLE_DIR
+)
 
-## For each mission, create a page with a map and a table of mission data
-
-
-
-
-
-
-
-
-
-
-mission_ids = mission_polygons_w_summary_data$dataset_id
-
-mission_id = mission_ids[1]
-
-mission_polygon_foc = mission_polygons_w_summary_data |>
-  filter(dataset_id == !!mission_id)
-
-mission_points_foc = mission_points |>
-  rename(dataset_id = dataset_id_image_level) |>
-  filter(dataset_id == !!mission_id)
-
-mission_centroids = sf::st_centroid(mission_polygons_w_summary_data)
-
-
-make_mission_details_map(mission_polygon_foc = mission_polygon_foc,
-                         mission_points_foc = mission_points_foc,
-                         mission_polygons_for_mission_details_map = mission_polygons_w_summary_data,
-                         mission_centroids = mission_centroids,
-                         website_static_path = WEBSITE_STATIC_PATH,
-                         leaflet_header_files_dir = LEAFLET_HEADER_FILES_DIR,
-                         mission_details_map_dir = MISSION_DETAILS_MAP_DIR)
+## Loop through each mission and make a details page, including its media (map and datatable)
+make_mission_details_pages(
+  mission_summary = mission_polygons_w_summary_data,
+  website_static_path = WEBSITE_STATIC_PATH,
+  website_content_path = WEBSITE_CONTENT_PATH,
+  leaflet_header_files_dir = LEAFLET_HEADER_FILES_DIR,
+  datatable_header_files_dir = DATATABLE_HEADER_FILES_DIR,
+  mission_details_datatable_dir = MISSION_DETAILS_DATATABLE_DIR,
+  mission_details_map_dir = MISSION_DETAILS_MAP_DIR,
+  mission_details_template_filepath = MISSION_DETAILS_TEMPLATE_FILEPATH,
+  mission_details_page_dir = MISSION_DETAILS_PAGE_DIR
+)
