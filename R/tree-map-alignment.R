@@ -383,7 +383,7 @@ find_best_shift = function(pred, obs,
   } else if (method == "optim") {
     # Find the best shift using an optimization algorithm
 
-    optim(
+    optim_res = optim(
       par = c(0, 0),
       fn = eval_shift,
       gr = NULL,
@@ -393,6 +393,14 @@ find_best_shift = function(pred, obs,
       objective_fn = obj_mean_dist_to_closest,
       method = "Nelder-Mead"
     )
+    result = data.frame(
+      shift_x = optim_res$par[1],
+      shift_y = optim_res$par[2],
+      shift_obj = optim_res$value,
+      n_tested_coarse = optim_res$counts["function"]
+    )
+
+    return(result)
   } else {
     stop("Invalid method ", method, " passed to find_best_shift()")
   }
