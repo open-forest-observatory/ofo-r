@@ -416,20 +416,20 @@ find_best_shift_icp = function(pred, obs) {
   # Create PDAL pipeline for filter.icp algorithm
   pipeline = c(
     "[",
-      paste0('"', pred_file, '"', ","),
-      paste0('"', obs_unaligned_file, '"', ","),
-      "{",
-        '"type":"filters.icp"',
-        # '"method":"rigid"',
-        "},",
-      paste0('"', obs_aligned_file, '"'),
+    paste0('"', pred_file, '"', ","),
+    paste0('"', obs_unaligned_file, '"', ","),
+    "{",
+    '"type":"filters.icp"',
+    # '"method":"rigid"',
+    "},",
+    paste0('"', obs_aligned_file, '"'),
     "]"
   )
 
   pipeline_file = tempfile(fileext = ".json")
   writeLines(pipeline, pipeline_file)
 
-  cmd_call = paste0("/home/russelldj/anaconda3/envs/pdal/bin/pdal pipeline ", pipeline_file)
+  cmd_call = paste0("pdal pipeline ", pipeline_file)
   cmd_call
   system(cmd_call)
 
@@ -474,6 +474,11 @@ find_best_shift_icp = function(pred, obs) {
 }
 
 transform_points_by_homography = function(xy_mat, homography) {
+  #' Transforms a set of points by a homography.
+  #' xy_mat: a (n_points, 2) matrix of data to
+  #' homography: a (3, 3) matrix following the conventions of a 2d homography
+  #'
+  #' Returns: the (n_points, 2) transformed points
   homogenous_xy_mat = cbind(xy_mat, rep(1, nrow(xy_mat)))
   transformed_xy_mat = t(homography %*% t(homogenous_xy_mat))
   transformed_xy_mat = transformed_xy_mat[, 1:2]
@@ -488,15 +493,16 @@ compute_feature_descriptors = function(xy_mat, R_local) {
   pdist = dist(xy_mat, method = "euclidean")
   # Convert from a dist object into a matrix
   pdist = as.matrix(pdist)
-  # Set the diagnal to the max value so it will never be the minimum
+  # Set the diagnal entries to the the max value. This ensures that the closest matching point
+  # for a given point is not itself.
   diag(pdist) = max(pdist)
-  # Finding the closest neighboring object for each object
+  # Finding the closest neighboring point for each point
   # Invert the sign so we can use max.col
   indices_of_closest_points = max.col(-pdist)
 
-  # Coordinates of the closest neighboring object for each of the objects
+  # Coordinates of the closest neighboring point for each of the point
   closest_points = xy_mat[indices_of_closest_points]
-  # For each object, compute the normalized characteristic directions that
+  # For each point, compute the normalized characteristic directions that
   # are locally used as the 1st axis direction.
 
   char_dirs = closest_points - xy_mat
@@ -508,8 +514,8 @@ compute_feature_descriptors = function(xy_mat, R_local) {
   char_dirs_perp = cbind(-1 * char_dirs[, 2], char_dirs[, 1])
 
 
-  # For each object, we transform the coordinates of the other objects
-  # into the local coordinate frame of the given object. We denote the
+  # For each point, we transform the coordinates of the other points
+  # into the local coordinate frame of the given point We denote the
   # coordinate along the 1st axis direction by v and the coordinate along
   # the 2nd axis direction by w. In the matrices below, the element at row
   # i and column j means the coordinate of the jth object in the local
@@ -550,7 +556,7 @@ compute_feature_descriptors = function(xy_mat, R_local) {
   upper_bounds = c(pi / 2, pi, -pi / 2, -eps)
 
   # Pre-allocating the feature descriptor matrix
-  feat_desc_mat = matrix(0, n_points, 8)
+  feat_desc_mat = matrix(data = 0, nrow = n_points, ncol = 8)
 
   for (i_quadrant in 1:4) {
     lower_bound = lower_bounds[i_quadrant]
@@ -585,7 +591,7 @@ compute_feature_descriptors = function(xy_mat, R_local) {
   }
 
   char_theta = atan2(char_dirs[, 1], char_dirs[, 2])
-  return(list(feat_desc_mat, char_theta))
+  return(list(feat_desc_mat = feat_desc_mat, char_theta = char_theta))
 }
 
 # function [from_idx2_to_closest_idx1, from_idx2_to_min_dist1, n_of_matches] ...
@@ -635,7 +641,14 @@ get_closest_pairs_after_transformation = function(xy_mat1, xy_mat2, R_mat, t_vec
   # below the set criterion
   less_than_thresh = from_idx2_to_min_dist1 < r_thres
   n_of_matches = sum(less_than_thresh)
-  return(list(from_idx2_to_closest_idx1, from_idx2_to_min_dist1, n_of_matches))
+
+  return(
+    list(
+      from_idx2_to_closest_idx1 = from_idx2_to_closest_idx1,
+      from_idx2_to_min_dist1 = from_idx2_to_min_dist1,
+      n_of_matches = n_of_matches
+    )
+  )
 }
 
 
@@ -643,12 +656,12 @@ get_closest_pairs_after_transformation = function(xy_mat1, xy_mat2, R_mat, t_vec
 # https://gitlab.com/fgi_nls/public/2d-registration/-/blob/main/fit_euclidean_transformation.m?ref_type=heads
 find_best_shift_hyyppa = function(pred, obs, R_local = 10, k = 20, r_thresh = 1.0, max_iters = 200) {
   # Rename the variables for consistency with the reference code and remove unneeded columns
-  xy_mat1 = pred[c("x", "y")]
-  xy_mat2 = obs[c("x", "y")]
+  xy_mat1 = pred[, c("x", "y")]
+  xy_mat2 = obs[, c("x", "y")]
 
   # Centering the coordinates before matching to improve numerical stability
-  xy_mat1_mean = colMeans(xy_mat1[c("x", "y")])
-  xy_mat2_mean = colMeans(xy_mat2[c("x", "y")])
+  xy_mat1_mean = colMeans(xy_mat1[, c("x", "y")])
+  xy_mat2_mean = colMeans(xy_mat2[, c("x", "y")])
   # The double transpose seems to be the easiest way to broadcast subtraction
   # given the recycling rules
   xy_mat1 = t(t(xy_mat1) - xy_mat1_mean)
@@ -673,10 +686,10 @@ find_best_shift_hyyppa = function(pred, obs, R_local = 10, k = 20, r_thresh = 1.
   feature_info1 = compute_feature_descriptors(xy_mat1, R_local)
   feature_info2 = compute_feature_descriptors(xy_mat2, R_local)
   # Extract out the components of the result
-  feat_desc_mat1 = feature_info1[[1]]
-  char_thetas1 = feature_info1[[2]]
-  feat_desc_mat2 = feature_info2[[1]]
-  char_thetas2 = feature_info2[[2]]
+  feat_desc_mat1 = feature_info1$feat_desc_mat
+  char_thetas1 = feature_info1$char_theta
+  feat_desc_mat2 = feature_info2$feat_desc_mat
+  char_thetas2 = feature_info2$char_theta
 
   # Compute a matrix of pairwise distances between feature
   # descriptors of the two point clouds -> rows correspond to objects detected
@@ -691,7 +704,7 @@ find_best_shift_hyyppa = function(pred, obs, R_local = 10, k = 20, r_thresh = 1.
   # Now find the second nearest index for each point in the first point cloud
   # Mask out the first highest value.
   # Note this must be done after extracting the distances
-  feat_desc_pdist[cbind(1:N_objects_vect[2], nn_indices)] = NaN
+  feat_desc_pdist[cbind(1:N_objects_vect[2], nn_indices)] = NA
   # Find the closest remaining value
   second_nearest_inds = apply(feat_desc_pdist, 1, which.min)
   second_lowest_dists = feat_desc_pdist[
@@ -708,7 +721,7 @@ find_best_shift_hyyppa = function(pred, obs, R_local = 10, k = 20, r_thresh = 1.
   ## Initializing the parameters for the transformation of the best match.
   t_best = c(0, 0)
   theta_best = 0
-  idx_matches1_best = c() # ndices of matching objects in point cloud 1
+  idx_matches1_best = c() # indices of matching objects in point cloud 1
   idx_matches2_best = c() # indices of matching objects in point cloud 2
 
   if (length(sorted_indices) < k) {
@@ -930,10 +943,8 @@ vis2 = function(pred, obs, shift=c(0, 0), obs_foc = FALSE, coords_arbitrary = FA
   pred = pred |> dplyr::mutate(layer = "predicted")
   obs = obs |> dplyr::mutate(layer = "observed")
 
-  if (! identical(shift, c(0, 0))){
-    print(shift)
-    pred = pred |> dplyr::mutate(x = x + shift[1])
-    pred = pred |> dplyr::mutate(y = y + shift[2])
+  if (!identical(shift, c(0, 0))) {
+    pred = pred |> dplyr::mutate(x = x + shift[1], y = y + shift[2])
   }
 
 
