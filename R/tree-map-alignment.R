@@ -810,7 +810,15 @@ find_best_shift_hyyppa = function(pred, obs, R_local = 10, k = 20, r_thresh = 1.
   )
 
   composite_transform = add_xy2_mean %*% transform_by_R_t %*% subtract_xy1_mean
-  return(composite_transform)
+
+  result = data.frame(
+    x_shift = composite_transform[1, 3],
+    y_shift = composite_transform[2, 3],
+    scale = sqrt(det(composite_transform[1:2, 1:2])), # TODO Check that this is correct
+    rotation = atan2(composite_transform[2, 1], composite_transform[1, 1]),
+  )
+
+  return(result)
 }
 
 # Generate one pair of random tree maps (pred and observed) with observed shifted a known amt, test
