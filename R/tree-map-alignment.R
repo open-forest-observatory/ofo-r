@@ -565,7 +565,7 @@ compute_feature_descriptors = function(xy_mat, R_local) {
 
     # Construct a matrix marking objects not belonging to the current
     # quadrant with large values
-    not_quadrant_i_mat = matrix(0, n_points, n_points)
+    not_quadrant_i_mat = matrix(0, nrow = n_points, ncol = n_points)
     not_quadrant_i_mat[quadrant_i_mat == FALSE] = max(pdist) + eps
 
     # For each object, find the closest object within the current quadrant
@@ -726,7 +726,7 @@ find_best_shift_hyyppa = function(pred, obs, R_local = 10, k = 20, r_thresh = 1.
 
   if (length(sorted_indices) < k) {
     k = length(sorted_indices)
-    print(paste("Not enough valid correspondences, setting k to ", k))
+    warning("Not enough valid correspondences, setting k to ", k)
   }
 
   # Indices for each element in the second set
@@ -781,6 +781,7 @@ find_best_shift_hyyppa = function(pred, obs, R_local = 10, k = 20, r_thresh = 1.
       theta_best = delta_theta
     }
   }
+  # Compose the steps to recover the final transform since the computation occured on shifted data
   # It's going to be something like subtract mean of xy_1, then apply the R|t matrix, then add the mean of xy2
   subtract_xy1_mean = matrix(
     as.numeric(
@@ -809,13 +810,15 @@ find_best_shift_hyyppa = function(pred, obs, R_local = 10, k = 20, r_thresh = 1.
     byrow = TRUE
   )
 
+  # Find the 3x3 matrix representing the transformation
   composite_transform = add_xy2_mean %*% transform_by_R_t %*% subtract_xy1_mean
 
+  # Extract the elements of the matrix into a flat data frame
   result = data.frame(
     x_shift = composite_transform[1, 3],
     y_shift = composite_transform[2, 3],
     scale = sqrt(det(composite_transform[1:2, 1:2])), # TODO Check that this is correct
-    rotation = atan2(composite_transform[2, 1], composite_transform[1, 1]),
+    rotation = atan2(composite_transform[2, 1], composite_transform[1, 1])
   )
 
   return(result)
@@ -998,5 +1001,3 @@ vis2 = function(pred, obs, shift=c(0, 0), obs_foc = FALSE, coords_arbitrary = FA
 
   print(p)
 }
-
-
