@@ -1,3 +1,4 @@
+library(rdist)
 ## TODO: how much better is the best match vs the  mean of the alternatives (but only those where there is complete overlap between predicted and observed)? This could be a way to quantify the confidence in the alignment.
 #### TODO: Make sure that the requested range of shifts is still completley within the predicted stem map.
 
@@ -115,7 +116,7 @@ obj_mean_dist_to_closest = function(pred, obs, ...) {
   # Crop the predicted points to the x-y extent of the observed points +- 25%, so we don't waste
   # time if the user provided a predicted tree map that is much larger than the observed tree map
   pred_crop = crop_pred_to_obs(pred, obs)
-  
+
   ## For each predicted point, get the closest observed point in x, y, z space
   # For each observed point, get the distance to every predicted point
   # TODO: Is it OK that multiple observed points may be matched to the same predicted point? Maybe
@@ -166,7 +167,7 @@ obj_mee_matching = function(pred, obs, obs_bound) {
 # Test a given x-y shift and compute the objective function for it, using the objective
 # function supplied to it
 # transform_params: contains (in order): x_shift, y_shift
-eval_shift = function(transform_params, pred, obs, obs_bound, objective_fn) {
+eval_shift = function(transform_params, pred, obs, obs_bound, objective_fn, visualize = FALSE) {
 
   obs_shifted = obs |>
     dplyr::mutate(x = obs$x + transform_params[[1]], y = obs$y + transform_params[[2]])
@@ -178,6 +179,10 @@ eval_shift = function(transform_params, pred, obs, obs_bound, objective_fn) {
   obs_bound_shifted = sf::st_as_sf(obs_bound_shifted, crs = sf::st_crs(obs_bound))
 
   objective = objective_fn(pred, obs_shifted, obs_bound_shifted)
+
+  if (visualize){
+    vis2(pred, obs, shift=transform_params)
+  }
 
   return(objective)
 }
@@ -411,13 +416,13 @@ find_best_shift_icp = function(pred, obs) {
   # Create PDAL pipeline for filter.icp algorithm
   pipeline = c(
     "[",
-      paste0('"', pred_file, '"', ","),
-      paste0('"', obs_unaligned_file, '"', ","),
-      "{",
-        '"type":"filters.icp"',
-        # '"method":"rigid"',
-        "},",
-      paste0('"', obs_aligned_file, '"'),
+    paste0('"', pred_file, '"', ","),
+    paste0('"', obs_unaligned_file, '"', ","),
+    "{",
+    '"type":"filters.icp"',
+    # '"method":"rigid"',
+    "},",
+    paste0('"', obs_aligned_file, '"'),
     "]"
   )
 
@@ -455,16 +460,368 @@ find_best_shift_icp = function(pred, obs) {
   time_taken = toc$toc - toc$tic
 
   # Return the best shift and the ancillary data
-  result = data.frame(shift_x = mean(shifts$x),
-                      shift_y = mean(shifts$y),
-                      n_trees_obs = n_trees_obs,
-                      time_taken = time_taken)
+  result = data.frame(
+    shift_x = mean(shifts$x),
+    shift_y = mean(shifts$y),
+    n_trees_obs = n_trees_obs,
+    time_taken = time_taken
+  )
 
   row.names(result) = NULL
 
   # Return the best shift
   return(result)
+}
 
+transform_points_by_homography = function(xy_mat, homography) {
+  #' Transforms a set of points by a homography.
+  #' xy_mat: a (n_points, 2) matrix of data to
+  #' homography: a (3, 3) matrix following the conventions of a 2d homography
+  #'
+  #' Returns: the (n_points, 2) transformed points
+  homogenous_xy_mat = cbind(xy_mat, rep(1, nrow(xy_mat)))
+  transformed_xy_mat = t(homography %*% t(homogenous_xy_mat))
+  transformed_xy_mat = transformed_xy_mat[, 1:2]
+  return(transformed_xy_mat)
+}
+
+# Implementation of the following MATLAB function
+# https://gitlab.com/fgi_nls/public/2d-registration/-/blame/main/fit_euclidean_transformation.m?ref_type=heads#L231
+compute_feature_descriptors = function(xy_mat, R_local) {
+  xy_mat = as.matrix(xy_mat)[, 1:2]
+  # Convert the pairwise distances between each row
+  pdist = dist(xy_mat, method = "euclidean")
+  # Convert from a dist object into a matrix
+  pdist = as.matrix(pdist)
+  # Set the diagnal entries to the the max value. This ensures that the closest matching point
+  # for a given point is not itself.
+  diag(pdist) = max(pdist)
+  # Finding the closest neighboring point for each point
+  # Invert the sign so we can use max.col
+  indices_of_closest_points = max.col(-pdist)
+
+  # Coordinates of the closest neighboring point for each of the point
+  closest_points = xy_mat[indices_of_closest_points]
+  # For each point, compute the normalized characteristic directions that
+  # are locally used as the 1st axis direction.
+
+  char_dirs = closest_points - xy_mat
+  distances = sqrt(char_dirs[, 1]^2 + char_dirs[, 2]^2)
+  char_dirs = char_dirs / distances
+
+  # Directions perpendicular to the characteristic directions. These are
+  # used as the local 2nd axis direction.
+  char_dirs_perp = cbind(-1 * char_dirs[, 2], char_dirs[, 1])
+
+
+  # For each point, we transform the coordinates of the other points
+  # into the local coordinate frame of the given point We denote the
+  # coordinate along the 1st axis direction by v and the coordinate along
+  # the 2nd axis direction by w. In the matrices below, the element at row
+  # i and column j means the coordinate of the jth object in the local
+  # coordinate frame of the ith object.
+
+  # Define intermediate variables
+  x_values = xy_mat[, 1]
+  y_values = xy_mat[, 2]
+
+  n_points = nrow(xy_mat)
+  x_tiled = matrix(rep(t(x_values), n_points), ncol = n_points)
+  y_tiled = matrix(rep(t(y_values), n_points), ncol = n_points)
+  x_minus_x_transposed = x_tiled - t(x_tiled)
+  y_minus_y_transposed = y_tiled - t(y_tiled)
+
+
+  v_mat = (
+    (x_minus_x_transposed * char_dirs[, 1])
+    + (y_minus_y_transposed * char_dirs[, 2])
+  )
+  w_mat = (
+    (x_minus_x_transposed * char_dirs_perp[, 1])
+    + (y_minus_y_transposed * char_dirs_perp[, 2])
+  )
+
+  # Use atan2 to compute the angles with respect to the characteristic
+  # directions. The angles are in the range [-pi, pi]
+  # TODO check if this atan2 has the same conventions as expected
+  angle_mat = atan2(w_mat, v_mat)
+
+  # For each object, we then need to find the closest object in each of the
+  # four quadrants corresponding to angles (0, pi/2), (pi/2, pi), (-pi, -pi/2),
+  # (-pi/2, 0).
+  eps = 10^(-6) # used to exclude the closest object from the 1st/4th quadrant
+
+  # Bounds for the quadrants
+  lower_bounds = c(eps, pi / 2, -pi, -pi / 2)
+  upper_bounds = c(pi / 2, pi, -pi / 2, -eps)
+
+  # Pre-allocating the feature descriptor matrix
+  feat_desc_mat = matrix(data = 0, nrow = n_points, ncol = 8)
+
+  for (i_quadrant in 1:4) {
+    lower_bound = lower_bounds[i_quadrant]
+    upper_bound = upper_bounds[i_quadrant]
+    quadrant_i_mat = angle_mat > lower_bound & angle_mat <= upper_bound
+
+    # Construct a matrix marking objects not belonging to the current
+    # quadrant with large values
+    not_quadrant_i_mat = matrix(0, nrow = n_points, ncol = n_points)
+    not_quadrant_i_mat[quadrant_i_mat == FALSE] = max(pdist) + eps
+
+    # For each object, find the closest object within the current quadrant
+    summed_matrices = pdist + not_quadrant_i_mat
+    idx_closest_i = as.matrix(apply(summed_matrices, 2, which.min))
+    min_dist_i = as.matrix(summed_matrices[cbind(1:n_points, idx_closest_i)])
+    # For each object, determine the angle of the closest object in the
+    # current quadrant w.r.t. the characteristic direction.
+    angle_closest_quad_i = as.matrix(
+      angle_mat[cbind(1:n_points, idx_closest_i)]
+    )
+    # Normalizing the distances and angles
+    min_dist_i_norm = min_dist_i / R_local
+    angle_quad_i_norm = (angle_closest_quad_i - lower_bound) / (pi / 2)
+    # If the min distance in a given quadrant is larger than R_local, we set
+    # the normalized distance and angle to -1.
+    min_dist_i_norm[min_dist_i > R_local] = -1
+    angle_quad_i_norm[min_dist_i > R_local] = -1
+    # Storing the normalized min distance and the angle to the pre-allocated
+    # feature descriptor matrix
+    feat_desc_mat[, i_quadrant] = min_dist_i_norm
+    feat_desc_mat[, i_quadrant + 4] = angle_quad_i_norm
+  }
+
+  char_theta = atan2(char_dirs[, 1], char_dirs[, 2])
+  return(list(feat_desc_mat = feat_desc_mat, char_theta = char_theta))
+}
+
+# function [from_idx2_to_closest_idx1, from_idx2_to_min_dist1, n_of_matches] ...
+get_closest_pairs_after_transformation = function(xy_mat1, xy_mat2, R_mat, t_vect, r_thres) {
+  # Helper function for obtaining a mapping from each object in dataset 2 to the
+  # index of the closest object in dataset 1 after transforming the object
+  # locations in dataset 1 as R_mat*xy_mat1' + t_vect.
+  # The function also evaluates the number of matching pairs by finding the
+  # the number of closest object pairs, for which the pair-wise distance is below
+  # r_thres.
+  #
+  # Args:
+  #   xy_mat1 = (x,y)-coordinates of objects (e.g. trees) found from point
+  #             cloud 1 as a N1-by-2 matrix. (N1=number of rows, 2= number of
+  #             columns)
+  #   xy_mat2 = (x,y)-coordinates of objects (e.g. trees) found from point
+  #             cloud 2 as N2-by-2 matrix
+  #   R_mat = 2-by-2 rotation matrix of the transformation
+  #   t_vect = 2-by-1 column vector corresponding to the translation vector
+  #           of the transformation
+  #   r_thres = distance threshold for deciding if the closest object in the
+  #           other point cloud is a match
+  # Returns:
+  #   from_idx2_to_closest_idx1 = N2-by-1 vector containing the indices of the closest
+  #           object in dataset 1 for each object in dataset 2.
+  #   from_idx2_to_min_dist1 = N2-by-1 vector containing the distances to the closest
+  #           object in dataset 1 for each object in dataset 2.
+  #   n_of_matches = number of matching object pairs based on r_thres.
+  xy_mat1 = as.matrix(xy_mat1)
+  xy_mat2 = as.matrix(xy_mat2)
+  colnames(xy_mat2) = NULL
+  xy_mat1_t = t(xy_mat1)
+  rotated_xy1 = t(R_mat %*% xy_mat1_t)
+  t_vect = as.vector(as.numeric(t_vect))
+  xy_mat1_transformed = t(t(rotated_xy1) + t_vect) # N-by-2
+  # Pair-wise locations between each object in dataset 1 and 2. Each row is
+  # one object in dataset 2 and each column in one object in dataset 1.
+  transformed_loc_p_dist = cdist(xy_mat2, xy_mat1_transformed)
+  # Finding the closest object in transformed point cloud 1 for each object
+  # in point cloud 2
+  from_idx2_to_closest_idx1 = apply(transformed_loc_p_dist, 1, which.min)
+  from_idx2_to_min_dist1 = transformed_loc_p_dist[
+    cbind(1:nrow(transformed_loc_p_dist), from_idx2_to_closest_idx1)
+  ]
+
+  # Computing the number of matches, i.e., object pairs whose distance is
+  # below the set criterion
+  less_than_thresh = from_idx2_to_min_dist1 < r_thres
+  n_of_matches = sum(less_than_thresh)
+
+  return(
+    list(
+      from_idx2_to_closest_idx1 = from_idx2_to_closest_idx1,
+      from_idx2_to_min_dist1 = from_idx2_to_min_dist1,
+      n_of_matches = n_of_matches
+    )
+  )
+}
+
+
+# Implementation of the following MATLAB function
+# https://gitlab.com/fgi_nls/public/2d-registration/-/blob/main/fit_euclidean_transformation.m?ref_type=heads
+find_best_shift_hyyppa = function(pred, obs, R_local = 10, k = 20, r_thresh = 1.0, max_iters = 200) {
+  # Rename the variables for consistency with the reference code and remove unneeded columns
+  xy_mat1 = pred[, c("x", "y")]
+  xy_mat2 = obs[, c("x", "y")]
+
+  # Centering the coordinates before matching to improve numerical stability
+  xy_mat1_mean = colMeans(xy_mat1[, c("x", "y")])
+  xy_mat2_mean = colMeans(xy_mat2[, c("x", "y")])
+  # The double transpose seems to be the easiest way to broadcast subtraction
+  # given the recycling rules
+  xy_mat1 = t(t(xy_mat1) - xy_mat1_mean)
+  xy_mat2 = t(t(xy_mat2) - xy_mat2_mean)
+
+  # Number of objects detected from each point cloud
+  N_objects_vect = c(nrow(xy_mat1), nrow(xy_mat2))
+
+  if (N_objects_vect[2] < k) {
+    k = N_objects_vect[2]
+    msg = paste0(
+      "Number of objects in dataset 2 (and thus the potential number of matches) ",
+      "is smaller than given parameter k. k was set to ",
+      N_objects_vect[2]
+    )
+    # TODO make this a warning
+    print(msg)
+  }
+
+  # First, we construct the feature descriptor for each object in each of
+  # the point clouds.
+  feature_info1 = compute_feature_descriptors(xy_mat1, R_local)
+  feature_info2 = compute_feature_descriptors(xy_mat2, R_local)
+  # Extract out the components of the result
+  feat_desc_mat1 = feature_info1$feat_desc_mat
+  char_thetas1 = feature_info1$char_theta
+  feat_desc_mat2 = feature_info2$feat_desc_mat
+  char_thetas2 = feature_info2$char_theta
+
+  # Compute a matrix of pairwise distances between feature
+  # descriptors of the two point clouds -> rows correspond to objects detected
+  # from the point cloud 2 and columns correspond to objects detected from
+  # the point cloud 1.
+  feat_desc_pdist = cdist(feat_desc_mat2, feat_desc_mat1)
+
+  # Find the index per row with the lowest value
+  nn_indices = apply(feat_desc_pdist, 1, which.min)
+  lowest_dists = feat_desc_pdist[cbind(1:N_objects_vect[2], nn_indices)]
+
+  # Now find the second nearest index for each point in the first point cloud
+  # Mask out the first highest value.
+  # Note this must be done after extracting the distances
+  feat_desc_pdist[cbind(1:N_objects_vect[2], nn_indices)] = NA
+  # Find the closest remaining value
+  second_nearest_inds = apply(feat_desc_pdist, 1, which.min)
+  second_lowest_dists = feat_desc_pdist[
+    cbind(1:N_objects_vect[2], second_nearest_inds)
+  ]
+
+  # Sorting the nearest neighbor distance ratios so that we can rank the
+  # tentative matches from most reliable to least reliable
+  NNDR_vect = lowest_dists / second_lowest_dists
+  sorted_indices = sort(NNDR_vect, index.return = TRUE, decreasing = FALSE)$ix
+
+  # Then, we consider the k most promising tentative matches
+  max_n_of_matches = 0 # maximum number of matching objects
+  ## Initializing the parameters for the transformation of the best match.
+  t_best = c(0, 0)
+  theta_best = 0
+  idx_matches1_best = c() # indices of matching objects in point cloud 1
+  idx_matches2_best = c() # indices of matching objects in point cloud 2
+
+  if (length(sorted_indices) < k) {
+    k = length(sorted_indices)
+    warning("Not enough valid correspondences, setting k to ", k)
+  }
+
+  # Indices for each element in the second set
+  indices2 = 1:N_objects_vect[2]
+  for (i_iter in 1:k) {
+    # indices of objects corresponding to the current tentative match
+    idx_object_2 = sorted_indices[i_iter]
+    idx_object_1 = nn_indices[idx_object_2]
+
+    # Characteristic directions corresponding to these objects
+    char_theta1 = char_thetas1[idx_object_1]
+    char_theta2 = char_thetas2[idx_object_2]
+
+    # TODO figure out if this is the right convention
+    delta_theta = char_theta2 - char_theta1
+    # The corresponding rotation matrix, in column major order
+    R_mat = matrix(
+      as.numeric(
+        c(cos(delta_theta), sin(delta_theta), -sin(delta_theta), cos(delta_theta))
+      ),
+      nrow = 2,
+      ncol = 2
+    )
+
+    # Computing the translation vector based on the object locations in the two point
+    # clouds
+    xy_1 = xy_mat1[idx_object_1, c("x", "y")] # row vect.
+    xy_2 = xy_mat2[idx_object_2, c("x", "y")] # row vect.
+    # TODO ensure that matrix-vector multiplication works as expected
+    xy1_t_vec = as.vector(as.numeric(xy_1))
+    rotated_xy1 = R_mat %*% xy1_t_vec
+    t_vect = (xy_2 - rotated_xy1) # column vector
+
+    # For each object in point cloud 2, we find the closest object in the
+    # point cloud 1 after using the estimated transformation. We also compute
+    # the number of matches, i.e., object pairs whose distance is below the
+    # set criterion
+    res = get_closest_pairs_after_transformation(
+      xy_mat1, xy_mat2, R_mat, t_vect, r_thresh
+    )
+    from_idx2_to_closest_idx1 = res[[1]]
+    from_idx2_to_min_dist1 = res[[2]]
+    n_of_matches = res[[3]]
+
+    if (n_of_matches > max_n_of_matches) {
+      max_n_of_matches = n_of_matches
+
+      idx_matches2_best = indices2[from_idx2_to_min_dist1 < r_thresh]
+      idx_matches1_best = from_idx2_to_closest_idx1[idx_matches2_best]
+
+      t_best = t_vect
+      theta_best = delta_theta
+    }
+  }
+  # Compose the steps to recover the final transform since the computation occured on shifted data
+  # It's going to be something like subtract mean of xy_1, then apply the R|t matrix, then add the mean of xy2
+  subtract_xy1_mean = matrix(
+    as.numeric(
+      c(1, 0, -xy_mat1_mean[[1]], 0, 1, -xy_mat1_mean[[2]], 0, 0, 1)
+    ),
+    nrow = 3,
+    ncol = 3,
+    byrow = TRUE
+  )
+  transform_by_R_t = matrix(
+    as.numeric(
+      c(
+        cos(theta_best), -sin(theta_best), t_best[1],
+        sin(theta_best), cos(theta_best), t_best[2],
+        0, 0, 1
+      )
+    ),
+    nrow = 3,
+    ncol = 3,
+    byrow = TRUE,
+  )
+  add_xy2_mean = matrix(
+    as.numeric(c(1, 0, xy_mat2_mean[[1]], 0, 1, xy_mat2_mean[[2]], 0, 0, 1)),
+    nrow = 3,
+    ncol = 3,
+    byrow = TRUE
+  )
+
+  # Find the 3x3 matrix representing the transformation
+  composite_transform = add_xy2_mean %*% transform_by_R_t %*% subtract_xy1_mean
+
+  # Extract the elements of the matrix into a flat data frame
+  result = data.frame(
+    x_shift = composite_transform[1, 3],
+    y_shift = composite_transform[2, 3],
+    scale = sqrt(det(composite_transform[1:2, 1:2])), # TODO Check that this is correct
+    rotation = atan2(composite_transform[2, 1], composite_transform[1, 1])
+  )
+
+  return(result)
 }
 
 # Generate one pair of random tree maps (pred and observed) with observed shifted a known amt, test
@@ -593,9 +950,12 @@ vis1 = function(trees) {
 # on the observed trees, with some buffer. Assumes the observed tree map is 50 x 50 and that both
 # tree maps are centered at 0,0.
 #' @export
-vis2 = function(pred, obs, obs_foc = FALSE, coords_arbitrary = FALSE, zoom_to_obs = FALSE, obs_buffer = 75) {
+vis2 = function(pred, obs, shift=c(0, 0), obs_foc = FALSE, coords_arbitrary = FALSE, zoom_to_obs = FALSE, obs_buffer = 75) {
   pred = pred |> dplyr::mutate(layer = "predicted")
   obs = obs |> dplyr::mutate(layer = "observed")
+
+  # Shift the values. Will not change the data with the default shift
+  pred = pred |> dplyr::mutate(x = x + shift[1], y = y + shift[2])
 
   trees = dplyr::bind_rows(pred, obs)
 
