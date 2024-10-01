@@ -110,7 +110,7 @@ crop_pred_to_obs = function(pred, obs) {
 
 
 # Objective function: the mean x,y,z distance between each observed tree and its nearest predicted
-# tree. Note that obs_bound is not used by this objective function logic, but it needs to be included for compatibility with objective functions that do require it.
+# tree. Note that obs_bounds is not used by this objective function logic, but it needs to be included for compatibility with objective functions that do require it.
 #' @export
 obj_mean_dist_to_closest = function(pred, obs, ...) {
   # Crop the predicted points to the x-y extent of the observed points +- 25%, so we don't waste
@@ -139,8 +139,8 @@ obj_mee_matching = function(pred, obs, obs_bounds) {
   pred_crop = crop_pred_to_obs(pred, obs)
 
   # Prep predicted and observed tree maps for comparison
-  obs_prepped = prep_obs_map(obs, obs_bounds = obs_bounds, edge_buffer = 5)
-  pred_prepped = prep_pred_map(pred_crop, obs_bounds = obs_bounds, edge_buffer = 5)
+  obs_prepped = prep_obs_map(obs, obs_bound = obs_bounds, edge_buffer = 5)
+  pred_prepped = prep_pred_map(pred_crop, obs_bound = obs_bounds, edge_buffer = 5)
 
   # Match predicted and observed trees, following logic in MEE paper, and compute the match stats
 
@@ -167,7 +167,7 @@ obj_mee_matching = function(pred, obs, obs_bounds) {
 # Test a given x-y shift and compute the objective function for it, using the objective
 # function supplied to it
 # transform_params: contains (in order): x_shift, y_shift
-eval_shift = function(transform_params, pred, obs, obs_bound, objective_fn, visualize = FALSE) {
+eval_shift = function(transform_params, pred, obs, obs_bounds, objective_fn, visualize = FALSE) {
 
   obs_shifted = obs |>
     dplyr::mutate(x = obs$x + transform_params[[1]], y = obs$y + transform_params[[2]])
@@ -175,10 +175,10 @@ eval_shift = function(transform_params, pred, obs, obs_bound, objective_fn, visu
   # Shift the obs bound by the same amount the obs tree map is being shifted
   shift_df = data.frame(x = transform_params[[1]], y = transform_params[[2]])
   shift_geom = sf::st_as_sf(shift_df, coords = c("x", "y"))
-  obs_bound_shifted = obs_bounds + shift_geom
-  obs_bound_shifted = sf::st_as_sf(obs_bound_shifted, crs = sf::st_crs(obs_bounds))
+  obs_bounds_shifted = obs_bounds + shift_geom
+  obs_bounds_shifted = sf::st_as_sf(obs_bounds_shifted, crs = sf::st_crs(obs_bounds))
 
-  objective = objective_fn(pred, obs_shifted, obs_bound_shifted)
+  objective = objective_fn(pred, obs_shifted, obs_bounds_shifted)
 
   if (visualize){
     vis2(pred, obs, shift=transform_params)
@@ -955,7 +955,7 @@ make_map_and_align = function(method, ...) {
   # Find the optimal shift, unparallelized because it is more efficient to parallelize over multiple
   # runs of the current function
   result = find_best_shift(sim$pred, sim$obs,
-    obs_bounds = sim$obs_bound,
+    obs_bounds = sim$obs_bounds,
     method = method, parallel = FALSE
   )
 
