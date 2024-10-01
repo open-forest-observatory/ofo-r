@@ -162,7 +162,7 @@ match_obs_to_pred_mee = function(obs, pred, search_distance_fun_intercept, searc
     stop("The observed and predicted tree maps are not in the same UTM zone.")
   }
 
-  dist_mat <- sf::st_distance(obs, pred) |> units::drop_units()
+  dist_mat <- sf::st_distance(obs, pred) |> drop_units_if_present() # To remove units if present
 
   colnames(dist_mat) = pred$pred_tree_id
   rownames(dist_mat) = obs$obs_tree_id

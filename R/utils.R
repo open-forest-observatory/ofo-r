@@ -5,3 +5,11 @@ create_dir <- function(dir) {
     dir.create(dir, recursive = TRUE)
   }
 }
+
+drop_units_if_present = function(x) {
+  if (inherits(x, "units")) {
+    return(x |> drop_units())
+  } else {
+    return(x)
+  }
+}
