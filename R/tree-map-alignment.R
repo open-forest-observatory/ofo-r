@@ -954,10 +954,8 @@ vis2 = function(pred, obs, shift=c(0, 0), obs_foc = FALSE, coords_arbitrary = FA
   pred = pred |> dplyr::mutate(layer = "predicted")
   obs = obs |> dplyr::mutate(layer = "observed")
 
-  if (!identical(shift, c(0, 0))) {
-    pred = pred |> dplyr::mutate(x = x + shift[1], y = y + shift[2])
-  }
-
+  # Shift the values. Will not change the data with the default shift
+  pred = pred |> dplyr::mutate(x = x + shift[1], y = y + shift[2])
 
   trees = dplyr::bind_rows(pred, obs)
 
