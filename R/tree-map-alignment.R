@@ -670,7 +670,7 @@ get_closest_pairs_after_transformation = function(xy_mat1, xy_mat2, R_mat, t_vec
 
 # Implementation of the following MATLAB function
 # https://gitlab.com/fgi_nls/public/2d-registration/-/blob/main/fit_euclidean_transformation.m?ref_type=heads
-find_best_shift_hyyppa = function(pred, obs, R_local = 10, k = 20, r_thresh = 1.0, max_iters = 200) {
+find_best_shift_hyyppa = function(pred, obs, R_local = 10, k = 20, r_thresh = 1.0, max_iters = 200, obs_bounds = NULL) {
   # Rename the variables for consistency with the reference code and remove unneeded columns
   xy_mat1 = pred[, c("x", "y")]
   xy_mat2 = obs[, c("x", "y")]
@@ -787,7 +787,7 @@ find_best_shift_hyyppa = function(pred, obs, R_local = 10, k = 20, r_thresh = 1.
     from_idx2_to_min_dist1 = res[[2]]
     n_of_matches = res[[3]]
 
-    if (n_of_matches > max_n_of_matches) {
+    if (!is.null(n_of_matches) && n_of_matches > max_n_of_matches) {
       max_n_of_matches = n_of_matches
 
       idx_matches2_best = indices2[from_idx2_to_min_dist1 < r_thresh]
@@ -831,8 +831,8 @@ find_best_shift_hyyppa = function(pred, obs, R_local = 10, k = 20, r_thresh = 1.
 
   # Extract the elements of the matrix into a flat data frame
   result = data.frame(
-    x_shift = composite_transform[1, 3],
-    y_shift = composite_transform[2, 3],
+    shift_x = composite_transform[1, 3],
+    shift_y = composite_transform[2, 3],
     scale = sqrt(det(composite_transform[1:2, 1:2])), # TODO Check that this is correct
     rotation = atan2(composite_transform[2, 1], composite_transform[1, 1])
   )
@@ -840,12 +840,21 @@ find_best_shift_hyyppa = function(pred, obs, R_local = 10, k = 20, r_thresh = 1.
   return(result)
 }
 
+create_parameter_grid = function(parameter_list, n_random_samples = NULL) {
+  param_grid = expand.grid(parameter_list)
+  if (!is.null(n_random_samples) && n_random_samples < nrow(param_grid)) {
+    param_grid = param_grid[sample(nrow(param_grid), n_random_samples), ]
+  }
+  return(param_grid)
+}
+
 big_testing_function = function(
     map_params,
     registration_methods,
     eval_function,
     per_method_registration_arguments = NULL,
-    registration_method_names = NULL) {
+    registration_method_names = NULL,
+    n_random_samples = NULL) {
   # Get the names of all arguments of the function and their default values
   simulate_tree_maps_default_args = formals(simulate_tree_maps)
 
@@ -867,7 +876,7 @@ big_testing_function = function(
     }
   }
   # Create the cross product of all parameter configurations
-  all_map_param_configurations = expand.grid(all_map_params)
+  all_map_param_configurations = create_parameter_grid(all_map_params, n_random_samples = n_random_samples)
   # Randomize the order so it's more likely that we hit errors early if they exist
   all_map_param_configurations = all_map_param_configurations[
     sample(nrow(all_map_param_configurations)),
@@ -875,7 +884,7 @@ big_testing_function = function(
 
   # Create names for each method if not provided
   if (is.null(registration_method_names)) {
-    registration_method_names = as.character(1:length(registration_methods))
+    registration_method_names = as.character(seq_along(registration_methods))
   }
   # Raise error if the list of names isn't the same length as the list of methods
   # This should only happen if a list is provided but it is spurious
