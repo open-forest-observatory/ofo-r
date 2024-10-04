@@ -1,5 +1,16 @@
 create_parameter_grid = function(parameter_list, n_random_samples = NULL) {
+  #' Create a grid search of parameters and optionally take a random subset
+  #'
+  #' @param parameter_list A named list of parameters. Each element is either a list of values or a single value
+  #' @param n_random_samples How many samples to draw from the cross product list. If NULL, all elements will be taken
+  #'
+  #' @return A dataframe where each row contains one value from each parameter drawn from the list
+
+  # Create the cross product of all elements in the list. The column names will be taken from the
+  # names in the list
   param_grid = expand.grid(parameter_list)
+
+  # Take a random sampling of rows if requested and the number is lower than the number of rows
   if (!is.null(n_random_samples) && n_random_samples < nrow(param_grid)) {
     param_grid = param_grid[sample(nrow(param_grid), n_random_samples), ]
   }
@@ -8,6 +19,15 @@ create_parameter_grid = function(parameter_list, n_random_samples = NULL) {
 
 
 compute_metric_per_trial = function(results_df, eval_function, params_df = NULL) {
+  #' Compute a scalar metric from each trial of an experiment.
+  #'
+  #' @param results_df A table of results, one row per trial
+  #' @param eval_function A function to evaluate each row, using the result and (optionally-null) parameters
+  #' @param params_df An optionally-null dataframe of paramters, one row per trial
+  #'
+  #' @return The list of metric values, one per row
+  #' The eval_function is run on the corresponding pairs of rows from results_df and params_df
+
   # List of metrics from each run
   metric_values = list()
   # Iterate over all trials and compute the metric for each
@@ -33,7 +53,18 @@ visualize_metric_vs_1_parameter = function(
     parameter_df,
     attributes_to_visualize,
     eval_function,
-    smoothing_bandwidth = 5) {
+    smoothing_bandwidth = 5,
+    title = "") {
+  #' Visualize one metric versus one or more paramter values
+  #'
+  #' @param results_df The results of trials, one per row
+  #' @param paramter_df The paramters used to generate the results, one row per trial
+  #' @param attributes_to_visualize Which paramters to visualize the metrics versus
+  #' @param eval_function How to evalute the quality of the result
+  #' @param smoothing_bandwidth Width of the kernel used to smooth the trend line. May be a scalar or one value per attribute being visualized.
+  #' @param title Title of the plot
+
+
   # Compute the metric values for each row in the results
   metric_values = compute_metric_per_trial(
     results_df = results_df,
@@ -41,20 +72,36 @@ visualize_metric_vs_1_parameter = function(
     params_df = parameter_df
   )
 
-  for (attribute in attributes_to_visualize) {
+  # If the bandwidth is a single value, duplicate it to the number of attributes being visualized
+  if (!is.vector(smoothing_bandwidth) || length(smoothing_bandwidth) == 1) {
+    smoothing_bandwidth = rep(smoothing_bandwidth, length(attributes_to_visualize))
+  }
+
+  # Visualize each attribute
+  for (i in seq_along(attributes_to_visualize)) {
     # Create a data frame containing the attribute in question and the metric values
+    attribute = attributes_to_visualize[i]
     df = data.frame(
       x = as.numeric(parameter_df[, attribute]),
       y = as.numeric(metric_values)
     )
+    # Create a smooth trend line using a smoothing kernel
     smooth_trend_line = as.data.frame(
-      ksmooth(df$x, df$y, kernel = "normal", bandwidth = smoothing_bandwidth, n.points = 100)
+      ksmooth(
+        df$x,
+        df$y,
+        kernel = "normal",
+        bandwidth = smoothing_bandwidth[[i]],
+        n.points = 100
+      )
     )
 
+    # Plot both the scatter plot and the smooth trend line
     p = ggplot2::ggplot(smooth_trend_line, ggplot2::aes(x = x, y = y)) +
       ggplot2::geom_line() +
       ggplot2::geom_point(data = df) +
-      ggplot2::labs(x = attribute, y = "metric value")
+      ggplot2::labs(x = attribute, y = "metric value") +
+      ggplot2::ggtitle(title)
     print(p)
   }
 }
@@ -62,10 +109,24 @@ visualize_metric_vs_1_parameter = function(
 test_tree_registration = function(
     map_params,
     registration_methods,
-    eval_function,
     per_method_registration_arguments = NULL,
     registration_method_names = NULL,
     n_random_samples = NULL) {
+  #' Test the different tree registration algorithms in a variety of situations
+  #'
+  #' @param map_params Named list. The names correspond to arguments to simulate_tree_maps. The values
+  #' correspond to potential values of this argument to be tried
+  #' @param registration_methods List of registration algorithms
+  #' @param per_method_registration_arguments A list of named lists, one for each registration method.
+  #' The arguments in each list will be passed to the corresponding function
+  #' @param registration_method_names The human-readable names for each method
+  #' @param n_random_samples The number of random samples to draw from the grid of paramters
+  #'
+  #' @returns Named list with the following fields
+  #'   per_method_results: Named list, where each name is from registration_method_names. The value is a data
+  #'     frame of results from the experiments using that method.
+  #'   all_map_param_configurations: Dataframe of paramters used in experiments, one row per trial
+
   # Get the names of all arguments of the function and their default values
   simulate_tree_maps_default_args = formals(simulate_tree_maps)
 
@@ -140,10 +201,10 @@ test_tree_registration = function(
     }
   }
 
-  # RBind each list of lists into a dataframe
+  # Concatenate each row into a single dataframe
   for (registration_method_name in registration_method_names) {
-    per_method_results[[registration_method_name]] = do.call(
-      rbind, per_method_results[[registration_method_name]]
+    per_method_results[[registration_method_name]] = as.data.frame(
+      dplyr::bind_rows(per_method_results[[registration_method_name]])
     )
   }
 
@@ -154,17 +215,4 @@ test_tree_registration = function(
       all_map_param_configurations = all_map_param_configurations
     )
   )
-  # Takes in
-  ## parameter ranges (or lists) for a variety of attributes of the map
-  ## potentially-multiple algorithms to test on the same datasets
-  ## convergence criteria or a convergence metric
-
-  # Create a cross product or sampling thereof from the map parameter space
-  ## If there aren't enough rows, redraw that configuration
-  # Run each of the algorithms on each of the maps
-  # Compute the metric for each run
-  # Plot the results, sliced by different metrics
-  ## Probably do a scatter plot for each repetition of a given configuration
-  ## Or average across all other params except for the one you are slicing by
-  ## Or just return data frame
 }
