@@ -1,5 +1,5 @@
 ---
-title: "Evaluating tree registration"
+title: "Evaluating tree alignment"
 author: "David Russell"
 format: html
 editor: visual
@@ -7,7 +7,7 @@ editor: visual
 
 ## Purpose
 
-There are various approaches to tree registration. The goal of this notebook is to conduct a direct comparison between them. The user can control the types of errors present in the initial registration and define a function that evaluates the quality of the predicted registration. Then, this code runs a set of experiments where a simulated tree alignment problem is generated, each algorithm is run on it, and the results are scored.
+There are various approaches to tree alignment. The goal of this notebook is to conduct a direct comparison between them. The user can control the types of errors present in the initial alignment and define a function that evaluates the quality of the predicted alignment. Then, this code runs a set of experiments where a simulated tree alignment problem is generated, each algorithm is run on it, and the results are scored.
 
 ## Setup
 
@@ -18,15 +18,15 @@ library(devtools)
 devtools::load_all()
 ```
 
-## Define the registration algorithms to compare
+## Define the alignment algorithms to compare
 
 ```{r}
 # The actual functions that take in a predicted and observed tree map and output a transform between them
-REGISTRATION_METHODS = c(find_best_shift, find_best_shift)
+ALIGNMENT_METHODS = c(find_best_shift, find_best_shift)
 # Additional arguments that are provided to these functions to control their behavior
-PER_METHOD_REGISTRATION_ARGUMENTS = list(list(method="optim"), list(method="grid"))
+PER_METHOD_ALIGNMENT_ARGUMENTS = list(list(method="optim"), list(method="grid"))
 # The name of these methods for visualization
-REGISTRATION_METHOD_NAMES = c("find_best_shift_optim", "find_best_shift_grid")
+ALIGNMENT_METHOD_NAMES = c("find_best_shift_optim", "find_best_shift_grid")
 ```
 
 # Define the experiments to run
@@ -46,39 +46,40 @@ N_RANDOM_SAMPLES = 20
 
 ## Run experiments
 
-Conduct all the registration trials with the set of starting configurations and multiple algorithms.
+Conduct all the alignment trials with the set of starting configurations and multiple algorithms.
 
 ```{r}
-all_registration_results = test_tree_registration(
+all_alignment_results = test_tree_map_alignment(
  map_params = MAP_PARAMS,
- registration_methods = REGISTRATION_METHODS,
- registration_method_names = REGISTRATION_METHOD_NAMES,
- per_method_registration_arguments = PER_METHOD_REGISTRATION_ARGUMENTS,
+ alignment_methods = ALIGNMENT_METHODS,
+ alignment_method_names = ALIGNMENT_METHOD_NAMES,
+ per_method_alignment_arguments = PER_METHOD_ALIGNMENT_ARGUMENTS,
  n_random_samples = N_RANDOM_SAMPLES
 )
 ```
 
 ## Define evaluation functions
 
-These are used only to visualize the results. They take the true and predicted registration values and use them to compute a scalar metric representing the quality.
+These are used only to visualize the results. They take the true and predicted alignment values and use them to compute a scalar metric representing the quality.
 
 ```{r}
 # Return the euclidian distance between the predicted and true shift
 eval_res_dist = function(predicted_shift, map_config){
-  pred_shift_vec = as.numeric(list(x=predicted_shift$shift_x, y=predicted_shift$shift_y))
+  pred_shift_vec = c(predicted_shift$shift_x, predicted_shift$shift_y)
   # TODO figure out one convention so we don't have to keep negating this
   pred_shift_vec = -1 * pred_shift_vec
 
-  map_shift = as.numeric(list(x = map_config$shift_x, y = map_config$shift_y))
-  #cat("pred: ", pred_shift_vec, "map: ", map_shift, "\n")
+  map_shift = c(map_config$shift_x, map_config$shift_y)
+  # Compute the diffrence between the real and predicted shifts
   diff = pred_shift_vec - map_shift
+  # Compute the Euclidean distance from this difference
   dist = norm(as.matrix(diff), type="2")
   return(dist)
 }
 
 # Determine whether the distance is less than the threshold value. Since lower is better
-# for the other metric, the same is here, with 0 representing suffient registration and 1
-# representing a bad match 
+# for the other metric, the same is here, with 0 representing suffient alignment and 1
+# representing a bad match
 eval_res_threshold = function(predicted_shift, map_config, threshold = 3){
   # Compute the distance
   dist = eval_res_dist(predicted_shift = predicted_shift, map_config = map_config)
@@ -98,8 +99,8 @@ Show the fraction of results that converged for a given parameter value. Note th
 ```{r}
 # Optimization
 visualize_metric_vs_1_parameter(
-  results_df = all_registration_results$per_method_results$find_best_shift_optim,
-  parameter_df = all_registration_results$all_map_param_configurations,
+  results_df = all_alignment_results$per_method_results$find_best_shift_optim,
+  parameter_df = all_alignment_results$all_map_param_configurations,
   attributes_to_visualize = c("shift_x", "horiz_jitter"),
   eval_function = eval_res_threshold,
   smoothing_bandwidth = c(10,2),
@@ -108,8 +109,8 @@ visualize_metric_vs_1_parameter(
 
 # Grid search
 visualize_metric_vs_1_parameter(
-  results_df = all_registration_results$per_method_results$find_best_shift_grid,
-  parameter_df = all_registration_results$all_map_param_configurations,
+  results_df = all_alignment_results$per_method_results$find_best_shift_grid,
+  parameter_df = all_alignment_results$all_map_param_configurations,
   attributes_to_visualize = c("shift_x", "horiz_jitter"),
   eval_function = eval_res_threshold,
   smoothing_bandwidth = c(10,2),
@@ -117,13 +118,13 @@ visualize_metric_vs_1_parameter(
 )
 ```
 
-Show the registration error versus parameter values. Lower is better.
+Show the alignment error versus parameter values. Lower is better.
 
 ```{r}
 # Optimization
 visualize_metric_vs_1_parameter(
-  results_df = all_registration_results$per_method_results$find_best_shift_optim,
-  parameter_df = all_registration_results$all_map_param_configurations,
+  results_df = all_alignment_results$per_method_results$find_best_shift_optim,
+  parameter_df = all_alignment_results$all_map_param_configurations,
   attributes_to_visualize = c("shift_x", "horiz_jitter"),
   eval_function = eval_res_dist,
   smoothing_bandwidth = c(10,2),
@@ -132,8 +133,8 @@ visualize_metric_vs_1_parameter(
 
 # Grid search
 visualize_metric_vs_1_parameter(
-  results_df = all_registration_results$per_method_results$find_best_shift_grid,
-  parameter_df = all_registration_results$all_map_param_configurations,
+  results_df = all_alignment_results$per_method_results$find_best_shift_grid,
+  parameter_df = all_alignment_results$all_map_param_configurations,
   attributes_to_visualize = c("shift_x", "horiz_jitter"),
   eval_function = eval_res_dist,
   smoothing_bandwidth = c(10,2),
