@@ -1,10 +1,10 @@
+#' Create a grid search of parameters and optionally take a random subset
+#'
+#' @param parameter_list A named list of parameters. Each element is either a list of values or a single value
+#' @param n_random_samples How many samples to draw from the cross product list. If NULL, all elements will be taken
+#'
+#' @return A dataframe where each row contains one value from each parameter drawn from the list
 create_parameter_grid = function(parameter_list, n_random_samples = NULL) {
-  #' Create a grid search of parameters and optionally take a random subset
-  #'
-  #' @param parameter_list A named list of parameters. Each element is either a list of values or a single value
-  #' @param n_random_samples How many samples to draw from the cross product list. If NULL, all elements will be taken
-  #'
-  #' @return A dataframe where each row contains one value from each parameter drawn from the list
 
   # Create the cross product of all elements in the list. The column names will be taken from the
   # names in the list
@@ -18,16 +18,15 @@ create_parameter_grid = function(parameter_list, n_random_samples = NULL) {
 }
 
 
+#' Compute a scalar metric from each trial of an experiment.
+#'
+#' @param results_df A table of results, one row per trial
+#' @param eval_function A function to evaluate each row, using the result and (optionally-null) parameters
+#' @param params_df An optionally-null dataframe of paramters, one row per trial
+#'
+#' @return The list of metric values, one per row
+#' The eval_function is run on the corresponding pairs of rows from results_df and params_df
 compute_metric_per_trial = function(results_df, eval_function, params_df = NULL) {
-  #' Compute a scalar metric from each trial of an experiment.
-  #'
-  #' @param results_df A table of results, one row per trial
-  #' @param eval_function A function to evaluate each row, using the result and (optionally-null) parameters
-  #' @param params_df An optionally-null dataframe of paramters, one row per trial
-  #'
-  #' @return The list of metric values, one per row
-  #' The eval_function is run on the corresponding pairs of rows from results_df and params_df
-
   # List of metrics from each run
   metric_values = vector()
   # Iterate over all trials and compute the metric for each
@@ -48,6 +47,15 @@ compute_metric_per_trial = function(results_df, eval_function, params_df = NULL)
   return(metric_values)
 }
 
+
+#' Visualize one metric versus one or more paramter values
+#'
+#' @param results_df The results of trials, one per row
+#' @param paramter_df The paramters used to generate the results, one row per trial
+#' @param attributes_to_visualize Which paramters to visualize the metrics versus
+#' @param eval_function How to evalute the quality of the result
+#' @param smoothing_bandwidth Width of the kernel used to smooth the trend line. May be a scalar or one value per attribute being visualized.
+#' @param title Title of the plot
 visualize_metric_vs_1_parameter = function(
     results_df,
     parameter_df,
@@ -55,16 +63,6 @@ visualize_metric_vs_1_parameter = function(
     eval_function,
     smoothing_bandwidth = 5,
     title = "") {
-  #' Visualize one metric versus one or more paramter values
-  #'
-  #' @param results_df The results of trials, one per row
-  #' @param paramter_df The paramters used to generate the results, one row per trial
-  #' @param attributes_to_visualize Which paramters to visualize the metrics versus
-  #' @param eval_function How to evalute the quality of the result
-  #' @param smoothing_bandwidth Width of the kernel used to smooth the trend line. May be a scalar or one value per attribute being visualized.
-  #' @param title Title of the plot
-
-
   # Compute the metric values for each row in the results
   metric_values = compute_metric_per_trial(
     results_df = results_df,
@@ -106,27 +104,27 @@ visualize_metric_vs_1_parameter = function(
   }
 }
 
+
+#' Test the different tree alignment algorithms in a variety of situations
+#'
+#' @param map_params Named list. The names correspond to arguments to simulate_tree_maps. The values
+#' correspond to potential values of this argument to be tried
+#' @param alignment_methods List of alignment algorithms
+#' @param per_method_alignment_arguments A list of named lists, one for each alignment method.
+#' The arguments in each list will be passed to the corresponding function
+#' @param alignment_method_names The human-readable names for each method
+#' @param n_random_samples The number of random samples to draw from the grid of paramters
+#'
+#' @returns Named list with the following fields
+#'   per_method_results: Named list, where each name is from alignment_method_names. The value is a data
+#'     frame of results from the experiments using that method.
+#'   all_map_param_configurations: Dataframe of paramters used in experiments, one row per trial
 test_tree_map_alignment = function(
     map_params,
     alignment_methods,
     per_method_alignment_arguments = NULL,
     alignment_method_names = NULL,
     n_random_samples = NULL) {
-  #' Test the different tree alignment algorithms in a variety of situations
-  #'
-  #' @param map_params Named list. The names correspond to arguments to simulate_tree_maps. The values
-  #' correspond to potential values of this argument to be tried
-  #' @param alignment_methods List of alignment algorithms
-  #' @param per_method_alignment_arguments A list of named lists, one for each alignment method.
-  #' The arguments in each list will be passed to the corresponding function
-  #' @param alignment_method_names The human-readable names for each method
-  #' @param n_random_samples The number of random samples to draw from the grid of paramters
-  #'
-  #' @returns Named list with the following fields
-  #'   per_method_results: Named list, where each name is from alignment_method_names. The value is a data
-  #'     frame of results from the experiments using that method.
-  #'   all_map_param_configurations: Dataframe of paramters used in experiments, one row per trial
-
   # Get the names of all arguments of the function and their default values
   simulate_tree_maps_default_args = formals(simulate_tree_maps)
 
