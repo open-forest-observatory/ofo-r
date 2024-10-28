@@ -46,12 +46,9 @@ extract_image_id = function(exif) {
 #' extract_datatime_local(exif)
 #'
 #' @export
-extract_datetime_local = function (exif) {
-
-  datetime_local = exif$capture_datetime
-
+extract_datetime_local = function(exif, candidate_columns = c("capture_datetime", "GPSDateTime")) {
+  datetime_local = extract_candidate_columns(st_drop_geometry(exif), candidate_columns)
   return(datetime_local)
-
 }
 
 #### lat and lon (Format: dd.dddddddd (EPSG:4326)) ####
@@ -121,20 +118,24 @@ extract_rtk_fix = function(exif) {
 #' @export
 
 extract_accuracy = function(exif) {
-
-  exif["RtkStdLon"[!("RtkStdLon" %in% colnames(exif))]] = NA
-
-  accuracy_x = exif$RtkStdLon
-
-  exif["RtkStdLat"[!("RtkStdLat" %in% colnames(exif))]] = NA
-
-  accuracy_y = exif$RtkStdLat
+  exif = st_drop_geometry(exif)
+  if ("GPSXYAccuracy" %in% colnames(exif)) {
+    accuracy_x = exif$GPSXYAccuracy
+    accuracy_y = exif$GPSXYAccuracy
+  } else {
+    exif["RtkStdLon"[!("RtkStdLon" %in% colnames(exif))]] = NA
+    exif["RtkStdLat"[!("RtkStdLat" %in% colnames(exif))]] = NA
+    accuracy_x = exif$RtkStdLon
+    accuracy_y = exif$RtkStdLat
+  }
 
   accuracy_x = round(accuracy_x, 4)
   accuracy_y = round(accuracy_y, 4)
 
-  ret = list(accuracy_x = accuracy_x,
-             accuracy_y = accuracy_y)
+  ret = list(
+    accuracy_x = accuracy_x,
+    accuracy_y = accuracy_y
+  )
 
   return(ret)
 }
@@ -154,21 +155,28 @@ extract_accuracy = function(exif) {
 #'
 #' @export
 
-extract_pitch_roll_yaw = function(exif) {
+extract_pitch_roll_yaw = function(exif,
+                                  candidate_pitch_cols = c("GimbalPitchDegree", "Pitch"),
+                                  candidate_roll_cols = c("GimbalRollDegree", "Roll"),
+                                  candidate_yaw_cols = c("GimbalYawDegree", "Yaw")) {
+  # Remove the geometry column since it can cause issues
+  exif = st_drop_geometry(exif)
+  camera_pitch = extract_candidate_columns(exif, candidate_pitch_cols)
+  camera_roll = extract_candidate_columns(exif, candidate_roll_cols)
+  camera_yaw = extract_candidate_columns(exif, candidate_yaw_cols)
 
-  camera_pitch = exif$GimbalPitchDegree + 90
+  # TODO should this be done in all cases?
+  camera_pitch = camera_pitch + 90
 
-  camera_roll = exif$GimbalRollDegree
-
-  camera_yaw = exif$GimbalYawDegree
-  
   camera_pitch = round(camera_pitch, 2)
   camera_roll = round(camera_roll, 2)
   camera_yaw = round(camera_yaw, 2)
 
-  pitch_roll_yaw = list(camera_pitch = camera_pitch,
-                        camera_roll = camera_roll,
-                        camera_yaw = camera_yaw)
+  pitch_roll_yaw = list(
+    camera_pitch = camera_pitch,
+    camera_roll = camera_roll,
+    camera_yaw = camera_yaw
+  )
 
   return(pitch_roll_yaw)
 }
@@ -294,9 +302,9 @@ extract_received_image_path = function(exif) {
 #' extract_altitude_asl(exif)
 #'
 #' @export
-extract_altitude_asl = function(exif) {
-
-  altitude_asl = exif$AbsoluteAltitude |> round()
+extract_altitude_asl = function(exif, candidate_asl_columns = c("AbsoluteAltitude", "GPSAltitude")) {
+  altitude_asl = extract_candidate_columns(st_drop_geometry(exif), candidate_asl_columns)
+  altitude_asl = round(altitude_asl)
 
   return(altitude_asl)
 }
@@ -353,5 +361,9 @@ extract_imagery_perimage_metadata = function(input,
   )
 
   return(metadata)
+}
 
+extract_candidate_columns = function(dataframe, candidate_columns) {
+  extracted_column = dplyr::coalesce(!!!dplyr::select(dataframe, dplyr::any_of(candidate_columns)))
+  return(extracted_column)
 }
