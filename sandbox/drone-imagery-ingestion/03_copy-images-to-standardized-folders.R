@@ -5,7 +5,7 @@
 
 library(tidyverse)
 
-IMAGERY_PROJECT_NAME = "2022-early-regen" # 2023-ny-ofo, 2022-early-regen
+IMAGERY_PROJECT_NAME = "2020-ucnrs" # 2023-ny-ofo, 2022-early-regen
 
 PROCESSED_EXIF_PATH = "/ofo-share/drone-imagery-organization/1c_exif-for-sorting"
 SORTED_IMAGERY_OUT_FOLDER = "/ofo-share/drone-imagery-organization/2_sorted-notcleaned"

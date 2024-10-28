@@ -5,7 +5,7 @@ library(tidyverse)
 library(exifr)
 library(furrr)
 
-IMAGERY_PROJECT_NAME = "2022-early-regen"
+IMAGERY_PROJECT_NAME = "2020-ucnrs"
 
 IMAGERY_INPUT_PATH = "/ofo-share/drone-imagery-organization/1_manually-cleaned"
 EXIF_OUTPUT_PATH = "/ofo-share/drone-imagery-organization/1b_exif-unprocessed/"

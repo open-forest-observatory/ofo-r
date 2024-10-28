@@ -7,13 +7,15 @@ library(tidyverse)
 library(sf)
 
 #devtools::document(); devtools::install()
+devtools::install("/ofo-share/repos-david/ofo-r")
 library(ofo)
 
-IMAGERY_PROJECT_NAME = "2019-focal"
+IMAGERY_PROJECT_NAME = "2020-ucnrs"
 
 BASEROW_DATA_PATH = "/ofo-share/drone-imagery-organization/ancillary/baserow-snapshots"
 FOLDER_BASEROW_CROSSWALK_PATH = "/ofo-share/drone-imagery-organization/1c_exif-for-sorting/"
-EXIF_PATH = "/ofo-share/drone-imagery-organization/3b_exif-unprocessed/"
+
+EXIF_PATH = "/ofo-share/drone-imagery-organization/3b_exif-unprocessed"
 
 EXTRACTED_METADATA_PATH = "/ofo-share/drone-imagery-organization/3c_metadata-extracted/"
 
@@ -29,18 +31,21 @@ polygons_filepath = file.path(EXTRACTED_METADATA_PATH, paste0("sub-mission-polyg
 ## Workflow
 
 # Read in the EXIF
-exif = prep_exif(exif_filepath, plot_flightpath = FALSE)
+print("ABout to prep exif")
+print(exif_filepath)
+#exif = prep_exif(exif_filepath, plot_flightpath = FALSE)
+print("Done prepping exif")
 
 # Format columns
-exif = exif |>
-  mutate(mission_id = str_pad(mission_id, 6, pad = "0", side = "left"))
+#exif = exif |>
+#  mutate(mission_id = str_pad(mission_id, 6, pad = "0", side = "left"))
 
 # Assign the "dataset_id" parameter that is used in the metadata extraction functions. This is done
 # here as opposed to in the metadata extraction to keep those functions flexible as to how a dataset
 # is defined (e.g. a "mission" or a "sub-mission"). Here we are defining a dataset as a
 # "sub-mission".
-exif$dataset_id = exif$submission_id
-
+#exif$dataset_id = exif$submission_id
+exif = read.csv(exif_in)
 # Extract image-level metadata, which can occur across all missions at once becuase there are no
 # hierarchical dependencies on mission-level data
 metadata_perimage = extract_imagery_perimage_metadata(exif,

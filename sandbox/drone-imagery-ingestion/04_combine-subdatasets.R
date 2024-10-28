@@ -6,7 +6,7 @@
 library(tidyverse)
 library(furrr)
 
-IMAGERY_PROJECT_NAME = "2023-tahoe-aspen" # 2023-ny-ofo, 2022-early-regen
+IMAGERY_PROJECT_NAME = "2020-ucnrs" # 2023-ny-ofo, 2022-early-regen
 
 SORTED_IMAGERY_FOLDER = "/ofo-share/drone-imagery-organization/2_sorted-notcleaned"
 COMBINED_IMAGERY_FOLDER = "/ofo-share/drone-imagery-organization/3_sorted-notcleaned-combined"

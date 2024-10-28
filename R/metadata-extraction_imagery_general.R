@@ -3,25 +3,35 @@
 # order the images by capture time, and optionally plot the flight path for visual inspection,
 # standardize column names across different drone models, and remove any rows with missing GPS data.
 #' @export
-prep_exif = function(exif_in, plot_flightpath = FALSE) {
-
-  if ("data.frame" %in% class(exif_in)) {
+prep_exif = function(
+    exif_in, plot_flightpath = FALSE,
+    pitch_aliases = c("CameraPitch", "GimbalPitchDegree", "Pitch"),
+    roll_aliases = c("GimbalRollDegree", "Roll"),
+    yaw_aliases = c("GimbalYawDegree", "Yaw"),
+    original_filename_aliases = c("ImageDescription", "FileName")) {
+  if (is.data.frame(exif_in)) {
     exif = exif_in
   } else {
-    exif = read.csv(exif_filepath)
-    exif = exif_in
+    exif = read.csv(exif_in)
   }
 
-  # Standardize column names across different drone models
-  candidate_pitch_cols = c("CameraPitch", "GimbalPitchDegree")
+  #print(names(exif))
+  # TODO consider doing this all in one operation
+  # TODO why isn't the first row GibmalPitchDegree
+  #exif = exif |>
+  #  dplyr::mutate(CameraPitch = dplyr::coalesce(!!!dplyr::select(exif, dplyr::any_of(pitch_aliases))))
+  #exif = exif |>
+  #  dplyr::mutate(GimbalRollDegree = dplyr::coalesce(!!!dplyr::select(exif, dplyr::any_of(roll_aliases))))
+  #exif = exif |>
+  #  dplyr::mutate(GimbalYawDegree = dplyr::coalesce(!!!dplyr::select(exif, dplyr::any_of(roll_aliases))))
 
-  exif = exif |>
-    dplyr::mutate(CameraPitch = dplyr::coalesce(!!!dplyr::select(exif, dplyr::any_of(candidate_pitch_cols))))
+  #exif = exif |>
+  #  dplyr::mutate(OriginalFileName = dplyr::coalesce(!!!dplyr::select(exif, dplyr::any_of(original_filename_aliases))))
 
   # Remove any rows with missing GPS data
   missing_gps_rows = is.na(exif$GPSLongitude) | is.na(exif$GPSLatitude)
   n_missing_gps_rows = sum(missing_gps_rows)
-  if(n_missing_gps_rows > 0) {
+  if (n_missing_gps_rows > 0) {
     warning("Removing ", n_missing_gps_rows, " rows with missing GPS data from dataset", exif$dataset_id[1])
     exif = exif[!missing_gps_rows, ]
   }
@@ -45,17 +55,18 @@ prep_exif = function(exif_in, plot_flightpath = FALSE) {
   # in EXIF attribute 'ImageDescription'. We can't use the path alone because if the mission was
   # split over two SD cards, the file write path may have started over. TODO: Deal with the case
   # where a dataset was collected by two drones flying at once.
-  exif = exif[order(exif$ImageDescription), ]
+  exif = exif[order(exif$OriginalFileName), ]
   exif = exif[order(exif$capture_datetime), ]
 
-  if(plot_flightpath) {
+  if (plot_flightpath) {
     # Plot the flight path as a visual check
-    flightpath = exif |> dplyr::summarize(do_union = FALSE) |> sf::st_cast("LINESTRING")
+    flightpath = exif |>
+      dplyr::summarize(do_union = FALSE) |>
+      sf::st_cast("LINESTRING")
     plot(flightpath)
   }
 
   return(exif)
-
 }
 
 # Read in the EXIF data from a set of absolute image paths and drop the ThumbnailImage and

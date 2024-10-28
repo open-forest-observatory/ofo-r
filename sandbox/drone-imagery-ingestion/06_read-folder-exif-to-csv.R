@@ -7,9 +7,10 @@ library(tidyverse)
 library(exifr)
 library(furrr)
 
-devtools::load_all()
+devtools::install("/ofo-share/repos-david/ofo-r")
+library("ofo")
 
-IMAGERY_PROJECT_NAME = "2019-focal"
+IMAGERY_PROJECT_NAME = "2020-ucnrs"
 
 IMAGERY_INPUT_PATH = "/ofo-share/drone-imagery-organization/3_sorted-notcleaned-combined/"
 EXIF_OUTPUT_PATH = "/ofo-share/drone-imagery-organization/3b_exif-unprocessed/"
@@ -18,7 +19,6 @@ EXIF_OUTPUT_PATH = "/ofo-share/drone-imagery-organization/3b_exif-unprocessed/"
 # Derived constants
 project_imagery_path = file.path(IMAGERY_INPUT_PATH, IMAGERY_PROJECT_NAME)
 exif_output_filepath = file.path(EXIF_OUTPUT_PATH, paste0("exif_", IMAGERY_PROJECT_NAME, ".csv"))
-
 
 # Get a list of all image files in the project directory
 image_paths = list.files(project_imagery_path,

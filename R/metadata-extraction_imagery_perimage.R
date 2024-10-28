@@ -17,21 +17,17 @@
 #'
 #' @export
 extract_dataset_id_perimage = function(exif) {
-
   dataset_id_image_level = exif$dataset_id
 
   return(dataset_id_image_level)
-
 }
 
 # Image ID, from filename
 #' @export
 extract_image_id = function(exif) {
-
   image_id = tools::file_path_sans_ext(exif$FileName)
 
   return(image_id)
-
 }
 
 #' Extract local date and time of image collection
@@ -46,12 +42,10 @@ extract_image_id = function(exif) {
 #' extract_datatime_local(exif)
 #'
 #' @export
-extract_datetime_local = function (exif) {
-
+extract_datetime_local = function(exif) {
   datetime_local = exif$capture_datetime
 
   return(datetime_local)
-
 }
 
 #### lat and lon (Format: dd.dddddddd (EPSG:4326)) ####
@@ -69,8 +63,7 @@ extract_datetime_local = function (exif) {
 #'
 #' @export
 
-extract_lon_lat = function (exif) {
-
+extract_lon_lat = function(exif) {
   coords = sf::st_coordinates(exif)
   lon = coords[, 1] |> as.numeric()
   lat = coords[, 2] |> as.numeric()
@@ -98,8 +91,7 @@ extract_rtk_fix = function(exif) {
   if ("RtkFlag" %in% names(exif)) {
     rtk_fix = exif$RtkFlag == 50
     return(rtk_fix)
-  }
-  else {
+  } else {
     rtk_fix = rep(FALSE, nrow(exif))
     return(rtk_fix)
   }
@@ -121,7 +113,6 @@ extract_rtk_fix = function(exif) {
 #' @export
 
 extract_accuracy = function(exif) {
-
   exif["RtkStdLon"[!("RtkStdLon" %in% colnames(exif))]] = NA
 
   accuracy_x = exif$RtkStdLon
@@ -133,8 +124,10 @@ extract_accuracy = function(exif) {
   accuracy_x = round(accuracy_x, 4)
   accuracy_y = round(accuracy_y, 4)
 
-  ret = list(accuracy_x = accuracy_x,
-             accuracy_y = accuracy_y)
+  ret = list(
+    accuracy_x = accuracy_x,
+    accuracy_y = accuracy_y
+  )
 
   return(ret)
 }
@@ -155,20 +148,20 @@ extract_accuracy = function(exif) {
 #' @export
 
 extract_pitch_roll_yaw = function(exif) {
-
   camera_pitch = exif$GimbalPitchDegree + 90
 
   camera_roll = exif$GimbalRollDegree
 
   camera_yaw = exif$GimbalYawDegree
-  
   camera_pitch = round(camera_pitch, 2)
   camera_roll = round(camera_roll, 2)
   camera_yaw = round(camera_yaw, 2)
 
-  pitch_roll_yaw = list(camera_pitch = camera_pitch,
-                        camera_roll = camera_roll,
-                        camera_yaw = camera_yaw)
+  pitch_roll_yaw = list(
+    camera_pitch = camera_pitch,
+    camera_roll = camera_roll,
+    camera_yaw = camera_yaw
+  )
 
   return(pitch_roll_yaw)
 }
@@ -187,7 +180,7 @@ extract_pitch_roll_yaw = function(exif) {
 #' extract_exposure(exif)
 #'
 #' @export
-extract_exposure = function (exif) {
+extract_exposure = function(exif) {
   exposure = exif$ExposureTime |> round(6)
   return(exposure)
 }
@@ -245,7 +238,6 @@ extract_iso = function(exif) {
 #'
 #' @export
 extract_white_balance = function(exif) {
-
   white_balance = dplyr::case_when(
     exif$WhiteBalance == 0 ~ "auto",
     exif$WhiteBalance == 1 ~ "manual"
@@ -270,7 +262,6 @@ extract_white_balance = function(exif) {
 #' @export
 
 extract_received_image_path = function(exif) {
-
   received_image_path = stringr::str_split_fixed(exif$SourceFile, stringr::fixed(exif$dataset_id), 2)
 
   received_image_path <- received_image_path[, 2]
@@ -295,7 +286,6 @@ extract_received_image_path = function(exif) {
 #'
 #' @export
 extract_altitude_asl = function(exif) {
-
   altitude_asl = exif$AbsoluteAltitude |> round()
 
   return(altitude_asl)
@@ -315,7 +305,6 @@ extract_altitude_asl = function(exif) {
 #' @export
 extract_imagery_perimage_metadata = function(input,
                                              input_type = "dataframe") {
-
   if (input_type == "filepath") {
     exif = prep_exif(input)
   } else if (input_type == "dataframe") {
@@ -353,5 +342,4 @@ extract_imagery_perimage_metadata = function(input,
   )
 
   return(metadata)
-
 }

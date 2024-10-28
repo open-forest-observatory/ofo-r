@@ -5,7 +5,7 @@
 
 library(tidyverse)
 
-IMAGERY_PROJECT_NAME = "2019-focal" # 2023-ny-ofo, 2022-early-regen
+IMAGERY_PROJECT_NAME = "2020-ucnrs" # 2023-ny-ofo, 2022-early-regen
 
 BASEROW_DATA_PATH = "/ofo-share/drone-imagery-organization/ancillary/baserow-snapshots"
 EXIF_INPUT_PATH = "/ofo-share/drone-imagery-organization/1b_exif-unprocessed"
@@ -92,7 +92,7 @@ b = baserow |>
   mutate(dataset_date_canon = ifelse(folder_uses_old_id, date_old, date) |> as.Date()) |>
   # Preserve baserow_dataset_id for linking tables
   rename(baserow_dataset_id = dataset_id) |>
-  # Remove intermediate cols 
+  # Remove intermediate cols
   select(-dataset_id_old, -dataset_id_old_trimmed, -folder_uses_old_id, -date_old, -date) |>
   rename(dataset_id = baserow_dataset_id,
          date = dataset_date_canon) |>

@@ -13,7 +13,7 @@ library(sf)
 # devtools::document(); devtools::install()
 library(ofo)
 
-IMAGERY_PROJECT_NAME = "2020-dispersal"
+IMAGERY_PROJECT_NAME = "2020-ucnrs"
 
 BASEROW_DATA_PATH = "/ofo-share/drone-imagery-organization/ancillary/baserow-snapshots"
 FOLDER_BASEROW_CROSSWALK_PATH = "/ofo-share/drone-imagery-organization/1c_exif-for-sorting/"
