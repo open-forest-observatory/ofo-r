@@ -1,14 +1,14 @@
 Package: ofo
 Title: Open Forest Observatory data processing tools
 Version: 0.0.1
-Authors@R: 
+Authors@R:
     person("Derek", "Young", , "djyoung@ucdavis.edu", role = c("aut", "cre"))
 Description: This package provides tools to process and compare drone- and field-derived forest data.
 License: MIT + file LICENSE
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.2
-Imports: 
+Imports:
     dplyr,
     furrr,
     stats,
@@ -17,6 +17,7 @@ Imports:
     spatstat,
     ggplot2,
     lubridate,
+    rdist,
     stringr,
     yaml,
     lidR,

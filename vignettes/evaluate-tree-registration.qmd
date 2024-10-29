@@ -1,0 +1,109 @@
+---
+title: "Evaluating tree alignment"
+author: "David Russell"
+format: html
+editor: visual
+---
+
+## Purpose
+
+There are various approaches to tree alignment. The goal of this notebook is to conduct a direct comparison between them. The user can control the types of errors present in the initial alignment and define a function that evaluates the quality of the predicted alignment. Then, this code runs a set of experiments where a simulated tree alignment problem is generated, each algorithm is run on it, and the results are scored.
+
+## Setup
+
+Load the the `ofo` package (which is the repo that this vignette's source file is in, so we can use `devtools::load_all()` to load all the package's functions).
+
+```{r}
+library(devtools)
+devtools::load_all()
+```
+
+## Define the alignment algorithms to compare
+
+```{r}
+# The actual functions that take in a predicted and observed tree map and output a transform between them
+ALIGNMENT_METHODS = c(find_best_shift, find_best_shift)
+# Additional arguments that are provided to these functions to control their behavior
+PER_METHOD_ALIGNMENT_ARGUMENTS = list(list(method = "optim"), list(method = "grid"))
+# The name of these methods for visualization
+ALIGNMENT_METHOD_NAMES = c("find_best_shift_optim", "find_best_shift_grid")
+```
+
+# Define the experiments to run
+
+The values will be passed to `simulate_tree_maps` to generate experiments to run. You can provide a single value or a sequence of values. If you provide a sequence, all combinations of values can be run across the different arguments. This number can get large, so you choose to select only a random sample of them.
+
+```{r}
+# All other values will be set to the default from simulate_tree_maps
+MAP_PARAMS = list(
+  shift_x = seq(from = -20, to = 20),
+  shift_y = as.vector(1),
+  horiz_jitter = seq(from = 0, to = 10, by = 1)
+)
+# Choose this many random samples from the full list of combinations. Set to NULL to use all combinations.
+N_RANDOM_SAMPLES = 20
+```
+
+## Run experiments
+
+Conduct all the alignment trials with the set of starting configurations and multiple algorithms.
+
+```{r}
+all_alignment_results = test_tree_map_alignment(
+  map_params = MAP_PARAMS,
+  alignment_methods = ALIGNMENT_METHODS,
+  alignment_method_names = ALIGNMENT_METHOD_NAMES,
+  per_method_alignment_arguments = PER_METHOD_ALIGNMENT_ARGUMENTS,
+  n_random_samples = N_RANDOM_SAMPLES
+)
+```
+
+## Visualize the results
+
+Show the fraction of results that converged for a given parameter value. Note that 0 represents convergence and 1 represents failure, so lower is better.
+
+```{r}
+# Optimization
+visualize_metric_vs_1_parameter(
+  results_df = all_alignment_results$per_method_results$find_best_shift_optim,
+  parameter_df = all_alignment_results$all_map_param_configurations,
+  attributes_to_visualize = c("shift_x", "horiz_jitter"),
+  eval_function = eval_res_threshold,
+  smoothing_bandwidth = c(10, 2),
+  title = "Best shift optimization"
+)
+
+# Grid search
+visualize_metric_vs_1_parameter(
+  results_df = all_alignment_results$per_method_results$find_best_shift_grid,
+  parameter_df = all_alignment_results$all_map_param_configurations,
+  attributes_to_visualize = c("shift_x", "horiz_jitter"),
+  eval_function = eval_res_threshold,
+  smoothing_bandwidth = c(10, 2),
+  title = "Best shift grid search"
+)
+```
+
+Show the alignment error versus parameter values. Lower is better.
+
+```{r}
+# Optimization
+visualize_metric_vs_1_parameter(
+  results_df = all_alignment_results$per_method_results$find_best_shift_optim,
+  parameter_df = all_alignment_results$all_map_param_configurations,
+  attributes_to_visualize = c("shift_x", "horiz_jitter"),
+  eval_function = eval_res_dist,
+  smoothing_bandwidth = c(10, 2),
+  title = "Best shift optimization"
+)
+
+# Grid search
+visualize_metric_vs_1_parameter(
+  results_df = all_alignment_results$per_method_results$find_best_shift_grid,
+  parameter_df = all_alignment_results$all_map_param_configurations,
+  attributes_to_visualize = c("shift_x", "horiz_jitter"),
+  eval_function = eval_res_dist,
+  smoothing_bandwidth = c(10, 2),
+  title = "Best shift grid search"
+)
+```
