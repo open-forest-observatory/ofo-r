@@ -25,11 +25,53 @@ crosswalk_filepath = file.path(FOLDER_BASEROW_CROSSWALK_PATH, paste0(IMAGERY_PRO
 metadata_perimage_filepath = file.path(EXTRACTED_METADATA_PATH, paste0("sub-mission-exif-metadata_perimage_", IMAGERY_PROJECT_NAME, ".csv"))
 metadata_perdataset_filepath = file.path(EXTRACTED_METADATA_PATH, paste0("sub-mission-exif-metadata_perdataset_", IMAGERY_PROJECT_NAME, ".csv"))
 polygons_filepath = file.path(EXTRACTED_METADATA_PATH, paste0("sub-mission-polygons_", IMAGERY_PROJECT_NAME, ".gpkg"))
+metadata_sub_mission_filepath = file.path(EXTRACTED_METADATA_PATH, paste0("sub-mission-baserow-metadata_", IMAGERY_PROJECT_NAME, ".csv"))
+metadata_mission_filepath = file.path(EXTRACTED_METADATA_PATH, paste0("mission-baserow-metadata_", IMAGERY_PROJECT_NAME, ".csv"))
 
 ## Workflow
 
 # Read in the EXIF
-exif = prep_exif(exif_filepath, plot_flightpath = FALSE)
+exif = read.csv(exif_filepath)
+# Read in the baserow metadata
+baserow_sub_mission_metadata = read.csv(metadata_sub_mission_filepath)
+
+# Compute the unique sub mission IDs
+submissions = unique(exif$submission_id)
+
+# For parallelizing, make a list of subsets of the exif dataframe, one for each sub-mission
+exif_list <- lapply(submissions, function(submission) {
+  exif_foc <- exif |>
+    filter(submission_id == submission)
+  return(list(submission = submission, exif_foc = exif_foc))
+})
+
+# Compute the corresponding
+exif_list <- lapply(exif_list, function(submission_exif) {
+  sub_mission_id = submission_exif[[1]]
+  sub_mission_exif = submission_exif[[2]]
+
+  baserow_for_sub_mission <- baserow_sub_mission_metadata |> filter(sub_mission_id == sub_mission_id)
+  if (nrow(baserow_for_sub_mission) != 1) {
+    # TODO make this an actual error
+    print("Error: there was not one corresponding baserow entry")
+  }
+  return(
+    list(
+      aircraft_model_name = baserow_for_sub_mission$aircraft_model_name,
+      sub_mission_exif = sub_mission_exif,
+      sub_mission_id = sub_mission_id
+    )
+  )
+})
+
+my_test_function = function(submission_and_exif) {
+  print(submission_and_exif$aircraft_model_name)
+  print(submission_and_exif$sub_mission_id)
+  print(head(submission_and_exif$sub_mission_exif, 10))
+}
+
+furrr::future_map(exif_list, my_test_function)
+quit()
 
 # Format columns
 exif = exif |>
