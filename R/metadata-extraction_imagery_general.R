@@ -4,7 +4,6 @@
 # standardize column names across different drone models, and remove any rows with missing GPS data.
 #' @export
 prep_exif = function(exif_in, plot_flightpath = FALSE) {
-
   if ("data.frame" %in% class(exif_in)) {
     exif = exif_in
   } else {
@@ -21,7 +20,7 @@ prep_exif = function(exif_in, plot_flightpath = FALSE) {
   # Remove any rows with missing GPS data
   missing_gps_rows = is.na(exif$GPSLongitude) | is.na(exif$GPSLatitude)
   n_missing_gps_rows = sum(missing_gps_rows)
-  if(n_missing_gps_rows > 0) {
+  if (n_missing_gps_rows > 0) {
     warning("Removing ", n_missing_gps_rows, " rows with missing GPS data from dataset", exif$dataset_id[1])
     exif = exif[!missing_gps_rows, ]
   }
@@ -48,14 +47,15 @@ prep_exif = function(exif_in, plot_flightpath = FALSE) {
   exif = exif[order(exif$ImageDescription), ]
   exif = exif[order(exif$capture_datetime), ]
 
-  if(plot_flightpath) {
+  if (plot_flightpath) {
     # Plot the flight path as a visual check
-    flightpath = exif |> dplyr::summarize(do_union = FALSE) |> sf::st_cast("LINESTRING")
+    flightpath = exif |>
+      dplyr::summarize(do_union = FALSE) |>
+      sf::st_cast("LINESTRING")
     plot(flightpath)
   }
 
   return(exif)
-
 }
 
 # Read in the EXIF data from a set of absolute image paths and drop the ThumbnailImage and
