@@ -17,21 +17,17 @@
 #'
 #' @export
 extract_dataset_id_perimage = function(exif) {
-
   dataset_id_image_level = exif$dataset_id
 
   return(dataset_id_image_level)
-
 }
 
 # Image ID, from filename
 #' @export
 extract_image_id = function(exif) {
-
   image_id = tools::file_path_sans_ext(exif$FileName)
 
   return(image_id)
-
 }
 
 #' Extract local date and time of image collection
@@ -46,8 +42,10 @@ extract_image_id = function(exif) {
 #' extract_datatime_local(exif)
 #'
 #' @export
-extract_datetime_local = function(exif, candidate_columns = c("capture_datetime", "GPSDateTime")) {
+extract_datetime_local = function(exif, candidate_columns = c("capture_datetime", "GPSDateTime", "DateTimeOriginal")) {
   datetime_local = extract_candidate_columns(st_drop_geometry(exif), candidate_columns)
+  datetime_local = lubridate::ymd_hms(datetime_local)
+  print(datetime_local)
   return(datetime_local)
 }
 
@@ -66,8 +64,8 @@ extract_datetime_local = function(exif, candidate_columns = c("capture_datetime"
 #'
 #' @export
 
-extract_lon_lat = function (exif) {
-
+extract_lon_lat = function(exif) {
+  exif = sf::st_as_sf(exif, crs = 4326, coords = c("GPSLongitude", "GPSLatitude"))
   coords = sf::st_coordinates(exif)
   lon = coords[, 1] |> as.numeric()
   lat = coords[, 2] |> as.numeric()
@@ -95,8 +93,7 @@ extract_rtk_fix = function(exif) {
   if ("RtkFlag" %in% names(exif)) {
     rtk_fix = exif$RtkFlag == 50
     return(rtk_fix)
-  }
-  else {
+  } else {
     rtk_fix = rep(FALSE, nrow(exif))
     return(rtk_fix)
   }
@@ -118,7 +115,7 @@ extract_rtk_fix = function(exif) {
 #' @export
 
 extract_accuracy = function(exif) {
-  exif = st_drop_geometry(exif)
+  exif = sf::st_drop_geometry(exif)
   if ("GPSXYAccuracy" %in% colnames(exif)) {
     accuracy_x = exif$GPSXYAccuracy
     accuracy_y = exif$GPSXYAccuracy
@@ -160,7 +157,7 @@ extract_pitch_roll_yaw = function(exif,
                                   candidate_roll_cols = c("GimbalRollDegree", "Roll"),
                                   candidate_yaw_cols = c("GimbalYawDegree", "Yaw")) {
   # Remove the geometry column since it can cause issues
-  exif = st_drop_geometry(exif)
+  exif = sf::st_drop_geometry(exif)
   camera_pitch = extract_candidate_columns(exif, candidate_pitch_cols)
   camera_roll = extract_candidate_columns(exif, candidate_roll_cols)
   camera_yaw = extract_candidate_columns(exif, candidate_yaw_cols)
@@ -195,7 +192,7 @@ extract_pitch_roll_yaw = function(exif,
 #' extract_exposure(exif)
 #'
 #' @export
-extract_exposure = function (exif) {
+extract_exposure = function(exif) {
   exposure = exif$ExposureTime |> round(6)
   return(exposure)
 }
@@ -253,7 +250,6 @@ extract_iso = function(exif) {
 #'
 #' @export
 extract_white_balance = function(exif) {
-
   white_balance = dplyr::case_when(
     exif$WhiteBalance == 0 ~ "auto",
     exif$WhiteBalance == 1 ~ "manual"
@@ -278,7 +274,6 @@ extract_white_balance = function(exif) {
 #' @export
 
 extract_received_image_path = function(exif) {
-
   received_image_path = stringr::str_split_fixed(exif$SourceFile, stringr::fixed(exif$dataset_id), 2)
 
   received_image_path <- received_image_path[, 2]
@@ -303,10 +298,17 @@ extract_received_image_path = function(exif) {
 #'
 #' @export
 extract_altitude_asl = function(exif, candidate_asl_columns = c("AbsoluteAltitude", "GPSAltitude")) {
-  altitude_asl = extract_candidate_columns(st_drop_geometry(exif), candidate_asl_columns)
+  altitude_asl = extract_candidate_columns(sf::st_drop_geometry(exif), candidate_asl_columns)
   altitude_asl = round(altitude_asl)
 
   return(altitude_asl)
+}
+
+#' @export
+extract_original_file_name = function(exif, candidate_file_name_columns = c("ImageDescription", "FileName")) {
+  original_file_names = extract_candidate_columns(sf::st_drop_geometry(exif), candidate_file_name_columns)
+
+  return(original_file_names)
 }
 
 #' Extract image-level metadata parameters from EXIF datafram
@@ -321,15 +323,7 @@ extract_altitude_asl = function(exif, candidate_asl_columns = c("AbsoluteAltitud
 #' extract_metadata_emp(exif)
 #'
 #' @export
-extract_imagery_perimage_metadata = function(input,
-                                             input_type = "dataframe") {
-
-  if (input_type == "filepath") {
-    exif = prep_exif(input)
-  } else if (input_type == "dataframe") {
-    exif = input
-  }
-
+extract_imagery_perimage_metadata_DJI = function(exif) {
   image_id = extract_image_id(exif)
   dataset_id_image_level = extract_dataset_id_perimage(exif)
   datetime_local = extract_datetime_local(exif)
@@ -364,6 +358,12 @@ extract_imagery_perimage_metadata = function(input,
 }
 
 extract_candidate_columns = function(dataframe, candidate_columns) {
-  extracted_column = dplyr::coalesce(!!!dplyr::select(dataframe, dplyr::any_of(candidate_columns)))
+  selected_columns = dplyr::select(dataframe, dplyr::any_of(candidate_columns))
+  if (ncol(selected_columns) == 0) {
+    print("Will fail to extract candidate columns")
+    print(candidate_columns)
+    print(names(dataframe))
+  }
+  extracted_column = dplyr::coalesce(!!!selected_columns)
   return(extracted_column)
 }
