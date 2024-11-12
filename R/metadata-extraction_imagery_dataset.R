@@ -10,7 +10,7 @@ extract_flight_speed = function(exif) {
   distance = sf::st_distance(start_image, end_image, by_element = TRUE)
 
   # Get time from each image to the next, in seconds
-  interval = end_image$capture_datetime - start_image$capture_datetime
+  interval = end_image$datetime_local - start_image$datetime_local
 
   # Compute speed in meters per second
   speed = as.numeric(distance) / as.numeric(interval)
@@ -406,7 +406,8 @@ extract_area_and_density = function(exif, mission_polygon) {
 # Image frequency (imgs/sec)
 extract_image_frequency <- function(exif) {
   # Convert DateTimeOriginal to datetime object
-  datetime <- lubridate::as_datetime(exif$capture_datetime)
+  print(exif$datetime_local)
+  datetime <- lubridate::as_datetime(exif$datetime_local)
 
   # Calculate time difference between consecutive images
   time_diff <- diff(datetime)
@@ -463,6 +464,7 @@ extract_resolution_and_aspect_ratio_summary <- function(exif) {
 # File type
 extract_file_format_summary <- function(exif) {
   # Get image file format
+  # TODO fix this column
   image_file_format <- unique(exif$FileType)
 
   # Check if image file format is consistent
@@ -514,7 +516,6 @@ extract_imagery_dataset_metadata = function(exif,
 
   images_retained = extract_image_id(exif)
 
-  print("Cropped to region")
   # Extract/compute metadata attributes
   dataset_id = extract_dataset_id_summary(exif)
   flight_speed_derived = extract_flight_speed(exif)
@@ -528,15 +529,30 @@ extract_imagery_dataset_metadata = function(exif,
   file_size_derived = extract_file_size_summary(exif)
   percent_images_rtk_derived = extract_pct_images_rtk(exif)
   white_balance = extract_white_balance_summary(exif)
-  print("Trying exposure")
   exposure = extract_exposure_summary(exif)
-  print("Trying area and density")
   area_and_density = extract_area_and_density(exif, mission_polygon)
   image_frequency_derived = extract_image_frequency(exif)
   resolution_and_aspect_ratio = extract_resolution_and_aspect_ratio_summary(exif)
   file_format_derived = extract_file_format_summary(exif)
+  print("Computed all summary statistics")
 
   # Return extracted/computed metadata as a data frame row
+  print(head(dataset_id))
+  print(head(flight_speed_derived))
+  print(head(flight_terrain_correlation_derived))
+  print(head(camera_pitch)) # this is a multi-column dataframe; preserving its column names
+  print(head(dates_times))
+  print(head(centroid_lonlat)) # this is a multi-column dataframe; preserving its column names
+  print(head(solarnoon_utc_derived))
+  print(head(image_count_derived))
+  print(head(file_size_derived))
+  print(head(percent_images_rtk_derived))
+  print(head(white_balance)) # this is a multi-column dataframe; preserving its column names
+  print(head(exposure)) # this is a multi-column dataframe; preserving its column names
+  print(head(area_and_density)) # this is a multi-column dataframe; preserving its column names
+  print(head(image_frequency_derived))
+  print(head(resolution_and_aspect_ratio))
+  print(head(file_format_derived))
   dataset_metadata = data.frame(
     dataset_id,
     flight_speed_derived,
