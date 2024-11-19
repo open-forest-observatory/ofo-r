@@ -58,7 +58,7 @@ transform_to_local_utm = function(sf) {
   return(sf_transf)
 }
 
-
+#' @export
 prep_obs_map = function(obs, obs_bound, edge_buffer) {
   # Convert the maps to sf objects (without a real CRS) if they are not already. This is to enable
   # tree map comparison in an arbitrary "local" crs, and in this case we assume all other files are in
@@ -107,6 +107,7 @@ prep_obs_map = function(obs, obs_bound, edge_buffer) {
   return(obs)
 }
 
+#' @export
 prep_pred_map = function(pred, obs_bound, edge_buffer) {
   # Convert the maps to sf objects (without a real CRS) if they are not already. This is to enable
   # tree map comparison in an arbitrary "local" crs, and in this case we assume all other files are in
@@ -155,6 +156,7 @@ prep_pred_map = function(pred, obs_bound, edge_buffer) {
   return(pred)
 }
 
+#' @export
 match_obs_to_pred_mee = function(obs, pred, search_distance_fun_intercept, search_distance_fun_slope, search_height_proportion) {
   if (st_crs(obs) != st_crs(pred)) {
     stop("The observed and predicted tree maps are not in the same UTM zone.")
@@ -266,7 +268,7 @@ count_total_and_matched_trees = function(obs_pred_match, pred_obs_match, min_hei
 }
 
 
-
+#' @export
 compute_match_stats = function(pred, obs_matched, min_height = 10) {
   obs_simple = obs_matched |>
     dplyr::select(obs_tree_id, matched_pred_tree_id, obs_tree_height, obs_tree_core_area)

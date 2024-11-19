@@ -4,7 +4,10 @@
 \alias{extract_datetime_local}
 \title{Extract local date and time of image collection}
 \usage{
-extract_datetime_local(exif)
+extract_datetime_local(
+  exif,
+  candidate_columns = c("capture_datetime", "GPSDateTime")
+)
 }
 \arguments{
 \item{exif}{the exif metadata file}

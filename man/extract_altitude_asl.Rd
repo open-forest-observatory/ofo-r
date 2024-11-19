@@ -4,7 +4,10 @@
 \alias{extract_altitude_asl}
 \title{Returns altitude above sea level (asl) in meters}
 \usage{
-extract_altitude_asl(exif)
+extract_altitude_asl(
+  exif,
+  candidate_asl_columns = c("AbsoluteAltitude", "GPSAltitude")
+)
 }
 \arguments{
 \item{exif}{the exif metadata file}

@@ -4,7 +4,12 @@
 \alias{extract_pitch_roll_yaw}
 \title{Returns camera pitch, camera roll, and camera yaw. Units: degrees.}
 \usage{
-extract_pitch_roll_yaw(exif)
+extract_pitch_roll_yaw(
+  exif,
+  candidate_pitch_cols = c("GimbalPitchDegree", "Pitch"),
+  candidate_roll_cols = c("GimbalRollDegree", "Roll"),
+  candidate_yaw_cols = c("GimbalYawDegree", "Yaw")
+)
 }
 \arguments{
 \item{exif}{the exif metadata file}

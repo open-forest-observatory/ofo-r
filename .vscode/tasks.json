@@ -1,0 +1,14 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"type": "R",
+			"code": [
+				"devtools::document()"
+			],
+			"group": "build",
+			"problemMatcher": [],
+			"label": "R: Document"
+		}
+	]
+}
