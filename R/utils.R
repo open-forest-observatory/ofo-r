@@ -8,7 +8,7 @@ create_dir <- function(dir) {
 
 drop_units_if_present = function(x) {
   if (inherits(x, "units")) {
-    return(x |> drop_units())
+    return(x |> units::drop_units())
   } else {
     return(x)
   }
