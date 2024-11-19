@@ -2,9 +2,9 @@ CANDIDATE_HEIGHT_COLNAMES = c("Height", "height", "z")
 
 # Function to look for one or more columns matching a provided set of names, select the first
 # matching one, and rename it to a provided standard name
-standardize_colname = function(d, candadate_colnames, new_colname) {
+standardize_colname = function(d, candidate_colnames, new_colname) {
   # Which of the candidate height column names is present in the data frame?
-  candidate_colnames_idxs = which(names(d) %in% CANDIDATE_HEIGHT_COLNAMES)
+  candidate_colnames_idxs = which(names(d) %in% candidate_colnames)
   candidate_colnames = names(d)[candidate_colnames_idxs]
 
   # If there are no height cols, return an error
@@ -50,7 +50,8 @@ lonlat_to_utm_epsg = function(lonlat) {
 # Reproject a sf object into the CRS representing its local UTM zone
 transform_to_local_utm = function(sf) {
   geo = sf::st_transform(sf, 4326)
-  lonlat = sf::st_centroid(geo) |> sf::st_coordinates()
+  geo_noz = st_zm(geo, drop = TRUE)
+  lonlat = sf::st_centroid(geo_noz) |> sf::st_coordinates()
   utm = lonlat_to_utm_epsg(lonlat)
 
   sf_transf = sf::st_transform(sf, utm)
@@ -193,8 +194,8 @@ match_obs_to_pred_mee = function(obs, pred, search_distance_fun_intercept, searc
     dplyr::select(obs_tree_id, obs_tree_height)
   sf::st_geometry(obs_height) = NULL
 
-  dist_graph = dplyr::left_join(dist_graph, obs_height)
-  dist_graph = dplyr::left_join(dist_graph, pred_height)
+  dist_graph = dplyr::left_join(dist_graph, obs_height, by = "obs_tree_id")
+  dist_graph = dplyr::left_join(dist_graph, pred_height, by = "pred_tree_id")
 
   # Take every possible pairing of trees and filter to those within matching distance (horiz and vert)
   dist_graph = dist_graph |>
