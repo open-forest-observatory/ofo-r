@@ -219,15 +219,19 @@ create_chms = function(exported_data_folder, res = 0.25, skip_existing = TRUE) {
         pattern = "dsm.*tif", recursive = TRUE, include.dirs = TRUE, full.names = TRUE
       )
     )
+    if (length(dsm_files) == 0) {
+      next()
+    } else if (length(dsm_files) > 1) {
+      stop(paste0("Expected only one DSM file but found: ", str(dsm_files)))
+    }
+    # Take the only DSM file
+    dsm_file = dsm_files[1]
+
     for (j in seq_along(dtm_files)) {
       dtm_file = dtm_files[j]
-      corresponding_dsm_file = str_replace(dtm_file, "dtm", "dsm")
       output_chm_file = str_replace(dtm_file, "dtm", "chm")
-      if (
-        !(skip_existing && file.exists(output_chm_file)) &&
-          corresponding_dsm_file %in% dsm_files
-      ) {
-        dsm = terra::rast(corresponding_dsm_file)
+      if (!(skip_existing && file.exists(output_chm_file))) {
+        dsm = terra::rast(dsm_file)
         dtm = terra::rast(dtm_file)
         chm = ofo::chm_from_coregistered_dsm_dtm(dsm, dtm, res = res)
         terra::writeRaster(chm, output_chm_file, filetype = "COG", overwrite = TRUE)
@@ -235,7 +239,7 @@ create_chms = function(exported_data_folder, res = 0.25, skip_existing = TRUE) {
           "Creating ",
           output_chm_file,
           " from ",
-          corresponding_dsm_file,
+          dsm_file,
           " and ", dtm_file
         ))
       }
