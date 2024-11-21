@@ -16,7 +16,7 @@ MISSION_FOOTPRINTS_PATH = "/ofo-share/drone-imagery-organization/3c_metadata-ext
 VISUALIZE = FALSE
 SKIP_EXISTING = FALSE
 
-RUN_CONVERSION = TRUE
+RUN_CONVERSION = FALSE
 RUN_CHM = TRUE
 RUN_THUMBNAIL = TRUE
 
@@ -207,28 +207,28 @@ create_chms = function(exported_data_folder, res = 0.25, skip_existing = TRUE) {
 
   for (i in seq_along(full_folders)) {
     full_folder = full_folders[i]
-    dtm_files = as.vector(
-      list.files(
-        full_folder,
-        pattern = "dtm.*tif", recursive = TRUE, include.dirs = TRUE, full.names = TRUE
-      )
-    )
     dsm_files = as.vector(
       list.files(
         full_folder,
         pattern = "dsm.*tif", recursive = TRUE, include.dirs = TRUE, full.names = TRUE
       )
     )
-    if (length(dsm_files) == 0) {
+    dtm_files = as.vector(
+      list.files(
+        full_folder,
+        pattern = "dtm.*tif", recursive = TRUE, include.dirs = TRUE, full.names = TRUE
+      )
+    )
+    if (length(dtm_files) == 0) {
       next()
-    } else if (length(dsm_files) > 1) {
-      stop(paste0("Expected only one DSM file but found: ", str(dsm_files)))
+    } else if (length(dtm_files) > 1) {
+      stop(paste0("Expected only one DTM file but found: ", str(dtm_files)))
     }
     # Take the only DSM file
-    dsm_file = dsm_files[1]
+    dtm_file = dtm_files[1]
 
     for (j in seq_along(dtm_files)) {
-      dtm_file = dtm_files[j]
+      dsm_file = dsm_files[j]
       output_chm_file = str_replace(dtm_file, "dtm", "chm")
       if (!(skip_existing && file.exists(output_chm_file))) {
         dsm = terra::rast(dsm_file)
@@ -337,7 +337,7 @@ if (RUN_CONVERSION) {
 }
 if (RUN_CHM) {
   # Create the CHM layers for each file pair that has been copied to the output folder
-  create_chms(PHOTOGRAMMETRY_PUBLISH_PATH, skip_existing = FALSE, skip_existing = SKIP_EXISTING)
+  create_chms(PHOTOGRAMMETRY_PUBLISH_PATH, skip_existing = SKIP_EXISTING)
 }
 if (RUN_THUMBNAIL) {
   # Generate the thumbnails for each of the produced files
