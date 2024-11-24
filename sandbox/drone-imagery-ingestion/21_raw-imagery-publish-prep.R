@@ -193,4 +193,5 @@ future_pwalk(
     mission_footprint = mission_footprints_list
   ),
   imagery_publish_prep_mission,
-  .options = furrr_options(seed = TRUE))
+  .options = furrr_options(seed = TRUE,
+                           scheduling = Inf))
