@@ -10,7 +10,7 @@ library(tidyverse)
 library(sf)
 library(magick)
 library(furrr)
-devtools::load_all()
+library(ofo)
 
 ## Constants
 
@@ -20,16 +20,34 @@ RAW_IMAGES_PATH = "/ofo-share/drone-imagery-organization/6_combined-across-proje
 RAW_IMAGES_METADATA_PATH = "/ofo-share/drone-imagery-organization/3c_metadata-extracted/all-mission-points-w-metadata.gpkg"
 MISSION_FOOTPRINTS_PATH = "/ofo-share/drone-imagery-organization/3c_metadata-extracted/all-mission-polygons-w-metadata.gpkg"
 PUBLISHABLE_IMAGES_PATH = "/ofo-share/drone-imagery-organization/7_to-publish"
+IN_PROCESS_PATH = "/ofo-share/tmp/raw-imagery-publish-prep-progress-tracking/"
 
 # Processing constants
 N_EXAMPLE_IMAGES = 4
 THUMBNAIL_SIZE = "512"
+SKIP_EXISTING = TRUE # Skip processing for missions that already have all outputs
 
 
 ## Functions
 
 # Function to do all the imagery prep for a given mission, with pre-subsetted metadata and footprint
 imagery_publish_prep_mission = function(mission_id_foc, mission_images_metadata, mission_footprint) {
+
+  cat("Processing mission", mission_id_foc, "\n")
+
+  # Skip if the mission already has all outputs, asuming that if the zip file exists, the entire
+  # mission was processed to completion
+  zip_outpath = file.path(PUBLISHABLE_IMAGES_PATH, mission_id_foc, "images", "images.zip")
+
+  if (SKIP_EXISTING && file.exists(zip_outpath)) {
+    cat("Already exists. Skipping.\n")
+    return()
+  }
+
+  # Save a file that indicates the mission is being processed
+  processing_file = file.path(IN_PROCESS_PATH, paste0(mission_id_foc, ".csv"))
+  fake_df = data.frame(a = 1, b = 1)
+  write.csv(fake_df, processing_file)
 
   # Project mission image locs and footprint to the local UTM zone
   mission_images_metadata = transform_to_local_utm(mission_images_metadata)
@@ -112,18 +130,30 @@ imagery_publish_prep_mission = function(mission_id_foc, mission_images_metadata,
   # Save to a tempfile while creating the zip, then move to the final location, because if the
   # process is terminated we don't want to leave a partial temp file in the file tree
   inpath = file.path(RAW_IMAGES_PATH, mission_id_foc)
-  zip_outpath = file.path(PUBLISHABLE_IMAGES_PATH, mission_id_foc, "images", "images.zip")
 
-  tempfile = tempfile(fileext = ".zip")
+  tempfile = paste0("/ofo-share/tmp/ofor_tempzip/tempzip_", mission_id_foc, ".zip")
+  # Delete if exists
+  if (file.exists(tempfile)) {
+    file.remove(tempfile)
+  }
+  # Create dir
+  dir.create(dirname(tempfile), recursive = TRUE)
+
 
   system(paste("zip -r -0", shQuote(tempfile), shQuote(inpath)), ignore.stdout = TRUE)
   file.rename(tempfile, zip_outpath)
+
+  # Remove the file indicating the mission is being processed
+  file.remove(processing_file)
+
+  gc()
 
 }
 
 ## Workflow
 
-future::plan("multisession", workers = 3 * future::availableCores())
+future::plan("multisession")
+magick:::magick_threads(1)
 
 # Read in the raw image locations and the mission footptings (both with metadata)
 raw_images_metadata = st_read(RAW_IMAGES_METADATA_PATH)
@@ -148,10 +178,19 @@ for (mission_id_foc in mission_ids_to_run) {
 }
 
 # Run the imagery prep for each mission
+# pwalk(
+#   list(
+#     mission_id_foc = mission_ids_to_run,
+#     mission_images_metadata = mission_images_metadata_list,
+#     mission_footprint = mission_footprints_list
+#   ),
+#   imagery_publish_prep_mission)
+
 future_pwalk(
   list(
     mission_id_foc = mission_ids_to_run,
     mission_images_metadata = mission_images_metadata_list,
     mission_footprint = mission_footprints_list
   ),
-  imagery_publish_prep_mission)
+  imagery_publish_prep_mission,
+  .options = furrr_options(seed = TRUE))
