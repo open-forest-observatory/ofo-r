@@ -53,6 +53,9 @@ imagery_publish_prep_mission = function(mission_id_foc, mission_images_metadata,
   mission_images_metadata = transform_to_local_utm(mission_images_metadata)
   mission_footprint = transform_to_local_utm(mission_footprint)
 
+  # In case one was in a different UTM zone than the other, reproject to the same zone
+  mission_footprint = st_transform(mission_footprint, st_crs(mission_images_metadata))
+
   # Get the footprint area
   mission_footprint_area = mission_footprint |> st_area()
 
@@ -177,7 +180,7 @@ for (mission_id_foc in mission_ids_to_run) {
 
 }
 
-# Run the imagery prep for each mission
+# # Run the imagery prep for each mission
 # pwalk(
 #   list(
 #     mission_id_foc = mission_ids_to_run,
