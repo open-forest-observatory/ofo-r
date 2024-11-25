@@ -48,6 +48,7 @@ lonlat_to_utm_epsg = function(lonlat) {
 }
 
 # Reproject a sf object into the CRS representing its local UTM zone
+#' @export
 transform_to_local_utm = function(sf) {
   geo = sf::st_transform(sf, 4326)
   geo_noz = st_zm(geo, drop = TRUE)
