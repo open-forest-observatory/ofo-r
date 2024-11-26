@@ -1,4 +1,5 @@
-# Purpose: Create the Hugo markdown pages for all drone imagery datasets, as well as a dataset index
+# Purpose: Create the Hugo markdown pages for all drone mission datasets including
+# visualizations/links to the actual data on CyVerse, as well as a dataset index
 # page
 
 library(dplyr)
@@ -12,12 +13,12 @@ library(jinjar)
 devtools::load_all()
 
 
-# BASE_OFO_URL = "https://openforestobservatory.org/"
-BASE_OFO_URL = "http://localhost:1313/"
+BASE_OFO_URL = "https://openforestobservatory.org/"
+# BASE_OFO_URL = "http://localhost:1313/"
 WEBSITE_REPO_PATH = "/ofo-share/repos-derek/ofo-website-3"
 
 # Path to the plot details template page within this repo
-MISSION_DETAILS_TEMPLATE_FILEPATH = fs::path(file.path("sandbox", "drone-data-web-catalog", "templates", "drone-mission-details.md"))
+MISSION_DETAILS_TEMPLATE_FILEPATH = fs::path(file.path("sandbox", "drone-mission-web-catalog", "templates", "drone-mission-details.md"))
 
 # Path to plot details dir relative to the 'content' dir in the website repo. No leading slash but
 # trailing slash
@@ -41,6 +42,12 @@ WEBSITE_CONTENT_PATH = file.path(WEBSITE_REPO_PATH, "content", "")
 MISSION_POLYGONS_PATH = "/ofo-share/drone-imagery-organization/3c_metadata-extracted/all-mission-polygons-w-metadata.gpkg"
 MISSION_POINTS_PATH = "/ofo-share/drone-imagery-organization/3c_metadata-extracted/all-mission-points-w-metadata.gpkg"
 
+# The path to all the published files for the drone mission catalog
+PUBLISHED_DATA_PATH = "/ofo-share/drone-data-publish/01/"
+
+# The base URL for the data server (Cyverse Data Store)
+DATA_SERVER_BASE_URL = "https://data.cyverse.org/dav-anon/iplant/projects/ofo/public/missions/"
+
 
 # ---- Processing
 
@@ -51,6 +58,12 @@ mission_points = st_read(MISSION_POINTS_PATH)
 # Save header library files required by embedded HTML datatables and leaflet maps
 save_dt_header_files(WEBSITE_STATIC_PATH, DATATABLE_HEADER_FILES_DIR)
 save_leaflet_header_files(WEBSITE_STATIC_PATH, LEAFLET_HEADER_FILES_DIR)
+
+# # ** Unique to drone mission catalog beta: keep only nadir missions (or keep only missions with photogrammetry products, etc)
+# mission_polygons_w_metadata = mission_polygons_w_metadata |>
+#   filter(abs(camera_pitch_derived) < 10)
+
+
 # Compile relevant and human-readable values from mission attributes as additional columns of the
 # mission polygons object
 mission_polygons_w_summary_data = compile_mission_summary_data(mission_polygons_w_metadata,
@@ -96,5 +109,7 @@ make_mission_details_pages(
   mission_details_datatable_dir = MISSION_DETAILS_DATATABLE_DIR,
   mission_details_map_dir = MISSION_DETAILS_MAP_DIR,
   mission_details_template_filepath = MISSION_DETAILS_TEMPLATE_FILEPATH,
-  mission_details_page_dir = MISSION_DETAILS_PAGE_DIR
+  mission_details_page_dir = MISSION_DETAILS_PAGE_DIR,
+  published_data_path = PUBLISHED_DATA_PATH,
+  data_server_base_url = DATA_SERVER_BASE_URL
 )
