@@ -9,7 +9,8 @@ compile_mission_summary_data = function(mission_level_metadata, base_ofo_url, mi
   d = mission_level_metadata |>
     dplyr::mutate(
       overlap_combined_nominal = paste(overlap_front_nominal, overlap_side_nominal, sep = "/"),
-      license = "License will display here",
+      license = "CC-BY 4.0",
+      creator = "Dr. Derek Young and UC Davis FOCAL Lab",
       dataset_id_link = paste0('<a href="', base_ofo_url, mission_details_dir, dataset_id, '/"', ' target="_PARENT">', dataset_id, "</a>"),
       time_range_local_derived = paste0(earliest_time_local_derived, " to ", latest_time_local_derived),
       overlap_front_side_nominal = paste0(overlap_front_nominal, "/", overlap_side_nominal),
@@ -335,7 +336,9 @@ make_mission_details_datatable = function(mission_summary_foc,
       "File format" = file_format_derived,
       "Project ID" = project_id,
       "Contributor dataset name" = contributor_dataset_name,
-      "Dataset license" = license) |>
+      "Creator" = creator,
+      "License" = license
+    ) |>
       # Pivot longer
       dplyr::mutate(across(everything(), as.character)) |>
       tidyr::pivot_longer(cols = everything(), names_to = "Attribute", values_to = "Value")
