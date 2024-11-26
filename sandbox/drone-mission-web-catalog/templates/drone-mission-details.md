@@ -24,7 +24,8 @@ profile: false
 <p style="color: red; line-height: 125%; text-align:center;"><b>This page is in beta.</b> The drone data web catalog is under active development and will continue to improve. Feel free to <a href="/about/#contact-us">contact us</a> with feedback!</p>
 
 {% if oblique -%}
-<p style="color: red; line-height: 125%; text-align:center;">Note: This dataset was collected using an oblique camera pitch and is intended to complement a co-located mission that was flown using a nadir camera. The processed data products on this page were produced from the oblique dataset only and are not expected to be of high quality.</p>
+<p style="color: red; line-height: 125%; text-align:center;">Note: This dataset was collected using an oblique camera pitch and is intended to complement a co-located mission that was flown using a nadir camera. Any processed data products on this page were produced from the oblique dataset only and are not expected to be of high quality.</p>
+
 {% endif -%}
 
 {% if ortho_exists -%}
