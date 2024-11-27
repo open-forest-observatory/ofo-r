@@ -227,9 +227,9 @@ create_chms = function(exported_data_folder, res = 0.25, skip_existing = TRUE) {
     # Take the only DSM file
     dtm_file = dtm_files[1]
 
-    for (j in seq_along(dtm_files)) {
+    for (j in seq_along(dsm_files)) {
       dsm_file = dsm_files[j]
-      output_chm_file = str_replace(dtm_file, "dtm", "chm")
+      output_chm_file = str_replace(dsm_file, "dsm", "chm")
       if (!(skip_existing && file.exists(output_chm_file))) {
         dsm = terra::rast(dsm_file)
         dtm = terra::rast(dtm_file)
