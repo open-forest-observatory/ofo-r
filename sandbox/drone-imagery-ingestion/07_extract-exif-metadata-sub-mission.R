@@ -6,11 +6,11 @@
 library(tidyverse)
 library(sf)
 
-devtools::document()
+# devtools::document()
 devtools::install("/ofo-share/repos-david/ofo-r")
 library(ofo)
 
-IMAGERY_PROJECT_NAME = "2021-tnc-yuba-test"
+IMAGERY_PROJECT_NAME = "2020-ucnrs"
 
 BASEROW_DATA_PATH = "/ofo-share/drone-imagery-organization/ancillary/baserow-snapshots"
 FOLDER_BASEROW_CROSSWALK_PATH = "/ofo-share/drone-imagery-organization/1c_exif-for-sorting/"
@@ -91,8 +91,10 @@ extract_perimage_metadata = function(submission_and_exif) {
     "Matrice 300"
   )) {
     return(extract_imagery_perimage_metadata_DJI(exif))
+  } else if (aircraft_model_name %in% c("eBee X")) {
+    return(extract_imagery_perimage_metadata_eBee(exif))
   } else {
-    print(paste0("Aircraft model name \'", aircraft_model_name, "\' not supported"))
+    stop(paste0("Aircraft model name \'", aircraft_model_name, "\' not supported"))
     return(NULL)
   }
 }

@@ -357,6 +357,52 @@ extract_imagery_perimage_metadata_DJI = function(exif) {
   return(metadata)
 }
 
+#' Extract image-level metadata parameters from EXIF datafram
+#'
+#' @param exif_file the exif filepath (before being prepared to pass to the functions in the
+#' wrapper)
+#' @param input_type the type of input, either "dataframe" or "filepath" to a .csv file
+#'
+#' @return a data.frame of dataset_id_image_level, datetime_local, lat, lon, rtk_fix, accuracy_x, accuracy_y, camera_pitch, camera_roll, camera_yaw, exposure, aperture, iso, white_balance, received_image_path, and altitude_asl
+#'
+#' @examples
+#' extract_metadata_emp(exif)
+#'
+#' @export
+extract_imagery_perimage_metadata_eBee = function(exif) {
+  image_id = extract_image_id(exif)
+  dataset_id_image_level = extract_dataset_id_perimage(exif)
+  datetime_local = extract_datetime_local(exif)
+  lon_lat = extract_lon_lat(exif)
+  rtk_fix = extract_rtk_fix(exif)
+  accuracy = extract_accuracy(exif)
+  pitch_roll_yaw = extract_pitch_roll_yaw(exif)
+  exposure = extract_exposure(exif)
+  aperture = extract_aperture(exif)
+  iso = extract_iso(exif)
+  white_balance = extract_white_balance(exif)
+  received_image_path = extract_received_image_path(exif)
+  altitude_asl_drone = extract_altitude_asl(exif)
+
+  metadata = data.frame(
+    image_id = image_id,
+    dataset_id_image_level = dataset_id_image_level,
+    datetime_local = datetime_local,
+    lon_lat,
+    rtk_fix = rtk_fix,
+    accuracy,
+    pitch_roll_yaw,
+    exposure = exposure,
+    aperture = aperture,
+    iso = iso,
+    white_balance = white_balance,
+    received_image_path = received_image_path,
+    altitude_asl_drone = altitude_asl_drone
+  )
+
+  return(metadata)
+}
+
 extract_candidate_columns = function(dataframe, candidate_columns) {
   selected_columns = dplyr::select(dataframe, dplyr::any_of(candidate_columns))
   if (ncol(selected_columns) == 0) {
