@@ -532,27 +532,10 @@ extract_imagery_dataset_metadata = function(exif,
   exposure = extract_exposure_summary(exif)
   area_and_density = extract_area_and_density(exif, mission_polygon)
   image_frequency_derived = extract_image_frequency(exif)
-  resolution_and_aspect_ratio = extract_resolution_and_aspect_ratio_summary(exif)
-  file_format_derived = extract_file_format_summary(exif)
-  print("Computed all summary statistics")
+  # TODO resolve these two fields that currently return NULL
+  # resolution_and_aspect_ratio = extract_resolution_and_aspect_ratio_summary(exif)
+  # file_format_derived = extract_file_format_summary(exif)
 
-  # Return extracted/computed metadata as a data frame row
-  print(head(dataset_id))
-  print(head(flight_speed_derived))
-  print(head(flight_terrain_correlation_derived))
-  print(head(camera_pitch)) # this is a multi-column dataframe; preserving its column names
-  print(head(dates_times))
-  print(head(centroid_lonlat)) # this is a multi-column dataframe; preserving its column names
-  print(head(solarnoon_utc_derived))
-  print(head(image_count_derived))
-  print(head(file_size_derived))
-  print(head(percent_images_rtk_derived))
-  print(head(white_balance)) # this is a multi-column dataframe; preserving its column names
-  print(head(exposure)) # this is a multi-column dataframe; preserving its column names
-  print(head(area_and_density)) # this is a multi-column dataframe; preserving its column names
-  print(head(image_frequency_derived))
-  print(head(resolution_and_aspect_ratio))
-  print(head(file_format_derived))
   dataset_metadata = data.frame(
     dataset_id,
     flight_speed_derived,
@@ -567,9 +550,7 @@ extract_imagery_dataset_metadata = function(exif,
     white_balance, # this is a multi-column dataframe; preserving its column names
     exposure, # this is a multi-column dataframe; preserving its column names
     area_and_density, # this is a multi-column dataframe; preserving its column names
-    image_frequency_derived,
-    resolution_and_aspect_ratio,
-    file_format_derived
+    image_frequency_derived
   )
 
   mission_polygon = sf::st_as_sf(mission_polygon)
