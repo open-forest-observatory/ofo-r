@@ -1,3 +1,4 @@
+library(concaveman)
 # Functions to extract metadata from a drone imagery dataset, using an exif dataframe that has
 # already been prepped using prep_exif.
 
@@ -21,19 +22,25 @@ extract_flight_speed = function(exif) {
   speed = median(speed, na.rm = TRUE) |> round(2)
 
   return(speed)
-
 }
 
 # Get a polygon of the mission
 # image_merge_distance: The horizontal distance between images below which they are merged into one
 # mission polygon. Keep only contiguous patches > min_contig_area.
 #' @export
-extract_mission_polygon = function(exif, image_merge_distance, min_contig_area = 1600) {
-
-  exif = sf::st_transform(exif, 3310)
-  ptbuff = sf::st_buffer(exif, image_merge_distance)
-  polybuff = sf::st_union(ptbuff)
-  poly = sf::st_buffer(polybuff, -image_merge_distance + 1) |> sf::st_cast("MULTIPOLYGON")
+extract_mission_polygon = function(exif, image_merge_distance, min_contig_area = 1600, boundary_method = "concaveman") {
+  # TODO we could check that it's a meters-based projected CRS
+  if (boundary_method == "concaveman") {
+    poly = concaveman::concaveman(exif, concavity = 4)
+    poly = poly |> sf::st_cast("MULTIPOLYGON")
+  } else if (boundary_method == "dilate_erode") {
+    ptbuff = sf::st_buffer(exif, image_merge_distance)
+    polybuff = sf::st_union(ptbuff)
+    # This line is dangerous for single lines of images since
+    poly = sf::st_buffer(polybuff, -image_merge_distance + 1) |> sf::st_cast("MULTIPOLYGON")
+  } else {
+    stop(paste("Invalid boundary_method: ", boundary_method, ". Only 'concaveman' and 'dilate_erode' are supported"))
+  }
 
   n_polys = length(sf::st_geometry(poly)[[1]])
 
