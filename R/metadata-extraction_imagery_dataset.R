@@ -54,6 +54,7 @@ extract_mission_polygon = function(exif, image_merge_distance, min_contig_area =
       sf::st_cast("MULTIPOLYGON")
 
     n_polys_filtered = length(parts_filtered)
+    # TODO it's possible all polygons could be filtered out in this step
 
     if (n_polys_filtered < n_polys) {
       warning(n_polys, " non-contiguous image clusters in dataset ", exif$dataset_id[1], ". Retaining only the ", n_polys_filtered, " clusters with area > ", min_contig_area, " m^2.")
@@ -65,7 +66,7 @@ extract_mission_polygon = function(exif, image_merge_distance, min_contig_area =
   }
 
 
-  polysimp = sf::st_simplify(poly, dTolerance = 10) |> sf::st_cast("MULTIPOLYGON")
+  polysimp = sf::st_simplify(poly, dTolerance = 1) |> sf::st_cast("MULTIPOLYGON")
 
   return(polysimp)
 }
@@ -342,8 +343,6 @@ extract_white_balance_summary = function(exif) {
 #'
 #' @export
 extract_exposure_summary = function(exif) {
-  print(names(exif))
-
   exposure = exif$exposure
 
   exposure_median_derived = median(exposure)
@@ -404,9 +403,9 @@ extract_area_and_density = function(exif, mission_polygon) {
 
 
 # Image frequency (imgs/sec)
+#' @export
 extract_image_frequency <- function(exif) {
   # Convert DateTimeOriginal to datetime object
-  print(exif$datetime_local)
   datetime <- lubridate::as_datetime(exif$datetime_local)
 
   # Calculate time difference between consecutive images
@@ -443,14 +442,15 @@ extract_image_frequency <- function(exif) {
 # Resolution and aspect ratio
 extract_resolution_and_aspect_ratio_summary <- function(exif) {
   # Get Xresolution and Yresolution from the EXIF data
-  resolution_x <- unique(exif$ImageWidth)
-  resolution_y <- unique(exif$ImageHeight)
+  resolution_x <- unique(exif$image_width)
+  resolution_y <- unique(exif$image_height)
 
   # Calculate mode resolution
   mode_resolution_x <- as.numeric(names(sort(table(resolution_x), decreasing = TRUE)[1]))
   mode_resolution_y <- as.numeric(names(sort(table(resolution_y), decreasing = TRUE)[1]))
 
   # Get aspect ratio
+  # TODO instead could you directly calculate the aspect ratio of all images and then take the mode
   aspect_ratio <- round(mode_resolution_x / mode_resolution_y, 2)
 
   return(list(
@@ -465,7 +465,7 @@ extract_resolution_and_aspect_ratio_summary <- function(exif) {
 extract_file_format_summary <- function(exif) {
   # Get image file format
   # TODO fix this column
-  image_file_format <- unique(exif$FileType)
+  image_file_format <- unique(exif$file_format)
 
   # Check if image file format is consistent
   if (length(unique(image_file_format)) > 1) {
@@ -532,9 +532,8 @@ extract_imagery_dataset_metadata = function(exif,
   exposure = extract_exposure_summary(exif)
   area_and_density = extract_area_and_density(exif, mission_polygon)
   image_frequency_derived = extract_image_frequency(exif)
-  # TODO resolve these two fields that currently return NULL
-  # resolution_and_aspect_ratio = extract_resolution_and_aspect_ratio_summary(exif)
-  # file_format_derived = extract_file_format_summary(exif)
+  resolution_and_aspect_ratio = extract_resolution_and_aspect_ratio_summary(exif)
+  file_format_derived = extract_file_format_summary(exif)
 
   dataset_metadata = data.frame(
     dataset_id,
@@ -550,7 +549,9 @@ extract_imagery_dataset_metadata = function(exif,
     white_balance, # this is a multi-column dataframe; preserving its column names
     exposure, # this is a multi-column dataframe; preserving its column names
     area_and_density, # this is a multi-column dataframe; preserving its column names
-    image_frequency_derived
+    image_frequency_derived,
+    resolution_and_aspect_ratio,
+    file_format_derived
   )
 
   mission_polygon = sf::st_as_sf(mission_polygon)
