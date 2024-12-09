@@ -45,7 +45,6 @@ extract_image_id = function(exif) {
 extract_datetime_local = function(exif, candidate_columns = c("capture_datetime", "GPSDateTime", "DateTimeOriginal")) {
   datetime_local = extract_candidate_columns(st_drop_geometry(exif), candidate_columns)
   datetime_local = lubridate::ymd_hms(datetime_local)
-  print(datetime_local)
   return(datetime_local)
 }
 
@@ -135,6 +134,32 @@ extract_accuracy = function(exif) {
   )
 
   return(ret)
+}
+
+extract_image_shape = function(exif, image_width_candidate_columns = c("ImageWidth"), image_height_candidate_columns = c("ImageHeight")) {
+  image_width = extract_candidate_columns(exif, image_width_candidate_columns)
+  image_height = extract_candidate_columns(exif, image_height_candidate_columns)
+
+  ret_list = list(image_width = image_width, image_height = image_height)
+
+  return(ret_list)
+}
+
+extract_file_format = function(exif) {
+  file_names = extract_original_file_name(exif)
+
+  # For some reason this expects a vector of strings, so we give all the strings which will be split
+  # individually
+  # Use fixed = TRUE to avoid treating the period as a wildcard
+  splits = strsplit(file_names, split = ".", fixed = TRUE)
+  # Get the last element of each split
+  file_formats = lapply(splits, function(split) {
+    return(split[[length(split)]])
+  })
+  # Convert into a character array
+  file_formats = unlist(file_formats)
+
+  return(file_formats)
 }
 
 #### pitch_roll_yaw: camera_pitch (Units: deg, degrees up from nadir), camera_roll (Units: deg, degrees clockwise from up), camera_yaw (Units: deg, degrees right from true north) ####
@@ -383,6 +408,8 @@ extract_imagery_perimage_metadata_eBee = function(exif) {
   white_balance = extract_white_balance(exif)
   received_image_path = extract_received_image_path(exif)
   altitude_asl_drone = extract_altitude_asl(exif)
+  image_shape = extract_image_shape(exif)
+  file_format = extract_file_format(exif)
 
   metadata = data.frame(
     image_id = image_id,
@@ -397,7 +424,9 @@ extract_imagery_perimage_metadata_eBee = function(exif) {
     iso = iso,
     white_balance = white_balance,
     received_image_path = received_image_path,
-    altitude_asl_drone = altitude_asl_drone
+    altitude_asl_drone = altitude_asl_drone,
+    image_shape,
+    file_format = file_format
   )
 
   return(metadata)
