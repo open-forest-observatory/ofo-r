@@ -5,9 +5,11 @@
 
 library(tidyverse)
 library(sf)
+library(ggplot2)
+library(concaveman)
 
 # devtools::document()
-devtools::install("/ofo-share/repos-david/ofo-r")
+# devtools::install("/ofo-share/repos-david/ofo-r", quick = TRUE)
 library(ofo)
 
 IMAGERY_PROJECT_NAME = "2020-ucnrs"
@@ -88,63 +90,23 @@ extract_perimage_metadata = function(submission_and_exif) {
     "Phantom 4 Standard",
     "Matrice 210 RTK",
     "Matrice 100",
-    "Matrice 300"
+    "Matrice 300",
+    "eBee X" # As far as I can tell, there is no issue with this using the DJI parser
   )) {
-    return(extract_imagery_perimage_metadata_DJI(exif))
-  } else if (aircraft_model_name %in% c("eBee X")) {
-    return(extract_imagery_perimage_metadata_eBee(exif))
+    return(extract_imagery_perimage_metadata_generic(exif))
   } else {
     stop(paste0("Aircraft model name \'", aircraft_model_name, "\' not supported"))
     return(NULL)
   }
 }
 
-print(length(exif_list))
 
-standardized_exif_per_sub_mission = furrr::future_map(exif_list, extract_perimage_metadata)
+metadata_per_sub_dataset = furrr::future_map(exif_list, extract_perimage_metadata)
+metadata_perimage = bind_rows(metadata_per_sub_dataset)
 print("Finished processing per-sub-mission datasets")
-furrr::future_map(standardized_exif_per_sub_mission, extract_imagery_dataset_metadata)
+
+res = furrr::future_map(metadata_per_sub_dataset, extract_imagery_dataset_metadata)
 print("Finished processing dataset-level metadata")
-quit()
-
-
-# Assign the "dataset_id" parameter that is used in the metadata extraction functions. This is done
-# here as opposed to in the metadata extraction to keep those functions flexible as to how a dataset
-# is defined (e.g. a "mission" or a "sub-mission"). Here we are defining a dataset as a
-# "sub-mission".
-exif$dataset_id = exif$submission_id
-
-# Extract image-level metadata, which can occur across all missions at once becuase there are no
-# hierarchical dependencies on mission-level data
-metadata_perimage = extract_imagery_perimage_metadata(exif,
-  input_type = "dataframe"
-)
-
-# Assign image_id to the exif dataframe so it can be used in the dataset-level metadata extraction
-exif$image_id = metadata_perimage$image_id
-
-# For sub-mission-level metadata, run sub-mission by sub-mission
-submissions = unique(exif$submission_id)
-
-# For parallelizing, make a list of subsets of the exif dataframe, one for each sub-mission
-exif_list <- lapply(submissions, function(submission) {
-  exif_foc <- exif |>
-    filter(submission_id == submission)
-  return(exif_foc)
-})
-
-# Run dataset-level metadata extraction across each subset
-print("About to run future map")
-future::plan("multisession")
-res = furrr::future_map(exif_list,
-  extract_imagery_dataset_metadata,
-  input_type = "dataframe",
-  plot_flightpath = FALSE,
-  crop_to_contiguous = TRUE,
-  min_contig_area = 1600,
-  .options = furrr::furrr_options(seed = TRUE)
-)
-print("Done with future map")
 
 metadata_list = map(res, ~ .x$dataset_metadata)
 polygon_list = map(res, ~ .x$mission_polygon)
