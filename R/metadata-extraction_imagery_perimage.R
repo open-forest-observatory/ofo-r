@@ -146,20 +146,10 @@ extract_image_shape = function(exif, image_width_candidate_columns = c("ImageWid
 }
 
 extract_file_format = function(exif) {
-  file_names = extract_original_file_name(exif)
-
-  # For some reason this expects a vector of strings, so we give all the strings which will be split
-  # individually
-  # Use fixed = TRUE to avoid treating the period as a wildcard
-  splits = strsplit(file_names, split = ".", fixed = TRUE)
-  # Get the last element of each split
-  file_formats = lapply(splits, function(split) {
-    return(split[[length(split)]])
-  })
   # Convert into a character array
-  file_formats = unlist(file_formats)
+  file_format = extract_candidate_columns(exif, c("FileTypeExtension"))
 
-  return(file_formats)
+  return(file_format)
 }
 
 #### pitch_roll_yaw: camera_pitch (Units: deg, degrees up from nadir), camera_roll (Units: deg, degrees clockwise from up), camera_yaw (Units: deg, degrees right from true north) ####
@@ -334,6 +324,30 @@ extract_original_file_name = function(exif, candidate_file_name_columns = c("Ima
   original_file_names = extract_candidate_columns(sf::st_drop_geometry(exif), candidate_file_name_columns)
 
   return(original_file_names)
+}
+
+# TODO document
+#' @export
+extract_perimage_metadata = function(submission_and_exif) {
+  aircraft_model_name = submission_and_exif$aircraft_model_name
+  exif = submission_and_exif$sub_mission_exif
+
+  if (aircraft_model_name %in% c(
+    "Phantom 4 Pro v2.0",
+    "Phantom 4 Advanced",
+    "Mavic 3 Multispectral",
+    "Phantom 4 RTK",
+    "Phantom 4 Standard",
+    "Matrice 210 RTK",
+    "Matrice 100",
+    "Matrice 300",
+    "eBee X" # As far as I can tell, there is no issue with this using the DJI parser
+  )) {
+    return(extract_imagery_perimage_metadata_generic(exif))
+  } else {
+    stop(paste0("Aircraft model name \'", aircraft_model_name, "\' not supported"))
+    return(NULL)
+  }
 }
 
 #' Extract image-level metadata parameters from EXIF datafram
