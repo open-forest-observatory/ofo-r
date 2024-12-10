@@ -47,75 +47,56 @@ exif$dataset_id = exif$submission_id
 exif = exif |> mutate(mission_id = str_pad(mission_id, 6, pad = "0", side = "left"))
 
 # Compute the unique sub mission IDs
-submissions = unique(exif$submission_id)
+unique_sub_missions = unique(exif$submission_id)
 
 # For parallelizing, make a list of subsets of the exif dataframe, one for each sub-mission
-exif_list <- lapply(submissions, function(submission) {
-  exif_foc <- exif |>
-    filter(submission_id == submission)
-  return(list(submission = submission, exif_foc = exif_foc))
-})
-
-# Compute the corresponding
-exif_list <- lapply(exif_list, function(submission_exif) {
-  sub_mission_id = submission_exif[[1]]
-  sub_mission_exif = submission_exif[[2]]
-
-  baserow_for_sub_mission <- baserow_sub_mission_metadata[
-    baserow_sub_mission_metadata$sub_mission_id == sub_mission_id,
-  ]
-  if (nrow(baserow_for_sub_mission) != 1) {
-    # TODO make this an actual error
-    print("Error: there was not one corresponding baserow entry")
-    print(baserow_for_sub_mission)
+exif_per_sub_mission <- lapply(
+  unique_sub_missions,
+  function(sub_mission_ID) {
+    # Extract the exif rows matching that sub-mission ID
+    sub_mission_exif <- exif |>
+      filter(submission_id == sub_mission_ID)
+    return(sub_mission_exif)
   }
-  return(
-    list(
-      aircraft_model_name = baserow_for_sub_mission$aircraft_model_name,
-      sub_mission_exif = sub_mission_exif,
-      sub_mission_id = sub_mission_id
-    )
-  )
-})
+)
 
-extract_perimage_metadata = function(submission_and_exif) {
-  aircraft_model_name = submission_and_exif$aircraft_model_name
-  exif = submission_and_exif$sub_mission_exif
+# Compute the corresponding baserow data for each of the sub-missions
+aircraft_model_names <- lapply(
+  unique_sub_missions,
+  function(sub_mission_ID) {
+    # Extract the baserow entries for this sub-mission ID
+    baserow_for_sub_mission <- baserow_sub_mission_metadata[
+      baserow_sub_mission_metadata$sub_mission_id == sub_mission_ID,
+    ]
 
-  if (aircraft_model_name %in% c(
-    "Phantom 4 Pro v2.0",
-    "Phantom 4 Advanced",
-    "Mavic 3 Multispectral",
-    "Phantom 4 RTK",
-    "Phantom 4 Standard",
-    "Matrice 210 RTK",
-    "Matrice 100",
-    "Matrice 300",
-    "eBee X" # As far as I can tell, there is no issue with this using the DJI parser
-  )) {
-    return(extract_imagery_perimage_metadata_generic(exif))
-  } else {
-    stop(paste0("Aircraft model name \'", aircraft_model_name, "\' not supported"))
-    return(NULL)
+    # There should only be one matching row
+    if (nrow(baserow_for_sub_mission) != 1) {
+      stop(paste("Error: there was not one corresponding baserow entry: ", baserow_for_sub_mission))
+    }
+
+    # Extract the aircraft model name
+    aircraft_model_name = baserow_for_sub_mission$aircraft_model_name
+
+    return(aircraft_model_name)
   }
-}
+)
 
-
-metadata_per_sub_dataset = furrr::future_map(exif_list, extract_perimage_metadata)
-metadata_perimage = bind_rows(metadata_per_sub_dataset)
+# Extract the metadata in a standardized manner no matter the platform
+metadata_per_sub_dataset = furrr::future_map(seq_along(exif_per_sub_mission), function(i) {
+  extract_imagery_perimage_metadata(exif = exif_per_sub_mission[[i]], platform_name = aircraft_model_names[[i]])
+})
 print("Finished processing per-sub-mission datasets")
 
-res = furrr::future_map(metadata_per_sub_dataset, extract_imagery_dataset_metadata)
-print("Finished processing dataset-level metadata")
+summary_statistics = furrr::future_map(metadata_per_sub_dataset, extract_imagery_dataset_metadata)
+print("Finished processing dataset-level summary statistics")
 
-metadata_list = map(res, ~ .x$dataset_metadata)
-polygon_list = map(res, ~ .x$mission_polygon)
-images_retained_list = map(res, ~ .x$images_retained)
+# Extract the elements of the summary statistics
+metadata_perdataset = bind_rows(map(summary_statistics, ~ .x$dataset_metadata))
+polygon_perdataset = bind_rows(map(summary_statistics, ~ .x$mission_polygon))
+images_retained = unlist(map(summary_statistics, ~ .x$images_retained))
 
-metadata_perdataset = bind_rows(metadata_list)
-polygon_perdataset = bind_rows(polygon_list)
-images_retained = unlist(images_retained_list)
-
+# TODO the rows in each dataset could be sorted like they were in the past
+metadata_perimage = bind_rows(metadata_per_sub_dataset)
 # Filter the extracted metadata to only include images that were retained in the dataset-level
 # metadata extraction based on intersection with the mission polygon
 metadata_perimage = metadata_perimage |>
