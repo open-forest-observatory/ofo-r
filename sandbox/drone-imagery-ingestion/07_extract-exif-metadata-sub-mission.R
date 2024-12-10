@@ -95,7 +95,6 @@ metadata_perdataset = bind_rows(map(summary_statistics, ~ .x$dataset_metadata))
 polygon_perdataset = bind_rows(map(summary_statistics, ~ .x$mission_polygon))
 images_retained = unlist(map(summary_statistics, ~ .x$images_retained))
 
-# TODO the rows in each dataset could be sorted like they were in the past
 metadata_perimage = bind_rows(metadata_per_sub_dataset)
 # Filter the extracted metadata to only include images that were retained in the dataset-level
 # metadata extraction based on intersection with the mission polygon
