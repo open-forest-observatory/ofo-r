@@ -319,35 +319,12 @@ extract_altitude_asl = function(exif, candidate_asl_columns = c("AbsoluteAltitud
   return(altitude_asl)
 }
 
+# TODO document
 #' @export
 extract_original_file_name = function(exif, candidate_file_name_columns = c("ImageDescription", "FileName")) {
   original_file_names = extract_candidate_columns(sf::st_drop_geometry(exif), candidate_file_name_columns)
 
   return(original_file_names)
-}
-
-# TODO document
-#' @export
-extract_perimage_metadata = function(submission_and_exif) {
-  aircraft_model_name = submission_and_exif$aircraft_model_name
-  exif = submission_and_exif$sub_mission_exif
-
-  if (aircraft_model_name %in% c(
-    "Phantom 4 Pro v2.0",
-    "Phantom 4 Advanced",
-    "Mavic 3 Multispectral",
-    "Phantom 4 RTK",
-    "Phantom 4 Standard",
-    "Matrice 210 RTK",
-    "Matrice 100",
-    "Matrice 300",
-    "eBee X" # As far as I can tell, there is no issue with this using the DJI parser
-  )) {
-    return(extract_imagery_perimage_metadata_generic(exif))
-  } else {
-    stop(paste0("Aircraft model name \'", aircraft_model_name, "\' not supported"))
-    return(NULL)
-  }
 }
 
 #' Extract image-level metadata parameters from EXIF datafram
@@ -362,8 +339,26 @@ extract_perimage_metadata = function(submission_and_exif) {
 #' extract_metadata_emp(exif)
 #'
 #' @export
-extract_imagery_perimage_metadata_generic = function(exif) {
+extract_imagery_perimage_metadata = function(exif, platform_name, plot_flightpath = FALSE) {
+  # Check if the platform is supported
+  if (!(platform_name %in% c(
+    "Phantom 4 Pro v2.0",
+    "Phantom 4 Advanced",
+    "Mavic 3 Multispectral",
+    "Phantom 4 RTK",
+    "Phantom 4 Standard",
+    "Matrice 210 RTK",
+    "Matrice 100",
+    "Matrice 300",
+    "eBee X" # As far as I can tell, there is no issue with this using the DJI parser
+  ))) {
+    stop(paste("Platform ", platform_name, " is not supported"))
+  }
+
+  # In the future, some of these parsing steps might be dependent on the platform but for now it's
+  # not required
   image_id = extract_image_id(exif)
+  original_file_name = extract_original_file_name(exif)
   dataset_id_image_level = extract_dataset_id_perimage(exif)
   datetime_local = extract_datetime_local(exif)
   lon_lat = extract_lon_lat(exif)
@@ -381,6 +376,7 @@ extract_imagery_perimage_metadata_generic = function(exif) {
 
   metadata = data.frame(
     image_id = image_id,
+    original_file_name = original_file_name,
     dataset_id_image_level = dataset_id_image_level,
     datetime_local = datetime_local,
     lon_lat,
@@ -397,8 +393,41 @@ extract_imagery_perimage_metadata_generic = function(exif) {
     file_format = file_format
   )
 
+  # Remove any rows with missing GPS data
+  missing_gps_rows = is.na(metadata$lat) | is.na(metadata$lon)
+  n_missing_gps_rows = sum(missing_gps_rows)
+  if (n_missing_gps_rows > 0) {
+    warning("Removing ", n_missing_gps_rows, " rows with missing GPS data from dataset", exif$dataset_id[1])
+
+    # Keep only rows with GPS data
+    metadata = metadata[!missing_gps_rows, ]
+  }
+
+  # Arrange images by capture time (presumably they're already in capture order, but just to be
+  # sure). First arrange by full file path (assuming that is the capture order), then by capture
+  # time. This way, the capture time is used as top priority, with the file path used as a
+  # tiebreaker (e.g. if there were two images taken in the same second). We can't use the path alone
+  # because if the mission was split over two SD cards, the file write path may have started over.
+  # TODO: Deal with the case where a dataset was collected by two drones flying at once.
+  metadata = metadata[order(metadata$original_file_name), ]
+  metadata = metadata[order(metadata$datetime_local), ]
+
+  # Plot the flight path as a visual check if requested
+  if (plot_flightpath) {
+    # TODO figure out if this is the best way to visualize
+    # This has the issue of opening a bunch of windows
+    x11()
+    flightpath = sf::st_as_sf(metadata, crs = 4326, coords = c("lon", "lat"))
+
+    flightpath = flightpath |>
+      dplyr::summarize(do_union = FALSE) |>
+      sf::st_cast("LINESTRING")
+    plot(flightpath)
+  }
+
   return(metadata)
 }
+
 
 extract_candidate_columns = function(dataframe, candidate_columns) {
   selected_columns = dplyr::select(dataframe, dplyr::any_of(candidate_columns))
