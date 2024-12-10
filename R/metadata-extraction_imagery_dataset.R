@@ -514,7 +514,8 @@ extract_imagery_dataset_metadata = function(exif,
     }
   }
 
-  images_retained = extract_image_id(exif)
+  # Extract the IDs of the images that were retained
+  images_retained = exif$image_id
 
   # Extract/compute metadata attributes
   dataset_id = extract_dataset_id_summary(exif)
