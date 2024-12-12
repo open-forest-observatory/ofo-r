@@ -108,6 +108,7 @@ extract_camera_pitch_summary <- function(exif) {
 extract_dates_times = function(exif) {
   datetime = exif$datetime_local
 
+  # See if there are more than one unique dates (days)
   single_date = length(unique(lubridate::as_date(datetime))) == 1
 
   # Compute earliest and latest dates
@@ -315,7 +316,7 @@ extract_pct_images_rtk = function(exif) {
 #'
 #' @export
 extract_white_balance_summary = function(exif) {
-  white_balance = extract_white_balance(exif)
+  white_balance = exif$white_balance
 
   unique_white_balance <- unique(white_balance)
   white_balance_mode_derived = unique_white_balance[which.max(tabulate(match(white_balance, unique_white_balance)))][1]
