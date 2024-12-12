@@ -90,7 +90,11 @@ extract_lon_lat = function(exif) {
 #' @export
 extract_rtk_fix = function(exif) {
   if ("RtkFlag" %in% names(exif)) {
-    rtk_fix = exif$RtkFlag == 50
+    rtk_flag = exif$RtkFlag
+    # Since this may contain NA, replace them with zeros
+    rtk_flag = replace_na(rtk_flag, 0)
+    # Compute whether it has the "fix" flag
+    rtk_fix = rtk_flag == 50
     return(rtk_fix)
   } else {
     rtk_fix = rep(FALSE, nrow(exif))
@@ -115,10 +119,14 @@ extract_rtk_fix = function(exif) {
 
 extract_accuracy = function(exif) {
   exif = sf::st_drop_geometry(exif)
-  if ("GPSXYAccuracy" %in% colnames(exif)) {
+  # This field may not be actually present in the data but only introduced by
+  # row_binding across multiple platforms
+  if ("GPSXYAccuracy" %in% colnames(exif) && !all(is.na(exif$GPSXYAccuracy))) {
     accuracy_x = exif$GPSXYAccuracy
     accuracy_y = exif$GPSXYAccuracy
-  } else {
+  } else{
+    # Try extracting the deviation from the RTK field
+    # TODO should we instead prioritize the RTK value if both are present?
     exif["RtkStdLon"[!("RtkStdLon" %in% colnames(exif))]] = NA
     exif["RtkStdLat"[!("RtkStdLat" %in% colnames(exif))]] = NA
     accuracy_x = exif$RtkStdLon
