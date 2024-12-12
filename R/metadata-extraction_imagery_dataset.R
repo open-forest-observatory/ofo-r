@@ -170,6 +170,9 @@ extract_flight_terrain_correlation = function(exif) {
 
   # Get the correlation between the altitude of the drone and the ground elevation (i.e. trerrain
   # follow tightness)
+  # Note that for some small regions the DEM will not have any variation so this
+  # correlation will be NA. It appears thte DEM is reported as integer meters so
+  # small variations are suppressed
   flight_terrain_correlation = cor(drone_altitude_core, ground_elev_core) |> round(2)
 
   return(flight_terrain_correlation)
