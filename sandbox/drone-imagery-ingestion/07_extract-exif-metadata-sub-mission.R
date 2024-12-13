@@ -3,6 +3,9 @@
 # a two-part grid mission) and extract/process into human-readable metadata at the image level and
 # sub-mission level using the metadata extraction functions of the ofo package.
 
+# This needs to be included or else the bind_rows call to create polygon_perdataset fails. I don't
+# understand the concept of dispatching and why this is required.
+library(sf)
 library(tidyverse)
 library(ofo)
 
@@ -46,10 +49,10 @@ unique_datasets = unique(exif$dataset_id)
 # For parallelizing, make a list of subsets of the exif dataframe, one for each dataset
 exif_per_dataset <- lapply(
   unique_datasets,
-  function(dataset_id) {
+  function(unique_dataset) {
     # Extract the exif rows matching that sub-mission ID
     dataset_exif <- exif |>
-      filter(dataset_id == dataset_id)
+      filter(dataset_id == unique_dataset)
     return(dataset_exif)
   }
 )
@@ -85,26 +88,32 @@ metadata_per_dataset = furrr::future_map2(
   .x = exif_per_dataset,
   .y = aircraft_model_names,
   .f = extract_imagery_perimage_metadata,
+  .progress = TRUE,
   .options = furrr::furrr_options(seed = TRUE)
 )
-
+# Additional print since the progress bar doesn't end the line
 print("Started computing dataset-level summary statistics")
 # Use the standardized image-level metadata extracted in previous step to compute dataset-level summary statistics
-# TODO there might be a way to run this using furrr::future_map but currently this causes the following
-# error: "! ‘workers >= 1’ is not TRUE". Perhaps limiting the number of parallel jobs could prevent
-# this issue.
-summary_statistics = purrr::map(
+# TODO there may not be a performance benefit if this process is bottlenecked by network constraints
+# when downloading the DEM for "extract_flight_terrain_correlation".
+# The alternative sequential call with purr is provided below
+summary_statistics = furrr::future_map(
   metadata_per_dataset,
   extract_imagery_dataset_metadata,
+  .progress = TRUE,
+  .options = furrr::furrr_options(seed = TRUE)
 )
+# summary_statistics = purrr::map(
+#  metadata_per_dataset,
+#  extract_imagery_dataset_metadata,
+# )
 print("Finished computing dataset-level summary statistics")
-
 # Extract the elements of the summary statistics
-metadata_perdataset = bind_rows(map(summary_statistics, "dataset_metadata"))
-polygon_perdataset = bind_rows(map(summary_statistics, "mission_polygon"))
+metadata_perdataset = dplyr::bind_rows(map(summary_statistics, "dataset_metadata"))
+polygon_perdataset = dplyr::bind_rows(map(summary_statistics, "mission_polygon"))
 images_retained = unlist(map(summary_statistics, "images_retained"))
 
-metadata_perimage = bind_rows(metadata_per_dataset)
+metadata_perimage = dplyr::bind_rows(metadata_per_dataset)
 # Filter the extracted metadata to only include images that were retained in the dataset-level
 # metadata extraction based on intersection with the mission polygon
 metadata_perimage = metadata_perimage |>
@@ -121,4 +130,4 @@ purrr::walk(
 
 write_csv(metadata_perimage, metadata_perimage_filepath)
 write_csv(metadata_perdataset, metadata_perdataset_filepath)
-st_write(polygon_perdataset, polygons_filepath, delete_dsn = TRUE)
+sf::st_write(polygon_perdataset, polygons_filepath, delete_dsn = TRUE)
