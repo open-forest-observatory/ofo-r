@@ -4,12 +4,6 @@
 # sub-mission level using the metadata extraction functions of the ofo package.
 
 library(tidyverse)
-library(sf)
-library(ggplot2)
-library(concaveman)
-
-# devtools::document()
-# devtools::install("/ofo-share/repos-david/ofo-r", quick = TRUE)
 library(ofo)
 
 IMAGERY_PROJECT_NAME = "2020-ucnrs"
@@ -36,7 +30,7 @@ metadata_mission_filepath = file.path(EXTRACTED_METADATA_PATH, paste0("mission-b
 # Read in the EXIF
 exif = read.csv(exif_filepath)
 # Read in the baserow metadata
-baserow_sub_mission_metadata = read.csv(metadata_sub_mission_filepath)
+baserow_dataset_metadata = read.csv(metadata_sub_mission_filepath)
 
 # Assign the "dataset_id" parameter that is used in the metadata extraction functions. This is done
 # here as opposed to in the metadata extraction to keep those functions flexible as to how a dataset
@@ -47,62 +41,76 @@ exif$dataset_id = exif$submission_id
 exif = exif |> mutate(mission_id = str_pad(mission_id, 6, pad = "0", side = "left"))
 
 # Compute the unique sub mission IDs
-unique_sub_missions = unique(exif$submission_id)
+unique_datasets = unique(exif$dataset_id)
 
-# For parallelizing, make a list of subsets of the exif dataframe, one for each sub-mission
-exif_per_sub_mission <- lapply(
-  unique_sub_missions,
-  function(sub_mission_ID) {
+# For parallelizing, make a list of subsets of the exif dataframe, one for each dataset
+exif_per_dataset <- lapply(
+  unique_datasets,
+  function(dataset_id) {
     # Extract the exif rows matching that sub-mission ID
-    sub_mission_exif <- exif |>
-      filter(submission_id == sub_mission_ID)
-    return(sub_mission_exif)
+    dataset_exif <- exif |>
+      filter(dataset_id == dataset_id)
+    return(dataset_exif)
   }
 )
 
-# Compute the corresponding baserow data for each of the sub-missions
+# Get aircraft model name to use for determining the appropriate image-level metadata extractor
+# functions to use
 aircraft_model_names <- lapply(
-  unique_sub_missions,
-  function(sub_mission_ID) {
-    # Extract the baserow entries for this sub-mission ID
-    baserow_for_sub_mission <- baserow_sub_mission_metadata[
-      baserow_sub_mission_metadata$sub_mission_id == sub_mission_ID,
+  unique_datasets,
+  function(dataset_ID) {
+    # Extract the baserow entries for this dataset ID
+    baserow_for_dataset <- baserow_dataset_metadata[
+      baserow_dataset_metadata$dataset_id == dataset_ID,
     ]
 
     # There should only be one matching row
-    if (nrow(baserow_for_sub_mission) != 1) {
-      stop(paste("Error: there was not one corresponding baserow entry: ", baserow_for_sub_mission))
+    if (nrow(baserow_for_dataset) != 1) {
+      stop(paste("Error: there was not one corresponding baserow entry: ", baserow_for_dataset))
     }
 
     # Extract the aircraft model name
-    aircraft_model_name = baserow_for_sub_mission$aircraft_model_name
+    aircraft_model_name = baserow_for_dataset$aircraft_model_name
 
     return(aircraft_model_name)
   }
 )
 
 # Extract the metadata in a standardized manner no matter the platform
-metadata_per_sub_dataset = furrr::future_map(seq_along(exif_per_sub_mission), function(i) {
-  extract_imagery_perimage_metadata(exif = exif_per_sub_mission[[i]], platform_name = aircraft_model_names[[i]])
-})
-print("Finished processing per-sub-mission datasets")
+# This is run on a per-image basis, but requires the per-dataset platform name to understand how to
+# interpret the information.
+future::plan("future::multisession")
+print("Started extracting metadata per image to a standardized format")
+metadata_per_dataset = furrr::future_map2(
+  .x = exif_per_dataset,
+  .y = aircraft_model_names,
+  .f = extract_imagery_perimage_metadata,
+  .options = furrr::furrr_options(seed = TRUE)
+)
 
-summary_statistics = furrr::future_map(metadata_per_sub_dataset, extract_imagery_dataset_metadata)
-print("Finished processing dataset-level summary statistics")
+print("Started computing dataset-level summary statistics")
+# Use the standardized image-level metadata extracted in previous step to compute dataset-level summary statistics
+# TODO there might be a way to run this using furrr::future_map but currently this causes the following
+# error: "! ‘workers >= 1’ is not TRUE". Perhaps limiting the number of parallel jobs could prevent
+# this issue.
+summary_statistics = purrr::map(
+  metadata_per_dataset,
+  extract_imagery_dataset_metadata,
+)
+print("Finished computing dataset-level summary statistics")
 
 # Extract the elements of the summary statistics
-metadata_perdataset = bind_rows(map(summary_statistics, ~ .x$dataset_metadata))
-polygon_perdataset = bind_rows(map(summary_statistics, ~ .x$mission_polygon))
-images_retained = unlist(map(summary_statistics, ~ .x$images_retained))
+metadata_perdataset = bind_rows(map(summary_statistics, "dataset_metadata"))
+polygon_perdataset = bind_rows(map(summary_statistics, "mission_polygon"))
+images_retained = unlist(map(summary_statistics, "images_retained"))
 
-metadata_perimage = bind_rows(metadata_per_sub_dataset)
+metadata_perimage = bind_rows(metadata_per_dataset)
 # Filter the extracted metadata to only include images that were retained in the dataset-level
 # metadata extraction based on intersection with the mission polygon
 metadata_perimage = metadata_perimage |>
   filter(image_id %in% images_retained)
 
 # Save the metadata
-
 folders = c(metadata_perimage_filepath, metadata_perdataset_filepath, polygons_filepath)
 folders = dirname(folders)
 
