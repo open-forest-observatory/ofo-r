@@ -92,6 +92,7 @@ metadata_per_dataset = furrr::future_map2(
   .options = furrr::furrr_options(seed = TRUE)
 )
 # Additional print since the progress bar doesn't end the line
+print("")
 print("Started computing dataset-level summary statistics")
 # Use the standardized image-level metadata extracted in previous step to compute dataset-level summary statistics
 # TODO there may not be a performance benefit if this process is bottlenecked by network constraints
