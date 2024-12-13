@@ -64,7 +64,7 @@ extract_mission_polygon = function(exif, image_merge_distance, min_contig_area =
   }
 
 
-  polysimp = sf::st_simplify(poly, dTolerance = 1) |> sf::st_cast("MULTIPOLYGON")
+  polysimp = sf::st_simplify(poly, dTolerance = 10) |> sf::st_cast("MULTIPOLYGON")
 
   return(polysimp)
 }
