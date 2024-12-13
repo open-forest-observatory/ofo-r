@@ -17,21 +17,17 @@
 #'
 #' @export
 extract_dataset_id_perimage = function(exif) {
-
   dataset_id_image_level = exif$dataset_id
 
   return(dataset_id_image_level)
-
 }
 
 # Image ID, from filename
 #' @export
 extract_image_id = function(exif) {
-
   image_id = tools::file_path_sans_ext(exif$FileName)
 
   return(image_id)
-
 }
 
 #' Extract local date and time of image collection
@@ -46,8 +42,9 @@ extract_image_id = function(exif) {
 #' extract_datatime_local(exif)
 #'
 #' @export
-extract_datetime_local = function(exif, candidate_columns = c("capture_datetime", "GPSDateTime")) {
-  datetime_local = extract_candidate_columns(st_drop_geometry(exif), candidate_columns)
+extract_datetime_local = function(exif, candidate_columns = c("capture_datetime", "GPSDateTime", "DateTimeOriginal")) {
+  datetime_local = extract_candidate_columns(sf::st_drop_geometry(exif), candidate_columns)
+  datetime_local = lubridate::ymd_hms(datetime_local)
   return(datetime_local)
 }
 
@@ -66,8 +63,8 @@ extract_datetime_local = function(exif, candidate_columns = c("capture_datetime"
 #'
 #' @export
 
-extract_lon_lat = function (exif) {
-
+extract_lon_lat = function(exif) {
+  exif = sf::st_as_sf(exif, crs = 4326, coords = c("GPSLongitude", "GPSLatitude"))
   coords = sf::st_coordinates(exif)
   lon = coords[, 1] |> as.numeric()
   lat = coords[, 2] |> as.numeric()
@@ -93,10 +90,13 @@ extract_lon_lat = function (exif) {
 #' @export
 extract_rtk_fix = function(exif) {
   if ("RtkFlag" %in% names(exif)) {
-    rtk_fix = exif$RtkFlag == 50
+    rtk_flag = exif$RtkFlag
+    # Since this may contain NA, replace them with zeros
+    rtk_flag = tidyr::replace_na(rtk_flag, 0)
+    # Compute whether it has the "fix" flag
+    rtk_fix = rtk_flag == 50
     return(rtk_fix)
-  }
-  else {
+  } else {
     rtk_fix = rep(FALSE, nrow(exif))
     return(rtk_fix)
   }
@@ -118,11 +118,15 @@ extract_rtk_fix = function(exif) {
 #' @export
 
 extract_accuracy = function(exif) {
-  exif = st_drop_geometry(exif)
-  if ("GPSXYAccuracy" %in% colnames(exif)) {
+  exif = sf::st_drop_geometry(exif)
+  # This field may not be actually present in the data but only introduced by
+  # row_bind-ing across multiple platforms
+  if ("GPSXYAccuracy" %in% colnames(exif) && !all(is.na(exif$GPSXYAccuracy))) {
     accuracy_x = exif$GPSXYAccuracy
     accuracy_y = exif$GPSXYAccuracy
   } else {
+    # Try extracting the deviation from the RTK field
+    # TODO should we instead prioritize the RTK value if both are present?
     exif["RtkStdLon"[!("RtkStdLon" %in% colnames(exif))]] = NA
     exif["RtkStdLat"[!("RtkStdLat" %in% colnames(exif))]] = NA
     accuracy_x = exif$RtkStdLon
@@ -138,6 +142,22 @@ extract_accuracy = function(exif) {
   )
 
   return(ret)
+}
+
+extract_image_shape = function(exif, image_width_candidate_columns = c("ImageWidth"), image_height_candidate_columns = c("ImageHeight")) {
+  image_width = extract_candidate_columns(exif, image_width_candidate_columns)
+  image_height = extract_candidate_columns(exif, image_height_candidate_columns)
+
+  ret_list = list(image_width = image_width, image_height = image_height)
+
+  return(ret_list)
+}
+
+extract_file_format = function(exif) {
+  # Convert into a character array
+  file_format = extract_candidate_columns(exif, c("FileTypeExtension"))
+
+  return(file_format)
 }
 
 #### pitch_roll_yaw: camera_pitch (Units: deg, degrees up from nadir), camera_roll (Units: deg, degrees clockwise from up), camera_yaw (Units: deg, degrees right from true north) ####
@@ -160,7 +180,7 @@ extract_pitch_roll_yaw = function(exif,
                                   candidate_roll_cols = c("GimbalRollDegree", "Roll"),
                                   candidate_yaw_cols = c("GimbalYawDegree", "Yaw")) {
   # Remove the geometry column since it can cause issues
-  exif = st_drop_geometry(exif)
+  exif = sf::st_drop_geometry(exif)
   camera_pitch = extract_candidate_columns(exif, candidate_pitch_cols)
   camera_roll = extract_candidate_columns(exif, candidate_roll_cols)
   camera_yaw = extract_candidate_columns(exif, candidate_yaw_cols)
@@ -195,7 +215,7 @@ extract_pitch_roll_yaw = function(exif,
 #' extract_exposure(exif)
 #'
 #' @export
-extract_exposure = function (exif) {
+extract_exposure = function(exif) {
   exposure = exif$ExposureTime |> round(6)
   return(exposure)
 }
@@ -253,7 +273,6 @@ extract_iso = function(exif) {
 #'
 #' @export
 extract_white_balance = function(exif) {
-
   white_balance = dplyr::case_when(
     exif$WhiteBalance == 0 ~ "auto",
     exif$WhiteBalance == 1 ~ "manual"
@@ -278,7 +297,6 @@ extract_white_balance = function(exif) {
 #' @export
 
 extract_received_image_path = function(exif) {
-
   received_image_path = stringr::str_split_fixed(exif$SourceFile, stringr::fixed(exif$dataset_id), 2)
 
   received_image_path <- received_image_path[, 2]
@@ -303,10 +321,18 @@ extract_received_image_path = function(exif) {
 #'
 #' @export
 extract_altitude_asl = function(exif, candidate_asl_columns = c("AbsoluteAltitude", "GPSAltitude")) {
-  altitude_asl = extract_candidate_columns(st_drop_geometry(exif), candidate_asl_columns)
+  altitude_asl = extract_candidate_columns(sf::st_drop_geometry(exif), candidate_asl_columns)
   altitude_asl = round(altitude_asl)
 
   return(altitude_asl)
+}
+
+# TODO document
+#' @export
+extract_original_file_name = function(exif, candidate_file_name_columns = c("ImageDescription", "FileName")) {
+  original_file_names = extract_candidate_columns(sf::st_drop_geometry(exif), candidate_file_name_columns)
+
+  return(original_file_names)
 }
 
 #' Extract image-level metadata parameters from EXIF datafram
@@ -321,16 +347,34 @@ extract_altitude_asl = function(exif, candidate_asl_columns = c("AbsoluteAltitud
 #' extract_metadata_emp(exif)
 #'
 #' @export
-extract_imagery_perimage_metadata = function(input,
-                                             input_type = "dataframe") {
-
-  if (input_type == "filepath") {
-    exif = prep_exif(input)
-  } else if (input_type == "dataframe") {
-    exif = input
+extract_imagery_perimage_metadata = function(exif, platform_name, plot_flightpath = FALSE) {
+  # Check if the platform is supported
+  if (!(platform_name %in% c(
+    "Phantom 4 Pro v2.0",
+    "Phantom 4 Advanced",
+    "Mavic 3 Multispectral",
+    "Phantom 4 RTK",
+    "Phantom 4 Standard",
+    "Matrice 210 RTK",
+    "Matrice 100",
+    "Matrice 300",
+    "eBee X" # As far as I can tell, there is no issue with this using the DJI parser
+  ))) {
+    stop(paste("Platform ", platform_name, " is not supported"))
   }
 
+  # In the future, some of these parsing steps might be dependent on the platform but for now it's
+  # not required. For example, a given attribute may require different default column names to
+  # inspect dependent on what platform generated the metadata. If platform-specific logic needs to
+  # be implemented, it could be done in a variety of ways. One option (David's current
+  # recommendation) is to defer any platform-specific considerations to the individual functions.
+  # For example, the `extract_image_id` function could be passed both the exif data and the platform
+  # and then it would handle the logic of properly extracting the standardized data. Alternatively,
+  # we could have a function that extracts a parameter for a group of platforms, such as one
+  # function for extracting the image_id for all DJI platforms and another for all eBee platfroms.
+  # Then, the appropriate parsing function would be called in this function, based on the platform.
   image_id = extract_image_id(exif)
+  original_file_name = extract_original_file_name(exif)
   dataset_id_image_level = extract_dataset_id_perimage(exif)
   datetime_local = extract_datetime_local(exif)
   lon_lat = extract_lon_lat(exif)
@@ -343,9 +387,12 @@ extract_imagery_perimage_metadata = function(input,
   white_balance = extract_white_balance(exif)
   received_image_path = extract_received_image_path(exif)
   altitude_asl_drone = extract_altitude_asl(exif)
+  image_shape = extract_image_shape(exif)
+  file_format = extract_file_format(exif)
 
   metadata = data.frame(
     image_id = image_id,
+    original_file_name = original_file_name,
     dataset_id_image_level = dataset_id_image_level,
     datetime_local = datetime_local,
     lon_lat,
@@ -357,13 +404,54 @@ extract_imagery_perimage_metadata = function(input,
     iso = iso,
     white_balance = white_balance,
     received_image_path = received_image_path,
-    altitude_asl_drone = altitude_asl_drone
+    altitude_asl_drone = altitude_asl_drone,
+    image_shape,
+    file_format = file_format
   )
+
+  # Remove any rows with missing GPS data
+  missing_gps_rows = is.na(metadata$lat) | is.na(metadata$lon)
+  n_missing_gps_rows = sum(missing_gps_rows)
+  if (n_missing_gps_rows > 0) {
+    warning("Removing ", n_missing_gps_rows, " rows with missing GPS data from dataset", exif$dataset_id[1])
+
+    # Keep only rows with GPS data
+    metadata = metadata[!missing_gps_rows, ]
+  }
+
+  # Arrange images by capture time (presumably they're already in capture order, but just to be
+  # sure). First arrange by full file path (assuming that is the capture order), then by capture
+  # time. This way, the capture time is used as top priority, with the file path used as a
+  # tiebreaker (e.g. if there were two images taken in the same second). We can't use the path alone
+  # because if the mission was split over two SD cards, the file write path may have started over.
+  # TODO: Deal with the case where a dataset was collected by two drones flying at once.
+  metadata = metadata[order(metadata$original_file_name), ]
+  metadata = metadata[order(metadata$datetime_local), ]
+
+  # Plot the flight path as a visual check if requested
+  if (plot_flightpath) {
+    # TODO figure out if this is the best way to visualize
+    # This has the issue of opening a bunch of windows
+    x11()
+    flightpath = sf::st_as_sf(metadata, crs = 4326, coords = c("lon", "lat"))
+
+    flightpath = flightpath |>
+      dplyr::summarize(do_union = FALSE) |>
+      sf::st_cast("LINESTRING")
+    plot(flightpath)
+  }
 
   return(metadata)
 }
 
+
 extract_candidate_columns = function(dataframe, candidate_columns) {
-  extracted_column = dplyr::coalesce(!!!dplyr::select(dataframe, dplyr::any_of(candidate_columns)))
+  selected_columns = dplyr::select(dataframe, dplyr::any_of(candidate_columns))
+  if (ncol(selected_columns) == 0) {
+    print("Will fail to extract candidate columns")
+    print(candidate_columns)
+    print(names(dataframe))
+  }
+  extracted_column = dplyr::coalesce(!!!selected_columns)
   return(extracted_column)
 }

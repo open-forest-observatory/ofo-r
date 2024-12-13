@@ -51,7 +51,7 @@ lonlat_to_utm_epsg = function(lonlat) {
 #' @export
 transform_to_local_utm = function(sf) {
   geo = sf::st_transform(sf, 4326)
-  geo_noz = st_zm(geo, drop = TRUE)
+  geo_noz = sf::st_zm(geo, drop = TRUE)
   lonlat = sf::st_centroid(geo_noz) |> sf::st_coordinates()
   utm = lonlat_to_utm_epsg(lonlat)
 
