@@ -3,10 +3,10 @@
 
 
 # Flight speed in meters per second
-extract_flight_speed = function(exif) {
+extract_flight_speed = function(metadata) {
   # Get distance from each image to the next, in meters
-  start_image = exif[1:(nrow(exif) - 1), ]
-  end_image = exif[2:nrow(exif), ]
+  start_image = metadata[1:(nrow(metadata) - 1), ]
+  end_image = metadata[2:nrow(metadata), ]
   distance = sf::st_distance(start_image, end_image, by_element = TRUE)
 
   # Get time from each image to the next, in seconds
@@ -26,16 +26,24 @@ extract_flight_speed = function(exif) {
 # image_merge_distance: The horizontal distance between images below which they are merged into one
 # mission polygon. Keep only contiguous patches > min_contig_area.
 #' @export
-extract_mission_polygon = function(exif, image_merge_distance, min_contig_area = 1600) {
-  exif = sf::st_transform(exif, 3310)
-  ptbuff = sf::st_buffer(exif, image_merge_distance)
-  polybuff = sf::st_union(ptbuff)
-  poly = sf::st_buffer(polybuff, -image_merge_distance + 1) |> sf::st_cast("MULTIPOLYGON")
+extract_mission_polygon = function(metadata, image_merge_distance, min_contig_area = 1600, boundary_method = "dilate_erode") {
+  # TODO we could check that it's a meters-based projected CRS
+  if (boundary_method == "concaveman") {
+    poly = concaveman::concaveman(metadata, concavity = 4)
+    poly = poly |> sf::st_cast("MULTIPOLYGON")
+  } else if (boundary_method == "dilate_erode") {
+    ptbuff = sf::st_buffer(metadata, image_merge_distance)
+    polybuff = sf::st_union(ptbuff)
+    # This line is dangerous for single lines of images since
+    poly = sf::st_buffer(polybuff, -image_merge_distance + 1) |> sf::st_cast("MULTIPOLYGON")
+  } else {
+    stop(paste("Invalid boundary_method: ", boundary_method, ". Only 'concaveman' and 'dilate_erode' are supported"))
+  }
 
   n_polys = length(sf::st_geometry(poly)[[1]])
 
   if (n_polys == 0) {
-    stop("No contiguous images in dataset ", exif$dataset_id[1])
+    stop("No contiguous images in dataset ", metadata$dataset_id[1])
   }
 
 
@@ -55,12 +63,12 @@ extract_mission_polygon = function(exif, image_merge_distance, min_contig_area =
     # TODO it's possible all polygons could be filtered out in this step
 
     if (n_polys_filtered < n_polys) {
-      warning(n_polys, " non-contiguous image clusters in dataset ", exif$dataset_id[1], ". Retaining only the ", n_polys_filtered, " clusters with area > ", min_contig_area, " m^2.")
+      warning(n_polys, " non-contiguous image clusters in dataset ", metadata$dataset_id[1], ". Retaining only the ", n_polys_filtered, " clusters with area > ", min_contig_area, " m^2.")
     } else {
-      warning(n_polys, " non-contiguous image clusters in dataset ", exif$dataset_id[1], ". Retaining all becaus all have area > ", min_contig_area, " m^2.")
+      warning(n_polys, " non-contiguous image clusters in dataset ", metadata$dataset_id[1], ". Retaining all becaus all have area > ", min_contig_area, " m^2.")
     }
   } else if (n_polys == 0) {
-    stop("No contiguous images in dataset ", exif$dataset_id[1])
+    stop("No contiguous images in dataset ", metadata$dataset_id[1])
   }
 
 
@@ -72,8 +80,8 @@ extract_mission_polygon = function(exif, image_merge_distance, min_contig_area =
 # Extract camera pitch, detecting if smart oblique, and if so, report the oblique value (which is
 # unfortunatley reported identically whether forward or backward)
 #' @export
-extract_camera_pitch_summary <- function(exif) {
-  camera_pitch_values <- abs(as.numeric(exif$camera_pitch))
+extract_camera_pitch_summary <- function(metadata) {
+  camera_pitch_values <- abs(as.numeric(metadata$camera_pitch))
 
   quantiles <- quantile(camera_pitch_values, c(0.1, 0.5, 0.9), na.rm = TRUE)
 
@@ -99,8 +107,8 @@ extract_camera_pitch_summary <- function(exif) {
 
 
 # Various date and time summaries
-extract_dates_times = function(exif) {
-  datetime = exif$datetime_local
+extract_dates_times = function(metadata) {
+  datetime = metadata$datetime_local
 
   # See if there are more than one unique dates (days)
   single_date = length(unique(lubridate::as_date(datetime))) == 1
@@ -137,9 +145,9 @@ extract_dates_times = function(exif) {
 
 # Get the correlation between the altitude of the drone and the ground elevation (i.e. trerrain
 # follow tightness, using terrain data from AWS via elevatr package)
-extract_flight_terrain_correlation = function(exif) {
+extract_flight_terrain_correlation = function(metadata) {
   # Define the AOI as a polygon
-  aoi = sf::st_convex_hull(sf::st_union(exif)) |> sf::st_as_sf()
+  aoi = sf::st_convex_hull(sf::st_union(metadata)) |> sf::st_as_sf()
 
   # Get an elev raster for this AOI
   dem = elevatr::get_elev_raster(aoi, z = 14, prj = 4326, src = "aws")
@@ -147,8 +155,8 @@ extract_flight_terrain_correlation = function(exif) {
   ## Try it with USGS dem
 
   # Get the ground elevation beneath all the photo points
-  ground_elev = terra::extract(dem, exif, method = "bilinear")
-  drone_altitude = exif$altitude_asl_drone
+  ground_elev = terra::extract(dem, metadata, method = "bilinear")
+  drone_altitude = metadata$altitude_asl_drone
 
   # Get the difference between the drone's altitude and the ground elevation
   agl = drone_altitude - ground_elev
@@ -180,11 +188,11 @@ extract_flight_terrain_correlation = function(exif) {
 
 
 # Mission centroid coords
-extract_mission_centroid_sf = function(exif) {
-  # Getting the coordinates listed in the exif file and for it to seperate into long/lat
+extract_mission_centroid_sf = function(metadata) {
+  # Getting the coordinates listed in the metadata file and for it to seperate into long/lat
 
   # Making it a multipoint
-  multipoint <- sf::st_union(exif)
+  multipoint <- sf::st_union(metadata)
 
   # Calculate the centroid of the MULTIPOINT geometry
   centroid <- sf::st_centroid(multipoint)
@@ -220,42 +228,42 @@ solarnoon_from_centroid_and_date = function(centroid, date) {
 #' Extract dataset id
 #'
 #' Pulls the dataset id to include in dataset-level metadata. Relies on dataset_id being set
-#' properly by the prep_exif function.
+#' properly by the prep_metadata function.
 #'
-#' @param exif the exif metadata file
+#' @param metadata the metadata metadata file
 #'
 #' @return dataset id
 #'
 #' @examples
-#' extract_dataset_id(exif)
+#' extract_dataset_id(metadata)
 #'
 #' @export
-extract_dataset_id_summary = function(exif) {
-  if (is.null(exif$dataset_id[1])) {
-    stop("Dataset ID not set in exif dataframe. Set the dataset_id column in the exif dataframe before calling this function.")
+extract_dataset_id_summary = function(metadata) {
+  if (is.null(metadata$dataset_id[1])) {
+    stop("Dataset ID not set in metadata dataframe. Set the dataset_id column in the metadata dataframe before calling this function.")
   }
 
-  dataset_id_dataset_level = exif$dataset_id[1]
+  dataset_id_dataset_level = metadata$dataset_id[1]
 
   return(dataset_id_dataset_level)
 }
 
 #### image_count ####
 
-#' Extract number of images in an exif
+#' Extract number of images in an metadata
 #'
 #' Pulls the image count to include in dataset-level metadata
 #'
-#' @param exif the exif metadata file
+#' @param metadata the metadata metadata file
 #'
 #' @return image count
 #'
 #' @examples
-#' extract_image_count(exif)
+#' extract_image_count(metadata)
 #'
 #' @export
-extract_image_count = function(exif) {
-  image_count = nrow(exif)
+extract_image_count = function(metadata) {
+  image_count = nrow(metadata)
 
   return(image_count)
 }
@@ -266,16 +274,16 @@ extract_image_count = function(exif) {
 #'
 #' Total file size of all images in set. Units: GB.
 #'
-#' @param exif the exif metadata file
+#' @param metadata the metadata metadata file
 #'
 #' @return total file size
 #'
 #' @examples
-#' extract_file_size(exif)
+#' extract_file_size(metadata)
 #'
 #' @export
-extract_file_size_summary = function(exif) {
-  file_size = sum(exif$FileSize) / 1000000000
+extract_file_size_summary = function(metadata) {
+  file_size = sum(metadata$FileSize) / 1000000000
 
   file_size = round(file_size, 2)
 
@@ -288,18 +296,18 @@ extract_file_size_summary = function(exif) {
 #'
 #' Percent of images with an RTK fix
 #'
-#' @param exif the exif metadata file
+#' @param metadata the metadata metadata file
 #'
 #' @return percent of images with an RTK fix
 #'
 #' @examples
-#' extract_precent_images_rtk(exif)
+#' extract_precent_images_rtk(metadata)
 #'
 #' @export
-extract_pct_images_rtk = function(exif) {
-  rtk_fix = extract_rtk_fix(exif)
+extract_pct_images_rtk = function(metadata) {
+  rtk_fix = extract_rtk_fix(metadata)
 
-  percent_images_rtk = round((sum(rtk_fix == TRUE) / nrow(exif)) * 100)
+  percent_images_rtk = round((sum(rtk_fix == TRUE) / nrow(metadata)) * 100)
 
   return(percent_images_rtk)
 }
@@ -310,21 +318,21 @@ extract_pct_images_rtk = function(exif) {
 #'
 #' A data.frame of white_balance_mode_derived and white_balance_prop_derived. White_balance_mode_derived: The most common white balance setting across all images in the project. Options: auto and manual. White_balance_mode_prop_derived: The proportion of images with a white balance setting that matches the modal white balance setting in the dataset.
 #'
-#' @param exif the exif metadata file
+#' @param metadata the metadata metadata file
 #'
 #' @return a data.frame of the most common white balance setting and the proportion of images matching the most common white balance setting
 #'
 #' @examples
-#' extract_white_balance_mode_and_prop(exif)
+#' extract_white_balance_mode_and_prop(metadata)
 #'
 #' @export
-extract_white_balance_summary = function(exif) {
-  white_balance = exif$white_balance
+extract_white_balance_summary = function(metadata) {
+  white_balance = metadata$white_balance
 
   unique_white_balance <- unique(white_balance)
   white_balance_mode_derived = unique_white_balance[which.max(tabulate(match(white_balance, unique_white_balance)))][1]
 
-  white_balance_pct_mode_derived = round((sum(white_balance == white_balance_mode_derived) / nrow(exif)) * 100)
+  white_balance_pct_mode_derived = round((sum(white_balance == white_balance_mode_derived) / nrow(metadata)) * 100)
 
   ret = data.frame(white_balance_mode_derived, white_balance_pct_mode_derived)
 
@@ -338,16 +346,16 @@ extract_white_balance_summary = function(exif) {
 #'
 #' The median exposure time across all images in the dataset. Units: sec
 #'
-#' @param exif the exif metadata file
+#' @param metadata the metadata metadata file
 #'
 #' @return the median exposure time across all images in the dataset. Units: sec
 #'
 #' @examples
-#' extract_exposure(exif)
+#' extract_exposure(metadata)
 #'
 #' @export
-extract_exposure_summary = function(exif) {
-  exposure = exif$exposure
+extract_exposure_summary = function(metadata) {
+  exposure = metadata$exposure
 
   exposure_median_derived = median(exposure)
   exposure_stdev_derived = sd(exposure)
@@ -372,28 +380,28 @@ extract_exposure_summary = function(exif) {
 #'
 #' area_ha: Area of mission footprint. Units: ha. image_density: the image density computed with image count and footprint. Units: img/ha
 #'
-#' @param exif the exif metadata file
+#' @param metadata the metadata metadata file
 #'
 #' @param mission_polygon the sf polygon object of the mission footprint
 #'
 #' @return the area of the mission footprint (ha) and the image density based on image count and footprint (img/ha)
 #'
 #' @examples
-#' extract_area_and_density(exif)
+#' extract_area_and_density(metadata)
 #'
 #' @export
-extract_area_and_density = function(exif, mission_polygon) {
+extract_area_and_density = function(metadata, mission_polygon) {
   area_ha_derived = units::set_units(sf::st_area(mission_polygon), "hectare")
 
   # Crop images to the mission polygon, in case there were outlier images, or smaller outlier
   # polygons of images that were removed in the mission polygon creation
-  intersects = sf::st_intersects(exif,
+  intersects = sf::st_intersects(metadata,
     mission_polygon |>
-      sf::st_transform(sf::st_crs(exif)),
+      sf::st_transform(sf::st_crs(metadata)),
     sparse = FALSE
   )
   intersects = apply(intersects, 1, any, simplify = TRUE)
-  imgs_intersecting = exif[intersects, ]
+  imgs_intersecting = metadata[intersects, ]
 
   image_density_derived = (nrow(imgs_intersecting)) / area_ha_derived
 
@@ -408,9 +416,9 @@ extract_area_and_density = function(exif, mission_polygon) {
 
 # Image frequency (imgs/sec)
 #' @export
-extract_image_frequency <- function(exif) {
+extract_image_frequency <- function(metadata) {
   # Convert DateTimeOriginal to datetime object
-  datetime <- lubridate::as_datetime(exif$datetime_local)
+  datetime <- lubridate::as_datetime(metadata$datetime_local)
 
   # Calculate time difference between consecutive images
   time_diff <- diff(datetime)
@@ -444,10 +452,10 @@ extract_image_frequency <- function(exif) {
 }
 
 # Resolution and aspect ratio
-extract_resolution_and_aspect_ratio_summary <- function(exif) {
-  # Get Xresolution and Yresolution from the EXIF data
-  resolution_x <- unique(exif$image_width)
-  resolution_y <- unique(exif$image_height)
+extract_resolution_and_aspect_ratio_summary <- function(metadata) {
+  # Get Xresolution and Yresolution from the metadata data
+  resolution_x <- unique(metadata$image_width)
+  resolution_y <- unique(metadata$image_height)
 
   # Calculate mode resolution
   mode_resolution_x <- as.numeric(names(sort(table(resolution_x), decreasing = TRUE)[1]))
@@ -466,10 +474,10 @@ extract_resolution_and_aspect_ratio_summary <- function(exif) {
 
 
 # File type
-extract_file_format_summary <- function(exif) {
+extract_file_format_summary <- function(metadata) {
   # Get image file format
   # TODO fix this column
-  image_file_format <- unique(exif$file_format)
+  image_file_format <- unique(metadata$file_format)
 
   # Check if image file format is consistent
   if (length(unique(image_file_format)) > 1) {
@@ -484,61 +492,61 @@ extract_file_format_summary <- function(exif) {
 }
 
 
-# Preps the EXIF data for passing to the
+# Preps the metadata data for passing to the
 # extraction functions, then calls all the individual extraction functions to extract the respecive attributes.
 # crop_to_contiguous: Keeps only the images within the sets of contiguous images that are larger
 # than min_contig_areain m^2 (could be multiple clumps). It will always include the largest clump, even if
 # it is smaller than min_contig_area.
 #' @export
-extract_imagery_dataset_metadata = function(exif,
+extract_imagery_dataset_metadata = function(metadata,
                                             plot_flightpath = FALSE,
                                             crop_to_contiguous = TRUE,
                                             min_contig_area = 1600) {
   # Convert from dataframe to SF object
   # TODO ensure that these columns are always the correct/only ones to use
-  exif = sf::st_as_sf(exif, crs = 4326, coords = c("lon", "lat"))
+  metadata = sf::st_as_sf(metadata, crs = 4326, coords = c("lon", "lat"))
   # Transform to a meters-based CRS that is appropriate for that region
-  exif_proj = transform_to_local_utm(exif)
+  metadata_proj = transform_to_local_utm(metadata)
   # Compute geospatial features
-  mission_polygon = extract_mission_polygon(exif_proj, image_merge_distance = 50, min_contig_area = min_contig_area)
+  mission_polygon = extract_mission_polygon(metadata_proj, image_merge_distance = 50, min_contig_area = min_contig_area)
 
   if (crop_to_contiguous) {
     # Keep only the images within the largest contiguous patch of images, buffered to 10 m to
     # account for the simplified polygon
     # TODO ensure that the CRS is set appropriately
     polygon_proj_buffer = mission_polygon |> sf::st_buffer(10)
-    intersection_idxs = sf::st_intersects(exif_proj, polygon_proj_buffer, sparse = FALSE)
-    # Now go back to the original exif df
-    full_exif_length = nrow(exif)
-    exif = exif[intersection_idxs[, 1], ]
-    cropped_exif_length = nrow(exif)
-    if (cropped_exif_length < full_exif_length) {
-      n_cropped = full_exif_length - cropped_exif_length
-      message("Dropped ", n_cropped, " images that were not within the largest contiguous patch(es) of images retained for dataset ", exif$dataset_id[1], ".")
+    intersection_idxs = sf::st_intersects(metadata_proj, polygon_proj_buffer, sparse = FALSE)
+    # Now go back to the original metadata df
+    full_metadata_length = nrow(metadata)
+    metadata = metadata[intersection_idxs[, 1], ]
+    cropped_metadata_length = nrow(metadata)
+    if (cropped_metadata_length < full_metadata_length) {
+      n_cropped = full_metadata_length - cropped_metadata_length
+      message("Dropped ", n_cropped, " images that were not within the largest contiguous patch(es) of images retained for dataset ", metadata$dataset_id[1], ".")
     }
   }
 
   # Extract the IDs of the images that were retained
-  images_retained = exif$image_id
+  images_retained = metadata$image_id
 
   # Extract/compute metadata attributes
-  dataset_id = extract_dataset_id_summary(exif)
-  flight_speed_derived = extract_flight_speed(exif)
-  flight_terrain_correlation_derived = extract_flight_terrain_correlation(exif)
-  camera_pitch = extract_camera_pitch_summary(exif)
-  dates_times = extract_dates_times(exif)
-  centroid_internal = extract_mission_centroid_sf(exif)
+  dataset_id = extract_dataset_id_summary(metadata)
+  flight_speed_derived = extract_flight_speed(metadata)
+  flight_terrain_correlation_derived = extract_flight_terrain_correlation(metadata)
+  camera_pitch = extract_camera_pitch_summary(metadata)
+  dates_times = extract_dates_times(metadata)
+  centroid_internal = extract_mission_centroid_sf(metadata)
   centroid_lonlat = centroid_sf_to_lonlat(centroid_internal)
   solarnoon_utc_derived = solarnoon_from_centroid_and_date(centroid_internal, dates_times$earliest_date_derived)
-  image_count_derived = extract_image_count(exif)
-  file_size_derived = extract_file_size_summary(exif)
-  percent_images_rtk_derived = extract_pct_images_rtk(exif)
-  white_balance = extract_white_balance_summary(exif)
-  exposure = extract_exposure_summary(exif)
-  area_and_density = extract_area_and_density(exif, mission_polygon)
-  image_frequency_derived = extract_image_frequency(exif)
-  resolution_and_aspect_ratio = extract_resolution_and_aspect_ratio_summary(exif)
-  file_format_derived = extract_file_format_summary(exif)
+  image_count_derived = extract_image_count(metadata)
+  file_size_derived = extract_file_size_summary(metadata)
+  percent_images_rtk_derived = extract_pct_images_rtk(metadata)
+  white_balance = extract_white_balance_summary(metadata)
+  exposure = extract_exposure_summary(metadata)
+  area_and_density = extract_area_and_density(metadata, mission_polygon)
+  image_frequency_derived = extract_image_frequency(metadata)
+  resolution_and_aspect_ratio = extract_resolution_and_aspect_ratio_summary(metadata)
+  file_format_derived = extract_file_format_summary(metadata)
 
   dataset_metadata = data.frame(
     dataset_id,
