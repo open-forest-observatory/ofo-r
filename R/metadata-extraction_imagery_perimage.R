@@ -43,7 +43,7 @@ extract_image_id = function(exif) {
 #'
 #' @export
 extract_datetime_local = function(exif, candidate_columns = c("capture_datetime", "GPSDateTime", "DateTimeOriginal")) {
-  datetime_local = extract_candidate_columns(st_drop_geometry(exif), candidate_columns)
+  datetime_local = extract_candidate_columns(sf::st_drop_geometry(exif), candidate_columns)
   datetime_local = lubridate::ymd_hms(datetime_local)
   return(datetime_local)
 }
@@ -92,7 +92,7 @@ extract_rtk_fix = function(exif) {
   if ("RtkFlag" %in% names(exif)) {
     rtk_flag = exif$RtkFlag
     # Since this may contain NA, replace them with zeros
-    rtk_flag = replace_na(rtk_flag, 0)
+    rtk_flag = tidyr::replace_na(rtk_flag, 0)
     # Compute whether it has the "fix" flag
     rtk_fix = rtk_flag == 50
     return(rtk_fix)
@@ -120,11 +120,11 @@ extract_rtk_fix = function(exif) {
 extract_accuracy = function(exif) {
   exif = sf::st_drop_geometry(exif)
   # This field may not be actually present in the data but only introduced by
-  # row_binding across multiple platforms
+  # row_bind-ing across multiple platforms
   if ("GPSXYAccuracy" %in% colnames(exif) && !all(is.na(exif$GPSXYAccuracy))) {
     accuracy_x = exif$GPSXYAccuracy
     accuracy_y = exif$GPSXYAccuracy
-  } else{
+  } else {
     # Try extracting the deviation from the RTK field
     # TODO should we instead prioritize the RTK value if both are present?
     exif["RtkStdLon"[!("RtkStdLon" %in% colnames(exif))]] = NA
@@ -364,7 +364,15 @@ extract_imagery_perimage_metadata = function(exif, platform_name, plot_flightpat
   }
 
   # In the future, some of these parsing steps might be dependent on the platform but for now it's
-  # not required
+  # not required. For example, a given attribute may require different default column names to
+  # inspect dependent on what platform generated the metadata. If platform-specific logic needs to
+  # be implemented, it could be done in a variety of ways. One option (David's current
+  # recommendation) is to defer any platform-specific considerations to the individual functions.
+  # For example, the `extract_image_id` function could be passed both the exif data and the platform
+  # and then it would handle the logic of properly extracting the standardized data. Alternatively,
+  # we could have a function that extracts a parameter for a group of platforms, such as one
+  # function for extracting the image_id for all DJI platforms and another for all eBee platfroms.
+  # Then, the appropriate parsing function would be called in this function, based on the platform.
   image_id = extract_image_id(exif)
   original_file_name = extract_original_file_name(exif)
   dataset_id_image_level = extract_dataset_id_perimage(exif)

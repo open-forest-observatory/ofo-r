@@ -1,5 +1,5 @@
-# Functions to extract metadata from a drone imagery dataset, using an exif dataframe that has
-# already been prepped using prep_exif.
+# Functions to take image-level metadata that has already been assigned standardized column names
+# (regardless of drone platform) and compute summary metrics at the dataset level.
 
 
 # Flight speed in meters per second
@@ -20,7 +20,6 @@ extract_flight_speed = function(exif) {
   speed = median(speed, na.rm = TRUE) |> round(2)
 
   return(speed)
-
 }
 
 # Get a polygon of the mission
@@ -28,7 +27,6 @@ extract_flight_speed = function(exif) {
 # mission polygon. Keep only contiguous patches > min_contig_area.
 #' @export
 extract_mission_polygon = function(exif, image_merge_distance, min_contig_area = 1600) {
-
   exif = sf::st_transform(exif, 3310)
   ptbuff = sf::st_buffer(exif, image_merge_distance)
   polybuff = sf::st_union(ptbuff)
@@ -75,10 +73,6 @@ extract_mission_polygon = function(exif, image_merge_distance, min_contig_area =
 # unfortunatley reported identically whether forward or backward)
 #' @export
 extract_camera_pitch_summary <- function(exif) {
-  # Extract CameraPitch directly from exif and adjust pitch values so 0 is nadir. Also take abs val
-  # just in case the pitch is reported as negative for backward (even thouth it apparently never
-  # is), so that for smart-oblique missions, the low quantile represents nadir and the high quantile
-  # represents the oblique mission pitch
   camera_pitch_values <- abs(as.numeric(exif$camera_pitch))
 
   quantiles <- quantile(camera_pitch_values, c(0.1, 0.5, 0.9), na.rm = TRUE)
@@ -170,10 +164,16 @@ extract_flight_terrain_correlation = function(exif) {
 
   # Get the correlation between the altitude of the drone and the ground elevation (i.e. trerrain
   # follow tightness)
-  # Note that for some small regions the DEM will not have any variation so this
-  # correlation will be NA. It appears thte DEM is reported as integer meters so
-  # small variations are suppressed
-  flight_terrain_correlation = cor(drone_altitude_core, ground_elev_core) |> round(2)
+  ground_elev_no_variation = length(unique(ground_elev_core)) == 1
+  if (ground_elev_no_variation) {
+    # Note that for some small regions the DEM will not have any variation so this
+    # correlation would be NA. Instead we set it to 1 in this case, since the primary goal of this
+    # metric is to filter out missions with poor terrain following.
+    flight_terrain_correlation = 1
+  } else {
+    # Compute the correlation between the DEM and drone altitude
+    flight_terrain_correlation = cor(drone_altitude_core, ground_elev_core) |> round(2)
+  }
 
   return(flight_terrain_correlation)
 }
