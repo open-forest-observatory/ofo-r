@@ -109,12 +109,23 @@ summary_statistics = furrr::future_map(
 #  extract_imagery_dataset_metadata,
 # )
 print("Finished computing dataset-level summary statistics")
-# Extract the elements of the summary statistics
-metadata_perdataset = dplyr::bind_rows(map(summary_statistics, "dataset_metadata"))
-polygon_perdataset = dplyr::bind_rows(map(summary_statistics, "mission_polygon"))
-images_retained = unlist(map(summary_statistics, "images_retained"))
 
-metadata_perimage = dplyr::bind_rows(metadata_per_dataset)
+# Extract the elements of the summary statistics
+metadata_perdataset_list = map(summary_statistics, "dataset_metadata")
+polygon_perdataset_list = map(summary_statistics, "mission_polygon")
+images_retained_list = map(summary_statistics, "images_retained")
+
+# Standardize CRS of polygons to EPSG:4326 (lon/lat) so that polygons from anywhere can be combined
+# into a single dataset to be written to file
+polygon_perdataset_list = lapply(polygon_perdataset_list, sf::st_transform, crs = 4326)
+
+# Combine the metadata which is currently a list of datasets into a single data frame for each
+# metadata item
+metadata_perdataset = bind_rows(metadata_perdataset_list)
+polygon_perdataset = bind_rows(polygon_perdataset_list)
+images_retained = unlist(images_retained_list)
+metadata_perimage = bind_rows(metadata_per_sub_dataset)
+
 # Filter the extracted metadata to only include images that were retained in the dataset-level
 # metadata extraction based on intersection with the mission polygon
 metadata_perimage = metadata_perimage |>
