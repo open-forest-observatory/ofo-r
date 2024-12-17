@@ -42,10 +42,16 @@ gpu_multiplier: 2
 ## Refer to Metashape documentation for full parameter definitions: https://www.agisoft.com/pdf/metashape_python_api_1_5_0.pdf
 ## Parameter names here generally follow the parameter names of the Metashape functions.
 
-### Whether to use image EXIF RTK flags to make image geospatial accuracy more precise. If enabled but photos don't have RTK data, will treat them as regular photos and use the nofix accuracy.
-use_rtk: False
-fix_accuracy: 3 # Accuracy to set for photos that have a RTK fix, in units of the CRS
-nofix_accuracy: 25 # Accuracy to set for photos that have no fix, in units of the CRS
+# Should the photos at the path(s) listed above be added to the project? Can disable if, for
+# example, you only want to add GCPs (or do additional processing) to an existing project.
+addPhotos: # (Metashape: addPhotos)
+  enabled: True # This applies to the main photos specified in photo_path above. Secondary photos are always added and aligned if a path (or paths) is provided.
+  separate_calibration_per_path: False # If True, each photo path (i.e. each element in the list supplied to 'photo_path' above) will be calibrated independently. Regardless whether True or False, separate camera *models* are calibrated separately; if True, identical camera *models* are calibrated separately if they are provided as separate paths. This addresses the case where two different instances of the same camera model are used in the same project. Note that when True, the logic for assigning separate calibration to each path assumes that the same camera is used for all photos in the path.
+  multispectral: False # Is this a multispectral photo set? If RGB, set to False.
+  use_rtk: False # Whether to use image EXIF RTK flags to make image geospatial accuracy more precise. If enabled but photos don't have RTK data, will treat them as regular photos and use the nofix accuracy.
+  fix_accuracy: 3 # Accuracy to set for photos that have a RTK fix, in units of the CRS
+  nofix_accuracy: 25 # Accuracy to set for photos that have no fix, in units of the CRS
+
 
 # To use GCPs, a 'gcps' folder must exist in the top level photos folder. The contents of the 'gcps' folder are created by the prep_gcps.R script. See readme: https://github.com/ucdavis/metashape
 addGCPs:
