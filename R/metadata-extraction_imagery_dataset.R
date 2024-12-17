@@ -502,6 +502,11 @@ extract_imagery_dataset_metadata = function(metadata,
                                             plot_flightpath = FALSE,
                                             crop_to_contiguous = TRUE,
                                             min_contig_area = 1600) {
+
+  # Print which dataset is being processed
+  dataset_id = metadata$dataset_id[1]
+  message("Processing dataset ", dataset_id, "...")
+
   # Convert from dataframe to SF object
   # TODO ensure that these columns are always the correct/only ones to use
   metadata = sf::st_as_sf(metadata, crs = 4326, coords = c("lon", "lat"))
@@ -522,8 +527,14 @@ extract_imagery_dataset_metadata = function(metadata,
     cropped_metadata_length = nrow(metadata)
     if (cropped_metadata_length < full_metadata_length) {
       n_cropped = full_metadata_length - cropped_metadata_length
-      message("Dropped ", n_cropped, " images that were not within the largest contiguous patch(es) of images retained for dataset ", metadata$dataset_id[1], ".")
+      message("Dropped ", n_cropped, " images that were not within the largest contiguous patch(es) of images retained for dataset ", dataset_id, ".")
     }
+  }
+
+  # If there are < 10 images left in the largest contiguoug polygon, skip
+  if (nrow(metadata) < 10) {
+    message("Less than 10 images in the largest contiguous patch of images retained for dataset ", dataset_id, "; skipping metadata extraction.")
+    return()
   }
 
   # Extract the IDs of the images that were retained

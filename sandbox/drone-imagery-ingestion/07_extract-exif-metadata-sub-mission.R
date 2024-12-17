@@ -110,6 +110,10 @@ summary_statistics = furrr::future_map(
 # )
 print("Finished computing dataset-level summary statistics")
 
+# Remove the sub-missions that had no valid images (i.e. were assigned the value NULL)
+no_images = sapply(summary_statistics, is.null)
+summary_statistics = summary_statistics[!no_images]
+
 # Extract the elements of the summary statistics
 metadata_perdataset_list = map(summary_statistics, "dataset_metadata")
 polygon_perdataset_list = map(summary_statistics, "mission_polygon")
@@ -124,7 +128,7 @@ polygon_perdataset_list = lapply(polygon_perdataset_list, sf::st_transform, crs 
 metadata_perdataset = bind_rows(metadata_perdataset_list)
 polygon_perdataset = bind_rows(polygon_perdataset_list)
 images_retained = unlist(images_retained_list)
-metadata_perimage = bind_rows(metadata_per_sub_dataset)
+metadata_perimage = bind_rows(metadata_per_dataset)
 
 # Filter the extracted metadata to only include images that were retained in the dataset-level
 # metadata extraction based on intersection with the mission polygon
