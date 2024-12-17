@@ -10,6 +10,7 @@ load_project: ""
 # If there are multiple photo folders, set path to the folder that contains all the photo folders
 # If there are no photos to add (e.g., this is an existing project that already has photos in it, set to an empty string ("")
 photo_path: "/example/path/to/photo/folder"
+photo_path_secondary: ""
 separate_calibration_per_path: True
 multispectral: False # Is this a multispectral photo set? If RGB, set to False.
 
@@ -141,7 +142,16 @@ buildDem: # (Metashape: buildDem, (optionally) classifyGroundPoints, exportRaste
 
 buildOrthomosaic: # (Metashape: buildOrthomosaic, exportRaster)
     enabled: True
-    surface: ["DSM-mesh",] # Options: "DTM-ptcloud", "DSM-ptcloud", "DSM-mesh", and/or "Mesh". The surface to build the orthomosaic onto. DTM and DSM refer to elevation models built by Metashape and must be configured to be computed via buildDem, above. Mesh refers to using the mesh model directly rather than first computing a DEM.
+    # TODO This is a very annoying hack because the R yaml parser simplifies one-length lists into a
+    # single element. To get around this, we duplicate the element, running the same operation
+    # twice. Fortunately, this operation is relatively quick in the scheme of things.
+    # See discussions below.
+    # https://stackoverflow.com/questions/23475743/yaml-in-r-passing-in-a-one-element-list
+    # https://github.com/vubiostat/r-yaml/issues/69
+    # Options: "DTM-ptcloud", "DSM-ptcloud", "DSM-mesh", and/or "Mesh". The surface to build the orthomosaic onto. DTM and DSM refer to elevation models built by Metashape and must be configured to be computed via buildDem, above. Mesh refers to using the mesh model directly rather than first computing a DEM.
+    surface:
+        - DSM-mesh
+        - DSM-mesh
     blending: Metashape.MosaicBlending # Photo blending mode. Options include AverageBlending, MosaicBlending, MinBlending, MaxBlending, DisabledBlending
     fill_holes: True # Fill holes in orthomosaic where no photo data exist by interpolating?
     refine_seamlines: True # Use smart algorithm to identify photo seamlines where they will least distort.
