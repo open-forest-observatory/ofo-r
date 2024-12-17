@@ -13,7 +13,7 @@ library(sf)
 # devtools::document(); devtools::install()
 library(ofo)
 
-IMAGERY_PROJECT_NAME = "2020-dispersal"
+IMAGERY_PROJECT_NAME = "2020-ucnrs"
 
 BASEROW_DATA_PATH = "/ofo-share/drone-imagery-organization/ancillary/baserow-snapshots"
 FOLDER_BASEROW_CROSSWALK_PATH = "/ofo-share/drone-imagery-organization/1c_exif-for-sorting/"
@@ -26,7 +26,7 @@ EXTRACTED_METADATA_PATH = "/ofo-share/drone-imagery-organization/3c_metadata-ext
 exif_filepath = file.path(EXIF_PATH, paste0("exif_", IMAGERY_PROJECT_NAME, ".csv"))
 crosswalk_filepath = file.path(FOLDER_BASEROW_CROSSWALK_PATH, paste0(IMAGERY_PROJECT_NAME, "_crosswalk.csv"))
 
-metadata_perimage_filepath = file.path(EXTRACTED_METADATA_PATH, paste0("mission-exif-metadata_perimage_", IMAGERY_PROJECT_NAME, ".csv"))
+metadata_perimage_filepath = file.path(EXTRACTED_METADATA_PATH, paste0("sub-mission-exif-metadata_perimage_", IMAGERY_PROJECT_NAME, ".csv"))
 metadata_perdataset_filepath = file.path(EXTRACTED_METADATA_PATH, paste0("mission-exif-metadata_perdataset_", IMAGERY_PROJECT_NAME, ".csv"))
 polygons_filepath = file.path(EXTRACTED_METADATA_PATH, paste0("mission-polygons_", IMAGERY_PROJECT_NAME, ".gpkg"))
 
@@ -36,78 +36,58 @@ metadata_perimage_sub_mission_filepath = file.path(EXTRACTED_METADATA_PATH, past
 
 ## Workflow
 
-# Read in the EXIF
-exif = prep_exif(exif_filepath, plot_flightpath = FALSE)
+# Read in image-level metadata that was parsed in step 07
+image_metadata = read_csv(metadata_perimage_filepath)
 
-# Format columns
-exif = exif |>
-  mutate(mission_id = str_pad(mission_id, 6, pad = "0", side = "left"))
+# Parse the dataset_id_image_level field to get the dataset identifier
+sub_mission_IDs = unlist(image_metadata$dataset_id_image_level)
+# The data is stored in the "<mission_ID>_<sub_mission_ID>" format
+mission_IDs = lapply(sub_mission_IDs, function(x) {
+  return(substr(x[[1]], 1, 6))
+})
+# Add the missions as a new column of the metadata
+mission_IDs = unlist(mission_IDs)
+image_metadata$dataset_id = mission_IDs
 
-# Assign the "dataset_id" parameter that is used in the metadata extraction functions. This is done
-# here as opposed to in the metadata extraction to keep those functions flexible as to how a dataset
-# is defined (e.g. a "mission" or a "sub-mission"). Here we are defining a dataset as a
-# "sub-mission".
-exif$dataset_id = exif$mission_id
-
-# Extract image-level metadata, which can occur across all missions at once becuase there are no
-# hierarchical dependencies on mission-level data
-metadata_perimage = extract_imagery_perimage_metadata(exif,
-                                                      input_type = "dataframe")
-
-# Assign image_id to the exif dataframe so it can be used in the dataset-level metadata extraction
-exif$image_id = metadata_perimage$image_id
-
-# Filter the exif dataframe and extracted per-image metadata to include only images that were
-# retained in the previous workflow step of sub-mission-level metadata extraction
-metadata_perimage_sub_mission = read_csv(metadata_perimage_sub_mission_filepath)
-image_ids_retained = metadata_perimage_sub_mission$image_id
-exif = exif |>
-  filter(image_id %in% image_ids_retained)
-metadata_perimage = metadata_perimage |>
-  filter(image_id %in% image_ids_retained)
-
-
-# For sub-mission-level metadata, run sub-mission by sub-mission
-missions = unique(exif$mission_id)
-
-# For parallelizing, make a list of subsets of the exif dataframe, one for each sub-mission
-exif_list <- lapply(missions, function(mission) {
-  exif_foc <- exif |>
-    filter(mission_id == mission)
-  return(exif_foc)
+# For parallelizing, make a list of subsets of the metadata dataframe, one for each mission
+unique_missions = unique(mission_IDs)
+metadata_per_dataset <- lapply(unique_missions, function(mission) {
+  mission_metadata <- image_metadata |>
+    filter(dataset_id == mission)
+  return(mission_metadata)
 })
 
+# TODO this whole section is duplicated with step 07, so it could be made function
 # Run dataset-level metadata extraction across each subset
-
 future::plan("multisession")
-res = furrr::future_map(exif_list,
-                        extract_imagery_dataset_metadata,
-                        input_type = "dataframe",
-                        plot_flightpath = FALSE,
-                        crop_to_contiguous = TRUE,
-                        min_contig_area = 10000,
-                        .options = furrr_options(seed = TRUE))
+summary_statistics = furrr::future_map(
+  metadata_per_dataset,
+  extract_imagery_dataset_metadata,
+  crop_to_contiguous = TRUE,
+  min_contig_area = 10000,
+  .progress = TRUE,
+  .options = furrr::furrr_options(seed = TRUE)
+)
+print("Finished computing dataset-level summary statistics")
+# Extract the elements of the summary statistics
+metadata_perdataset = dplyr::bind_rows(map(summary_statistics, "dataset_metadata"))
+polygon_perdataset = dplyr::bind_rows(map(summary_statistics, "mission_polygon"))
+images_retained = unlist(map(summary_statistics, "images_retained"))
 
-metadata_list = map(res, ~.x$dataset_metadata)
-polygon_list = map(res, ~.x$mission_polygon)
-images_retained_list = map(res, ~.x$images_retained)
-
-metadata_perdataset = bind_rows(metadata_list)
-polygon_perdataset = bind_rows(polygon_list)
-images_retained = unlist(images_retained_list)
-
+metadata_perimage = dplyr::bind_rows(metadata_per_dataset)
 # Filter the extracted metadata to only include images that were retained in the dataset-level
 # metadata extraction based on intersection with the mission polygon
 metadata_perimage = metadata_perimage |>
   filter(image_id %in% images_retained)
 
 # Save the metadata
-
 folders = c(metadata_perimage_filepath, metadata_perdataset_filepath, polygons_filepath)
 folders = dirname(folders)
-purrr::walk(folders,
-            create_dir)
 
-write_csv(metadata_perimage, metadata_perimage_filepath)
+purrr::walk(
+  folders,
+  create_dir
+)
+
 write_csv(metadata_perdataset, metadata_perdataset_filepath)
-st_write(polygon_perdataset, polygons_filepath, delete_dsn = TRUE)
+sf::st_write(polygon_perdataset, polygons_filepath, delete_dsn = TRUE)
