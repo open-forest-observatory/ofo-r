@@ -141,7 +141,7 @@ buildDem: # (Metashape: buildDem, (optionally) classifyGroundPoints, exportRaste
 
 buildOrthomosaic: # (Metashape: buildOrthomosaic, exportRaster)
     enabled: True
-    surface: ["DSM-mesh"] # Options: "DTM-ptcloud", "DSM-ptcloud", "DSM-mesh", and/or "Mesh". The surface to build the orthomosaic onto. DTM and DSM refer to elevation models built by Metashape and must be configured to be computed via buildDem, above. Mesh refers to using the mesh model directly rather than first computing a DEM.
+    surface: ["DSM-mesh",] # Options: "DTM-ptcloud", "DSM-ptcloud", "DSM-mesh", and/or "Mesh". The surface to build the orthomosaic onto. DTM and DSM refer to elevation models built by Metashape and must be configured to be computed via buildDem, above. Mesh refers to using the mesh model directly rather than first computing a DEM.
     blending: Metashape.MosaicBlending # Photo blending mode. Options include AverageBlending, MosaicBlending, MinBlending, MaxBlending, DisabledBlending
     fill_holes: True # Fill holes in orthomosaic where no photo data exist by interpolating?
     refine_seamlines: True # Use smart algorithm to identify photo seamlines where they will least distort.
