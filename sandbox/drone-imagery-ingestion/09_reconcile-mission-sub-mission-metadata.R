@@ -6,7 +6,13 @@
 library(tidyverse)
 library(sf)
 
-IMAGERY_PROJECT_NAME = "2019-focal"
+# Handle difference in how the current directory is set between debugging and command line call
+if (file.exists("sandbox/drone-imagery-ingestion/imagery_project_name.txt")) {
+  IMAGERY_PROJECT_NAME_FILE = "sandbox/drone-imagery-ingestion/imagery_project_name.txt"
+} else {
+  IMAGERY_PROJECT_NAME_FILE = "imagery_project_name.txt"
+}
+IMAGERY_PROJECT_NAME = readr::read_lines(IMAGERY_PROJECT_NAME_FILE)
 
 EXTRACTED_METADATA_PATH = "/ofo-share/drone-imagery-organization/3c_metadata-extracted/"
 
