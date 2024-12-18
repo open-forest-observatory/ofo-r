@@ -1,6 +1,8 @@
 # Purpose: Thin the image-level metadata to only include images that were retained by *both* the
 # mission level and sub-mission level processing. Write this back to the same metadata input files
 
+# This can be skipped now since we only compute the per-image metadata once
+
 library(tidyverse)
 library(sf)
 

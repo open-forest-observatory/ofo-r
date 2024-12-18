@@ -9,7 +9,13 @@ library(furrr)
 
 devtools::load_all()
 
-IMAGERY_PROJECT_NAME = "2019-focal"
+# Handle difference in how the current directory is set between debugging and command line call
+if (file.exists("sandbox/drone-imagery-ingestion/imagery_project_name.txt")) {
+  IMAGERY_PROJECT_NAME_FILE = "sandbox/drone-imagery-ingestion/imagery_project_name.txt"
+} else {
+  IMAGERY_PROJECT_NAME_FILE = "imagery_project_name.txt"
+}
+IMAGERY_PROJECT_NAME = read_lines(IMAGERY_PROJECT_NAME_FILE)
 
 IMAGERY_INPUT_PATH = "/ofo-share/drone-imagery-organization/3_sorted-notcleaned-combined/"
 EXIF_OUTPUT_PATH = "/ofo-share/drone-imagery-organization/3b_exif-unprocessed/"
@@ -22,13 +28,14 @@ exif_output_filepath = file.path(EXIF_OUTPUT_PATH, paste0("exif_", IMAGERY_PROJE
 
 # Get a list of all image files in the project directory
 image_paths = list.files(project_imagery_path,
-                         recursive = TRUE,
-                         pattern = ".(jpg|JPG|jpeg|JPEG)$",
-                         full.names = TRUE)
+  recursive = TRUE,
+  pattern = ".(jpg|JPG|jpeg|JPEG)$",
+  full.names = TRUE
+)
 
 # Extract the EXIF from all of them
 future::plan("multisession")
-exif_rows = furrr::future_map(image_paths, read_exif_drop_thumbnails)
+exif_rows = furrr::future_map(image_paths, read_exif_drop_thumbnails, .progress = TRUE)
 exif = bind_rows(exif_rows)
 
 # Add the mission ID and submission ID to the EXIF data, assuming that the folder organization is:

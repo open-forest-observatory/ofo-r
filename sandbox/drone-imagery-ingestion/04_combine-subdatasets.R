@@ -6,7 +6,13 @@
 library(tidyverse)
 library(furrr)
 
-IMAGERY_PROJECT_NAME = "2023-tahoe-aspen" # 2023-ny-ofo, 2022-early-regen
+# Handle difference in how the current directory is set between debugging and command line call
+if (file.exists("sandbox/drone-imagery-ingestion/imagery_project_name.txt")) {
+  IMAGERY_PROJECT_NAME_FILE = "sandbox/drone-imagery-ingestion/imagery_project_name.txt"
+} else {
+  IMAGERY_PROJECT_NAME_FILE = "imagery_project_name.txt"
+}
+IMAGERY_PROJECT_NAME = read_lines(IMAGERY_PROJECT_NAME_FILE)
 
 SORTED_IMAGERY_FOLDER = "/ofo-share/drone-imagery-organization/2_sorted-notcleaned"
 COMBINED_IMAGERY_FOLDER = "/ofo-share/drone-imagery-organization/3_sorted-notcleaned-combined"

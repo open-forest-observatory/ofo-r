@@ -5,7 +5,13 @@ library(tidyverse)
 library(exifr)
 library(furrr)
 
-IMAGERY_PROJECT_NAME = "2022-early-regen"
+# Handle difference in how the current directory is set between debugging and command line call
+if (file.exists("sandbox/drone-imagery-ingestion/imagery_project_name.txt")) {
+  IMAGERY_PROJECT_NAME_FILE = "sandbox/drone-imagery-ingestion/imagery_project_name.txt"
+} else {
+  IMAGERY_PROJECT_NAME_FILE = "imagery_project_name.txt"
+}
+IMAGERY_PROJECT_NAME = read_lines(IMAGERY_PROJECT_NAME_FILE)
 
 IMAGERY_INPUT_PATH = "/ofo-share/drone-imagery-organization/1_manually-cleaned"
 EXIF_OUTPUT_PATH = "/ofo-share/drone-imagery-organization/1b_exif-unprocessed/"
@@ -51,7 +57,7 @@ imagery_input_path = file.path(IMAGERY_INPUT_PATH, IMAGERY_PROJECT_NAME)
 folders = list.dirs(imagery_input_path, full.names = TRUE, recursive = FALSE)
 
 plan = future::plan(multicore)
-l = future_map(folders, get_image_data)
+l = future_map(folders, get_image_data, .progress = TRUE)
 
 image_data = bind_rows(l)
 
