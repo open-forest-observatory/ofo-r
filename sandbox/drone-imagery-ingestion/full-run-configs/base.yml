@@ -142,16 +142,16 @@ buildDem: # (Metashape: buildDem, (optionally) classifyGroundPoints, exportRaste
 
 buildOrthomosaic: # (Metashape: buildOrthomosaic, exportRaster)
     enabled: True
-    # TODO This is a very annoying hack because the R yaml parser simplifies one-length lists into a
-    # single element. To get around this, we duplicate the element, running the same operation
-    # twice. Fortunately, this operation is relatively quick in the scheme of things.
-    # See discussions below.
+    # Note that there is a bug in the R yaml parser that turns one-length lists into a single
+    # element. This means there needs to be at least two options here. Alternatively, you can
+    # duplicate a single one, which is fine since generating the ortho is fairly quick. See
+    # descriptions of the issue below.
     # https://stackoverflow.com/questions/23475743/yaml-in-r-passing-in-a-one-element-list
     # https://github.com/vubiostat/r-yaml/issues/69
     # Options: "DTM-ptcloud", "DSM-ptcloud", "DSM-mesh", and/or "Mesh". The surface to build the orthomosaic onto. DTM and DSM refer to elevation models built by Metashape and must be configured to be computed via buildDem, above. Mesh refers to using the mesh model directly rather than first computing a DEM.
     surface:
         - DSM-mesh
-        - DSM-mesh
+        - DSM-ptcloud
     blending: Metashape.MosaicBlending # Photo blending mode. Options include AverageBlending, MosaicBlending, MinBlending, MaxBlending, DisabledBlending
     fill_holes: True # Fill holes in orthomosaic where no photo data exist by interpolating?
     refine_seamlines: True # Use smart algorithm to identify photo seamlines where they will least distort.
