@@ -9,7 +9,8 @@ compile_mission_summary_data = function(mission_level_metadata, base_ofo_url, mi
   d = mission_level_metadata |>
     dplyr::mutate(
       overlap_combined_nominal = paste(overlap_front_nominal, overlap_side_nominal, sep = "/"),
-      license = "License will display here",
+      license = "CC-BY 4.0",
+      creator = "Dr. Derek Young and UC Davis FOCAL Lab",
       dataset_id_link = paste0('<a href="', base_ofo_url, mission_details_dir, dataset_id, '/"', ' target="_PARENT">', dataset_id, "</a>"),
       time_range_local_derived = paste0(earliest_time_local_derived, " to ", latest_time_local_derived),
       overlap_front_side_nominal = paste0(overlap_front_nominal, "/", overlap_side_nominal),
@@ -335,7 +336,9 @@ make_mission_details_datatable = function(mission_summary_foc,
       "File format" = file_format_derived,
       "Project ID" = project_id,
       "Contributor dataset name" = contributor_dataset_name,
-      "Dataset license" = license) |>
+      "Creator" = creator,
+      "License" = license
+    ) |>
       # Pivot longer
       dplyr::mutate(across(everything(), as.character)) |>
       tidyr::pivot_longer(cols = everything(), names_to = "Attribute", values_to = "Value")
@@ -385,29 +388,152 @@ render_mission_details_page = function(
     next_dataset_page_path,
     previous_dataset_page_path,
     website_repo_content_path,
-    mission_details_page_dir) {
+    mission_details_page_dir,
+    display_data = FALSE,
+    published_data_path = NULL,
+    data_server_base_url = "") {
+
+  # The argument `display_data` determines whether to display actual drone data (e.g., images,
+  # orthomosaic), as opposed to metadata only 
 
   dataset_id = mission_summary_foc$dataset_id
 
-  # Determine if we need a dataset message at the top of the page, and if so, prepare it
-  if (mission_summary_foc$embargoed == TRUE) {
-    top_message = "This dataset has been submitted to the OFO and is planned for release, but it is currently under embargo. The tree locations have been randomized. For questions about data availability, please contact the dataset contributors."
-  } else if (!is.na(mission_summary_foc$display_message)) {
-    top_message = mission_summary_foc$display_message
-  } else {
-    top_message = NA
-  }
 
+  # Determine if this is an oblique mission, so we can enable a message to the top of the page
+  # explaining that the photogrammetry products are not expected to look good on their own.
+  oblique = abs(mission_summary_foc$camera_pitch_derived) > 10
+
+  # Initialize drone data display parameters to pass to jinjar, starting with value FALSE or NULL,
+  # but will be populated during the "display data" step below if specified
+  ortho_exists = FALSE
+  ortho_url_thumb = NULL
+  ortho_url_full = NULL
+  chm_exists = FALSE
+  chm_url_thumb = NULL
+  chm_url_full = NULL
+  dsm_exists = FALSE
+  dsm_url_thumb = NULL
+  dsm_url_full = NULL
+  dtm_exists = FALSE
+  dtm_url_thumb = NULL
+  dtm_url_full = NULL
+  pc_exists = FALSE
+  pc_url_full = NULL
+  mesh_exists = FALSE
+  mesh_url_full = NULL
+  images_example_exists = FALSE
+  images_example_url_thumb = NULL
+  images_example_url_full = NULL
+  images_zip_exists = FALSE
+  images_zip_url = NULL
+  footprint_exists = FALSE
+  footprint_url = NULL
+  cameras_exists = FALSE
+  cameras_url = NULL
+  log_exists = FALSE
+  log_url = NULL
+
+
+  if (display_data) {
+
+    # Get the processed photogrammetry folder name (for now taking the first if there are multiple)
+    sfm_folder = list.files(file.path(published_data_path, dataset_id),
+                            pattern = "^processed-",
+                            full.names = FALSE,
+                            recursive = FALSE) |> rev()
+    # In case there is more than one match, take the first (of the reversed data frame -- so
+    # actually the most recent)
+    sfm_folder = sfm_folder[1]
+
+    # Check if products exist and if so, get the URLs needed to add them to the page
+
+    # Orthomosaic
+    ortho_exists = file.exists(file.path(published_data_path, dataset_id, sfm_folder, "thumbnails", "orthomosaic.png"))
+    ortho_url_thumb = paste(data_server_base_url, dataset_id, sfm_folder, "thumbnails/orthomosaic.png", sep = "/")
+    ortho_url_full = paste(data_server_base_url, dataset_id, sfm_folder, "full/orthomosaic.tif", sep = "/")
+
+    # CHM
+    chm_exists = file.exists(file.path(published_data_path, dataset_id, sfm_folder, "thumbnails", "chm-mesh.png"))
+    chm_url_thumb = paste(data_server_base_url, dataset_id, sfm_folder, "thumbnails/chm-mesh.png", sep = "/")
+    chm_url_full = paste(data_server_base_url, dataset_id, sfm_folder, "full/chm-mesh.tif", sep = "/")
+
+    # DSM
+    dsm_exists = file.exists(file.path(published_data_path, dataset_id, sfm_folder, "thumbnails", "dsm-mesh.png"))
+    dsm_url_thumb = paste(data_server_base_url, dataset_id, sfm_folder, "thumbnails/dsm-mesh.png", sep = "/")
+    dsm_url_full = paste(data_server_base_url, dataset_id, sfm_folder, "full/dsm-mesh.tif", sep = "/")
+
+    # DTM
+    dtm_exists = file.exists(file.path(published_data_path, dataset_id, sfm_folder, "thumbnails", "dtm-ptcloud.png"))
+    dtm_url_thumb = paste(data_server_base_url, dataset_id, sfm_folder, "thumbnails/dtm-ptcloud.png", sep = "/")
+    dtm_url_full = paste(data_server_base_url, dataset_id, sfm_folder, "full/dtm-ptcloud.tif", sep = "/")
+
+    # Point cloud
+    pc_exists = file.exists(file.path(published_data_path, dataset_id, sfm_folder, "full", "points.laz"))
+    pc_url_full = paste(data_server_base_url, dataset_id, sfm_folder, "full/points.laz", sep = "/")
+
+    # Mesh model
+    mesh_exists = file.exists(file.path(published_data_path, dataset_id, sfm_folder, "full", "mesh-georeferenced.ply"))
+    mesh_url_full = paste(data_server_base_url, dataset_id, sfm_folder, "full/mesh-georeferenced.ply", sep = "/")
+
+    # Raw images
+    images_example_exists = file.exists(file.path(published_data_path, dataset_id, "images", "examples", "thumbnails", "example_4.JPG"))
+    images_example_url_thumb = paste(data_server_base_url, dataset_id, "images/examples/thumbnails/", sep = "/")
+    images_example_url_full = paste(data_server_base_url, dataset_id, "images/examples/fullsize/", sep = "/")
+
+    images_zip_exists = file.exists(file.path(published_data_path, dataset_id, "images", "images.zip"))
+    images_zip_url = paste(data_server_base_url, dataset_id, "images/images.zip", sep = "/")
+
+    # Mission footprint
+    footprint_exists = file.exists(file.path(published_data_path, dataset_id, "footprint", "footprint.gpkg"))
+    footprint_url = paste(data_server_base_url, dataset_id, "footprint/footprint.gpkg", sep = "/")
+
+    # Cameras
+    cameras_exists = file.exists(file.path(published_data_path, dataset_id, sfm_folder, "full", "cameras.xml"))
+    cameras_url = paste(data_server_base_url, dataset_id, sfm_folder, "full/cameras.xml", sep = "/")
+
+    # Log
+    log_exists = file.exists(file.path(published_data_path, dataset_id, sfm_folder, "full", "log.txt"))
+    log_url = paste(data_server_base_url, dataset_id, sfm_folder, "full/log.txt", sep = "/")
+
+  }
 
 
   rendered = jinjar::render(
     template_filepath,
     dataset_id = dataset_id,
+    oblique = oblique,
     map_html_path = mission_details_map_path,
     datatable_html_path = mission_details_datatable_path,
-    top_message = top_message,
     next_dataset_page_path = next_dataset_page_path,
-    previous_dataset_page_path = previous_dataset_page_path
+    previous_dataset_page_path = previous_dataset_page_path,
+    ortho_exists = ortho_exists,
+    ortho_url_thumb = ortho_url_thumb,
+    ortho_url_full = ortho_url_full,
+    chm_exists = chm_exists,
+    chm_url_thumb = chm_url_thumb,
+    chm_url_full = chm_url_full,
+    dsm_exists = dsm_exists,
+    dsm_url_thumb = dsm_url_thumb,
+    dsm_url_full = dsm_url_full,
+    dtm_exists = dtm_exists,
+    dtm_url_thumb = dtm_url_thumb,
+    dtm_url_full = dtm_url_full,
+    pc_exists = pc_exists,
+    pc_url_full = pc_url_full,
+    mesh_exists = mesh_exists,
+    mesh_url_full = mesh_url_full,
+    images_example_exists = images_example_exists,
+    images_example_url_thumb = images_example_url_thumb,
+    images_example_url_full = images_example_url_full,
+    images_zip_exists = images_zip_exists,
+    images_zip_url = images_zip_url,
+    footprint_exists = footprint_exists,
+    footprint_url = footprint_url,
+    cameras_exists = cameras_exists,
+    cameras_url = cameras_url,
+    log_exists = log_exists,
+    log_url = log_url,
+    .config = jinjar_config(variable_open = "{*", variable_close = "*}")
   )
 
   write_path = file.path(website_repo_content_path,
@@ -430,7 +556,9 @@ make_mission_details_pages = function(
     mission_details_datatable_dir,
     mission_details_map_dir,
     mission_details_template_filepath,
-    mission_details_page_dir) {
+    mission_details_page_dir,
+    published_data_path = "",
+    data_server_base_url = "") {
 
   mission_summary = mission_summary |>
     dplyr::arrange(dataset_id)
@@ -485,7 +613,10 @@ make_mission_details_pages = function(
       next_dataset_page_path = next_dataset_page_path,
       previous_dataset_page_path = previous_dataset_page_path,
       website_repo_content_path = website_content_path,
-      mission_details_page_dir = mission_details_page_dir
+      mission_details_page_dir = mission_details_page_dir,
+      published_data_path = published_data_path,
+      data_server_base_url = data_server_base_url,
+      display_data = TRUE
     )
   }
 
