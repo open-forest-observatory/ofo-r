@@ -65,6 +65,7 @@ metadata_per_dataset <- lapply(unique_missions, function(mission) {
 
 # TODO this whole section is duplicated with step 07, so it could be made function
 # Run dataset-level metadata extraction across each subset
+print("Started computing dataset-level summary statistics")
 future::plan("multisession")
 summary_statistics = furrr::future_map(
   metadata_per_dataset,

@@ -17,7 +17,7 @@ library(ofo)
 # File paths
 
 RAW_IMAGES_PATH = "/ofo-share/drone-imagery-organization/6_combined-across-projects"
-RAW_IMAGES_METADATA_PATH = "/ofo-share/drone-imagery-organization/3c_metadata-extracted/all-mission-points-w-metadata.gpkg"
+RAW_IMAGES_METADATA_PATH = "/ofo-share/drone-imagery-organization/3c_metadata-extracted/all-sub-mission-points-w-metadata.gpkg"
 MISSION_FOOTPRINTS_PATH = "/ofo-share/drone-imagery-organization/3c_metadata-extracted/all-mission-polygons-w-metadata.gpkg"
 PUBLISHABLE_IMAGES_PATH = "/ofo-share/drone-imagery-organization/7_to-publish"
 IN_PROCESS_PATH = "/ofo-share/tmp/raw-imagery-publish-prep-progress-tracking/"
@@ -101,7 +101,7 @@ imagery_publish_prep_mission = function(mission_id_foc, mission_images_metadata,
   }
 
   # Hardlink the selected images to the publishable folder
-  inpaths = file.path(RAW_IMAGES_PATH, selected_images$received_image_path)
+  inpaths = file.path(RAW_IMAGES_PATH, mission_id_foc, selected_images$received_image_path)
   extensions = tools::file_ext(inpaths)
   outpaths = file.path(PUBLISHABLE_IMAGES_PATH, mission_id_foc, "images", "examples", "fullsize", paste0("example_", 1:N_EXAMPLE_IMAGES, ".", extensions))
 
@@ -162,18 +162,23 @@ magick:::magick_threads(1)
 raw_images_metadata = st_read(RAW_IMAGES_METADATA_PATH)
 mission_footprints = st_read(MISSION_FOOTPRINTS_PATH)
 
-# Get all the mission IDs
-mission_ids = raw_images_metadata$dataset_id_image_level |> unique()
+# Get all the mission IDs from the sub-mission
+mission_ids = raw_images_metadata$dataset_id_image_level
+mission_ids = unlist(lapply(mission_ids, function(x) {
+  substring(x, 1, 6)
+}))
+raw_images_metadata$mission_id = mission_ids
 
+unique_mission_ids = raw_images_metadata$mission_id |> unique()
 
 # Split the raw images metadata and mission footprints by mission ID
-mission_ids_to_run = mission_ids
+mission_ids_to_run = unique_mission_ids
 mission_images_metadata_list = list()
 mission_footprints_list = list()
 for (mission_id_foc in mission_ids_to_run) {
 
   # Get the mission metadata (for image locations)
-  mission_images_metadata_list[[mission_id_foc]] = raw_images_metadata |> filter(dataset_id_image_level == mission_id_foc)
+  mission_images_metadata_list[[mission_id_foc]] = raw_images_metadata |> filter(mission_id == mission_id_foc)
 
   # Get the mission footprint
   mission_footprints_list[[mission_id_foc]] = mission_footprints |> filter(dataset_id == mission_id_foc)
@@ -182,19 +187,21 @@ for (mission_id_foc in mission_ids_to_run) {
 
 # # Run the imagery prep for each mission
 # pwalk(
-#   list(
-#     mission_id_foc = mission_ids_to_run,
-#     mission_images_metadata = mission_images_metadata_list,
-#     mission_footprint = mission_footprints_list
-#   ),
-#   imagery_publish_prep_mission)
+#  list(
+#    mission_id_foc = mission_ids_to_run,
+#    mission_images_metadata = mission_images_metadata_list,
+#    mission_footprint = mission_footprints_list
+#  ),
+#  imagery_publish_prep_mission
+# )
 
+input_list = list(
+  mission_id_foc = mission_ids_to_run,
+  mission_images_metadata = mission_images_metadata_list,
+  mission_footprint = mission_footprints_list
+)
 future_pwalk(
-  list(
-    mission_id_foc = mission_ids_to_run,
-    mission_images_metadata = mission_images_metadata_list,
-    mission_footprint = mission_footprints_list
-  ),
+  input_list,
   imagery_publish_prep_mission,
   .options = furrr_options(seed = TRUE,
                            scheduling = Inf))
