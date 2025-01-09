@@ -13,7 +13,13 @@ library(sf)
 # devtools::document(); devtools::install()
 library(ofo)
 
-IMAGERY_PROJECT_NAME = "2020-dispersal"
+# Handle difference in how the current directory is set between debugging and command line call
+if (file.exists("sandbox/drone-imagery-ingestion/imagery_project_name.txt")) {
+  IMAGERY_PROJECT_NAME_FILE = "sandbox/drone-imagery-ingestion/imagery_project_name.txt"
+} else {
+  IMAGERY_PROJECT_NAME_FILE = "imagery_project_name.txt"
+}
+IMAGERY_PROJECT_NAME = read_lines(IMAGERY_PROJECT_NAME_FILE)
 
 BASEROW_DATA_PATH = "/ofo-share/drone-imagery-organization/ancillary/baserow-snapshots"
 FOLDER_BASEROW_CROSSWALK_PATH = "/ofo-share/drone-imagery-organization/1c_exif-for-sorting/"

@@ -5,7 +5,13 @@
 
 library(tidyverse)
 
-IMAGERY_PROJECT_NAME = "2019-focal" # 2023-ny-ofo, 2022-early-regen
+# Handle difference in how the current directory is set between debugging and command line call
+if (file.exists("sandbox/drone-imagery-ingestion/imagery_project_name.txt")) {
+  IMAGERY_PROJECT_NAME_FILE = "sandbox/drone-imagery-ingestion/imagery_project_name.txt"
+} else {
+  IMAGERY_PROJECT_NAME_FILE = "imagery_project_name.txt"
+}
+IMAGERY_PROJECT_NAME = read_lines(IMAGERY_PROJECT_NAME_FILE)
 
 BASEROW_DATA_PATH = "/ofo-share/drone-imagery-organization/ancillary/baserow-snapshots"
 EXIF_INPUT_PATH = "/ofo-share/drone-imagery-organization/1b_exif-unprocessed"
