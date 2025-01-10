@@ -68,9 +68,9 @@ exif_per_dataset <- lapply(
 aircraft_model_names <- lapply(
   unique_datasets,
   function(dataset_ID) {
-    # Extract the baserow entries for this dataset ID
+    # Extract the baserow entries for this sub-mission ID
     baserow_for_dataset <- baserow_dataset_metadata[
-      baserow_dataset_metadata$dataset_id == dataset_ID,
+      baserow_dataset_metadata$sub_mission_id == dataset_ID,
     ]
 
     # There should only be one matching row
