@@ -176,6 +176,7 @@ extract_file_format = function(exif) {
 #' @export
 
 extract_pitch_roll_yaw = function(exif,
+                                  platform_name,
                                   candidate_pitch_cols = c("GimbalPitchDegree", "Pitch"),
                                   candidate_roll_cols = c("GimbalRollDegree", "Roll"),
                                   candidate_yaw_cols = c("GimbalYawDegree", "Yaw")) {
@@ -185,8 +186,19 @@ extract_pitch_roll_yaw = function(exif,
   camera_roll = extract_candidate_columns(exif, candidate_roll_cols)
   camera_yaw = extract_candidate_columns(exif, candidate_yaw_cols)
 
-  # TODO should this be done in all cases?
-  camera_pitch = camera_pitch + 90
+  # DJI platforms use an alternative pitch convention so we need shift it so it reflects degrees
+  # up from nadir
+  if(platform_name %in% c("Phantom 4 Pro v2.0",
+    "Phantom 4 Advanced",
+    "Mavic 3 Multispectral",
+    "Phantom 4 RTK",
+    "Phantom 4 Standard",
+    "Matrice 210 RTK",
+    "Matrice 100",
+    "Matrice 300")
+  ){
+    camera_pitch = camera_pitch + 90
+  }
 
   camera_pitch = round(camera_pitch, 2)
   camera_roll = round(camera_roll, 2)
@@ -358,7 +370,8 @@ extract_imagery_perimage_metadata = function(exif, platform_name, plot_flightpat
     "Matrice 210 RTK",
     "Matrice 100",
     "Matrice 300",
-    "eBee X" # As far as I can tell, there is no issue with this using the DJI parser
+    "eBee X",
+    "Evo II v2"
   ))) {
     stop(paste("Platform ", platform_name, " is not supported"))
   }
@@ -380,7 +393,7 @@ extract_imagery_perimage_metadata = function(exif, platform_name, plot_flightpat
   lon_lat = extract_lon_lat(exif)
   rtk_fix = extract_rtk_fix(exif)
   accuracy = extract_accuracy(exif)
-  pitch_roll_yaw = extract_pitch_roll_yaw(exif)
+  pitch_roll_yaw = extract_pitch_roll_yaw(exif, platform_name)
   exposure = extract_exposure(exif)
   aperture = extract_aperture(exif)
   iso = extract_iso(exif)
