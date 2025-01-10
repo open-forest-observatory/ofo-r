@@ -28,7 +28,7 @@ EXTRACTED_METADATA_PATH = "/ofo-share/drone-imagery-organization/3c_metadata-ext
 exif_filepath = file.path(EXIF_PATH, paste0("exif_", IMAGERY_PROJECT_NAME, ".csv"))
 crosswalk_filepath = file.path(FOLDER_BASEROW_CROSSWALK_PATH, paste0(IMAGERY_PROJECT_NAME, "_crosswalk.csv"))
 
-metadata_perimage_filepath = file.path(EXTRACTED_METADATA_PATH, paste0("sub-mission-exif-metadata_perimage_", IMAGERY_PROJECT_NAME, ".csv"))
+metadata_perimage_filepath = file.path(EXTRACTED_METADATA_PATH, paste0("exif-metadata_perimage_", IMAGERY_PROJECT_NAME, ".csv"))
 metadata_perdataset_filepath = file.path(EXTRACTED_METADATA_PATH, paste0("sub-mission-exif-metadata_perdataset_", IMAGERY_PROJECT_NAME, ".csv"))
 polygons_filepath = file.path(EXTRACTED_METADATA_PATH, paste0("sub-mission-polygons_", IMAGERY_PROJECT_NAME, ".gpkg"))
 metadata_sub_mission_filepath = file.path(EXTRACTED_METADATA_PATH, paste0("sub-mission-baserow-metadata_", IMAGERY_PROJECT_NAME, ".csv"))
@@ -86,8 +86,8 @@ aircraft_model_names <- lapply(
 )
 
 # Extract the metadata in a standardized manner no matter the platform
-# This is run on a per-image basis, but requires the per-dataset platform name to understand how to
-# interpret the information.
+# This is run on a per-image basis, but requires the per-sub-mission platform name to understand how
+# to interpret the information.
 future::plan("future::multisession")
 print("Started extracting metadata per image to a standardized format")
 metadata_per_dataset = furrr::future_map2(
@@ -97,59 +97,14 @@ metadata_per_dataset = furrr::future_map2(
   .progress = TRUE,
   .options = furrr::furrr_options(seed = TRUE)
 )
-# Additional print since the progress bar doesn't end the line
-print("")
-print("Started computing dataset-level summary statistics")
-# Use the standardized image-level metadata extracted in previous step to compute dataset-level summary statistics
-# TODO there may not be a performance benefit if this process is bottlenecked by network constraints
-# when downloading the DEM for "extract_flight_terrain_correlation".
-# The alternative sequential call with purr is provided below
-summary_statistics = furrr::future_map(
-  metadata_per_dataset,
-  extract_imagery_dataset_metadata,
-  .progress = TRUE,
-  .options = furrr::furrr_options(seed = TRUE)
-)
-# summary_statistics = purrr::map(
-#  metadata_per_dataset,
-#  extract_imagery_dataset_metadata,
-# )
-print("Finished computing dataset-level summary statistics")
-
-# Remove the sub-missions that had no valid images (i.e. were assigned the value NULL)
-no_images = sapply(summary_statistics, is.null)
-summary_statistics = summary_statistics[!no_images]
-
-# Extract the elements of the summary statistics
-metadata_perdataset_list = map(summary_statistics, "dataset_metadata")
-polygon_perdataset_list = map(summary_statistics, "mission_polygon")
-images_retained_list = map(summary_statistics, "images_retained")
-
-# Standardize CRS of polygons to EPSG:4326 (lon/lat) so that polygons from anywhere can be combined
-# into a single dataset to be written to file
-polygon_perdataset_list = lapply(polygon_perdataset_list, sf::st_transform, crs = 4326)
-
-# Combine the metadata which is currently a list of datasets into a single data frame for each
-# metadata item
-metadata_perdataset = bind_rows(metadata_perdataset_list)
-polygon_perdataset = bind_rows(polygon_perdataset_list)
-images_retained = unlist(images_retained_list)
+# Bind the rows together across all datasets
 metadata_perimage = bind_rows(metadata_per_dataset)
 
 # Filter the extracted metadata to only include images that were retained in the dataset-level
 # metadata extraction based on intersection with the mission polygon
-metadata_perimage = metadata_perimage |>
-  filter(image_id %in% images_retained)
 
-# Save the metadata
-folders = c(metadata_perimage_filepath, metadata_perdataset_filepath, polygons_filepath)
-folders = dirname(folders)
+# Create the folder to save the image metadata in
+create_dir(dirname(metadata_perimage_filepath))
 
-purrr::walk(
-  folders,
-  create_dir
-)
-
+# Write out the standardized metadata per image
 write_csv(metadata_perimage, metadata_perimage_filepath)
-write_csv(metadata_perdataset, metadata_perdataset_filepath)
-sf::st_write(polygon_perdataset, polygons_filepath, delete_dsn = TRUE)
