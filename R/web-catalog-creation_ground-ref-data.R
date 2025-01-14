@@ -35,7 +35,7 @@ read_and_standardize_tabular_field_ref_data = function(google_sheet_id) {
 
 
 # Read in plot boundary files (one file per plot) and merge to one object
-read_and_merge_plot_boundaries = function(plot_boundaries_dir) {
+read_and_merge_plot_boundaries = function(plot_boundaries_dir, base_ofo_url, plot_details_dir) {
 
   ## Load plot boundaries and merge to one layer
   bound_files = list.files(plot_boundaries_dir, full.names = TRUE,  pattern = ".gpkg$")
@@ -58,7 +58,11 @@ read_and_merge_plot_boundaries = function(plot_boundaries_dir) {
   bounds = bounds |>
     mutate(plot_id = str_pad(plot_id, 4, pad = "0", side = "left"))
 
-  bounds$area_ha_sf = (sf::st_area(bounds) |> as.numeric() / 10^4) |> round(4) # Convert to hectares
+  bounds$area_ha_sf = (sf::st_area(bounds) |> as.numeric() / 10^4) |> round(4)  # Convert to hectares
+
+  bounds = bounds |>
+    mutate(bounds_plot_id_link = paste0('<a href="', base_ofo_url, plot_details_dir, plot_id, '/"', ' target="_PARENT">', plot_id, "</a>")) |>
+    arrange(-area_ha_sf)
 
   # TODO: Simplifying plot boundaries here to reduce file size of resulting leaflet map
 
@@ -318,8 +322,9 @@ make_plot_catalog_map = function(plot_summary,
   d_map = left_join(plot_centroids, plot_summary, by = "plot_id")
 
   m = leaflet() |>
-    addMarkers(data = d_map, popup = ~plot_id_link) |>
-    addPolygons(data = plot_bounds, group = "bounds") |>
+    addTiles(options = providerTileOptions(maxZoom = 20)) |>
+    addMarkers(data = d_map, popup = ~plot_id_link, clusterOptions = markerClusterOptions(freezeAtZoom = 20)) |>
+    addPolygons(data = plot_bounds, popup = ~bounds_plot_id_link, group = "bounds") |>
     addProviderTiles(providers$Esri.WorldTopoMap, group = "Topo") |>
     addProviderTiles(providers$Esri.WorldImagery, group = "Imagery") |>
     groupOptions("bounds", zoomLevels = 13:20) |>

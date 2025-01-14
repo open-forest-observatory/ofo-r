@@ -13,10 +13,8 @@ library(jinjar)
 devtools::load_all()
 
 
-datadir = readLines("sandbox/data-dirs/derek-groundref-laptop.txt", n = 1)
-
-plot_boundaries_data_dir = file.path(datadir, "field-plot-boundaries")
-google_sheet_id = "1GjDseDCR1BX_EIkJAni7rk2zvK6nHmZz1nOFBd1d6k4"
+PLOT_BOUNDARIES_PATH = "~/Documents/repo-data-local/ofo-field/field-plot-boundaries"
+GOOGLE_SHEET_ID = "1GjDseDCR1BX_EIkJAni7rk2zvK6nHmZz1nOFBd1d6k4"
 
 BASE_OFO_URL = "https://openforestobservatory.org/"
 #BASE_OFO_URL = "http://localhost:1313/"
@@ -60,8 +58,8 @@ WEBSITE_CONTENT_PATH = file.path(WEBSITE_REPO_PATH, "content", "")
 
 # Load and prep field ref data
 
-tabular_data = read_and_standardize_tabular_field_ref_data(google_sheet_id)
-bounds = read_and_merge_plot_boundaries(plot_boundaries_data_dir)
+tabular_data = read_and_standardize_tabular_field_ref_data(GOOGLE_SHEET_ID)
+bounds = read_and_merge_plot_boundaries(PLOT_BOUNDARIES_PATH, base_ofo_url = BASE_OFO_URL, plot_details_dir = PLOT_DETAILS_PAGE_DIR) 
 
 check_field_ref_data(tabular_data, bounds)
 
@@ -92,7 +90,7 @@ plot_summary = plot_summary |>
   dplyr::filter(!is.na(plot_id) & !is.na(survey_date))
 
 # Write the plot-level data to a csv (for use otside the website purposes)
-readr::write_csv(plot_summary, file.path(datadir, "field-plot-summaries", "field-plot-summary.csv"))
+# readr::write_csv(plot_summary, FILE_PATH_HERE)
 
 # Make a HTML data table of plot catalog
 dt = make_plot_catalog_datatable(plot_summary = plot_summary,
