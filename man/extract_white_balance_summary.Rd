@@ -4,10 +4,10 @@
 \alias{extract_white_balance_summary}
 \title{Extracts the most common white balance setting (mode_derived) the proportion of images with a white balance setting that matches the most common white balance setting in the dataset (mode_prop_derived)}
 \usage{
-extract_white_balance_summary(exif)
+extract_white_balance_summary(metadata)
 }
 \arguments{
-\item{exif}{the exif metadata file}
+\item{metadata}{the metadata metadata file}
 }
 \value{
 a data.frame of the most common white balance setting and the proportion of images matching the most common white balance setting
@@ -16,6 +16,6 @@ a data.frame of the most common white balance setting and the proportion of imag
 A data.frame of white_balance_mode_derived and white_balance_prop_derived. White_balance_mode_derived: The most common white balance setting across all images in the project. Options: auto and manual. White_balance_mode_prop_derived: The proportion of images with a white balance setting that matches the modal white balance setting in the dataset.
 }
 \examples{
-extract_white_balance_mode_and_prop(exif)
+extract_white_balance_mode_and_prop(metadata)
 
 }

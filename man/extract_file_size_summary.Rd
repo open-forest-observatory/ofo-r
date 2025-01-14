@@ -4,10 +4,10 @@
 \alias{extract_file_size_summary}
 \title{Extracts total file size}
 \usage{
-extract_file_size_summary(exif)
+extract_file_size_summary(metadata)
 }
 \arguments{
-\item{exif}{the exif metadata file}
+\item{metadata}{the metadata metadata file}
 }
 \value{
 total file size
@@ -16,6 +16,6 @@ total file size
 Total file size of all images in set. Units: GB.
 }
 \examples{
-extract_file_size(exif)
+extract_file_size(metadata)
 
 }

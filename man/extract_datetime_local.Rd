@@ -6,7 +6,7 @@
 \usage{
 extract_datetime_local(
   exif,
-  candidate_columns = c("capture_datetime", "GPSDateTime")
+  candidate_columns = c("capture_datetime", "GPSDateTime", "DateTimeOriginal")
 )
 }
 \arguments{

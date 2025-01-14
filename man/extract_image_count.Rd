@@ -2,12 +2,12 @@
 % Please edit documentation in R/metadata-extraction_imagery_dataset.R
 \name{extract_image_count}
 \alias{extract_image_count}
-\title{Extract number of images in an exif}
+\title{Extract number of images in an metadata}
 \usage{
-extract_image_count(exif)
+extract_image_count(metadata)
 }
 \arguments{
-\item{exif}{the exif metadata file}
+\item{metadata}{the metadata metadata file}
 }
 \value{
 image count
@@ -16,6 +16,6 @@ image count
 Pulls the image count to include in dataset-level metadata
 }
 \examples{
-extract_image_count(exif)
+extract_image_count(metadata)
 
 }

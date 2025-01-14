@@ -6,6 +6,7 @@
 \usage{
 extract_pitch_roll_yaw(
   exif,
+  platform_name,
   candidate_pitch_cols = c("GimbalPitchDegree", "Pitch"),
   candidate_roll_cols = c("GimbalRollDegree", "Roll"),
   candidate_yaw_cols = c("GimbalYawDegree", "Yaw")

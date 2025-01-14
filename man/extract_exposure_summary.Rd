@@ -4,10 +4,10 @@
 \alias{extract_exposure_summary}
 \title{Extracts the median exposure time and its coefficient of variation}
 \usage{
-extract_exposure_summary(exif)
+extract_exposure_summary(metadata)
 }
 \arguments{
-\item{exif}{the exif metadata file}
+\item{metadata}{the metadata metadata file}
 }
 \value{
 the median exposure time across all images in the dataset. Units: sec
@@ -16,6 +16,6 @@ the median exposure time across all images in the dataset. Units: sec
 The median exposure time across all images in the dataset. Units: sec
 }
 \examples{
-extract_exposure(exif)
+extract_exposure(metadata)
 
 }

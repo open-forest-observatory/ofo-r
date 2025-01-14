@@ -4,19 +4,19 @@
 \alias{extract_dataset_id_summary}
 \title{Extract dataset id}
 \usage{
-extract_dataset_id_summary(exif)
+extract_dataset_id_summary(metadata)
 }
 \arguments{
-\item{exif}{the exif metadata file}
+\item{metadata}{the metadata metadata file}
 }
 \value{
 dataset id
 }
 \description{
 Pulls the dataset id to include in dataset-level metadata. Relies on dataset_id being set
-properly by the prep_exif function.
+properly by the prep_metadata function.
 }
 \examples{
-extract_dataset_id(exif)
+extract_dataset_id(metadata)
 
 }

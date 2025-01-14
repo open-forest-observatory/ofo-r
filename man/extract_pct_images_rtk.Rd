@@ -4,10 +4,10 @@
 \alias{extract_pct_images_rtk}
 \title{Extracts percent of images with an RTK fix}
 \usage{
-extract_pct_images_rtk(exif)
+extract_pct_images_rtk(metadata)
 }
 \arguments{
-\item{exif}{the exif metadata file}
+\item{metadata}{the metadata metadata file}
 }
 \value{
 percent of images with an RTK fix
@@ -16,6 +16,6 @@ percent of images with an RTK fix
 Percent of images with an RTK fix
 }
 \examples{
-extract_precent_images_rtk(exif)
+extract_precent_images_rtk(metadata)
 
 }

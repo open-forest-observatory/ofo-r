@@ -4,10 +4,10 @@
 \alias{extract_area_and_density}
 \title{Extracts the the area of the mission footprint and the image density of the dataset}
 \usage{
-extract_area_and_density(exif, mission_polygon)
+extract_area_and_density(metadata, mission_polygon)
 }
 \arguments{
-\item{exif}{the exif metadata file}
+\item{metadata}{the metadata metadata file}
 
 \item{mission_polygon}{the sf polygon object of the mission footprint}
 }
@@ -18,6 +18,6 @@ the area of the mission footprint (ha) and the image density based on image coun
 area_ha: Area of mission footprint. Units: ha. image_density: the image density computed with image count and footprint. Units: img/ha
 }
 \examples{
-extract_area_and_density(exif)
+extract_area_and_density(metadata)
 
 }
