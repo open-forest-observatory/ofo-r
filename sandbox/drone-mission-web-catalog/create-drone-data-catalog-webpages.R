@@ -102,6 +102,7 @@ reset_detail_dirs(
 ## Loop through each mission and make a details page, including its media (map and datatable)
 make_mission_details_pages(
   mission_summary = mission_polygons_w_summary_data,
+  mission_points = mission_points,
   website_static_path = WEBSITE_STATIC_PATH,
   website_content_path = WEBSITE_CONTENT_PATH,
   leaflet_header_files_dir = LEAFLET_HEADER_FILES_DIR,

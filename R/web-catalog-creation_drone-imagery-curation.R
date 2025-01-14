@@ -549,6 +549,7 @@ render_mission_details_page = function(
 ## Loop through each mission and make a details page, including its media (map and datatable)
 make_mission_details_pages = function(
     mission_summary,
+    mission_points,
     website_static_path,
     website_content_path,
     leaflet_header_files_dir,
