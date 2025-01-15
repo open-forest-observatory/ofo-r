@@ -560,28 +560,27 @@ make_mission_details_pages = function(
     mission_details_page_dir,
     published_data_path = "",
     data_server_base_url = "") {
-
-  mission_summary = mission_summary |>
-    dplyr::arrange(dataset_id)
+  # Sort the summary statistics by dataset_id (mission_id)
+  mission_summary = mission_summary |> dplyr::arrange(dataset_id)
 
   dataset_ids = mission_summary$dataset_id
   ndatasets = length(dataset_ids)
 
   mission_centroids = sf::st_centroid(mission_summary)
 
-  for (i in 1:ndatasets) {
+  # Rename mission_id to dataset_id
+  mission_points = mission_points |> dplyr::rename(dataset_id = mission_id)
 
-    dataset_id_foc = dataset_ids[i]
+  for (i in 1:ndatasets) {
+    # Get a single row from the summary statistics
+    mission_summary_foc = mission_summary[i]
+    # Extract the image-level metadata that's associated with that dataset
+    mission_points_foc = mission_points |> filter(dataset_id == mission_summary_foc$dataset_id)
+    print(mission_summary_foc)
 
     cat("\rGenerating details pages (", i, "of", ndatasets, ")    ")
 
-    mission_summary_foc = mission_summary |>
-      filter(dataset_id == dataset_id_foc)
-
-    mission_points_foc = mission_points |>
-      rename(dataset_id = dataset_id_image_level) |>
-      filter(dataset_id == dataset_id_foc)
-
+    # Make details map and datatable
     mission_details_map_path = make_mission_details_map(
       mission_summary_foc = mission_summary_foc,
       mission_points_foc = mission_points_foc,
@@ -599,6 +598,7 @@ make_mission_details_pages = function(
       mission_details_datatable_dir = mission_details_datatable_dir
     )
 
+    # Compute previous and next dataset, looping around as needed
     next_dataset_id = ifelse(i < ndatasets, dataset_ids[i + 1], dataset_ids[1])
     previous_dataset_id = ifelse(i > 1, dataset_ids[i - 1], dataset_ids[ndatasets])
 
