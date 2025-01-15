@@ -19,8 +19,7 @@ EXTRACTED_METADATA_PATH = "/ofo-share/drone-imagery-organization/3c_metadata-ext
 # Derived constants
 metadata_sub_mission_perdataset_filepath = file.path(EXTRACTED_METADATA_PATH, paste0("sub-mission-full-metadata_", IMAGERY_PROJECT_NAME, ".csv"))
 metadata_mission_perdataset_filepath = file.path(EXTRACTED_METADATA_PATH, paste0("mission-full-metadata_", IMAGERY_PROJECT_NAME, ".csv"))
-meadata_sub_mission_perimage_filepath = file.path(EXTRACTED_METADATA_PATH, paste0("sub-mission-exif-metadata_perimage_", IMAGERY_PROJECT_NAME, ".csv"))
-metadata_mission_perimage_filepath = file.path(EXTRACTED_METADATA_PATH, paste0("mission-exif-metadata_perimage_", IMAGERY_PROJECT_NAME, ".csv"))
+metadata_perimage_filepath = file.path(EXTRACTED_METADATA_PATH, paste0("exif-metadata_perimage_subset_", IMAGERY_PROJECT_NAME, ".csv"))
 polygons_mission_filepath = file.path(EXTRACTED_METADATA_PATH, paste0("mission-polygons_", IMAGERY_PROJECT_NAME, ".gpkg"))
 polygons_sub_mission_filepath = file.path(EXTRACTED_METADATA_PATH, paste0("sub-mission-polygons_", IMAGERY_PROJECT_NAME, ".gpkg"))
 
@@ -29,15 +28,13 @@ polygons_sub_mission_filepath = file.path(EXTRACTED_METADATA_PATH, paste0("sub-m
 # Load the metadata and polygons
 metadata_sub_mission_perdataset = read_csv(metadata_sub_mission_perdataset_filepath)
 metadata_mission_perdataset = read_csv(metadata_mission_perdataset_filepath)
-metadata_sub_mission_perimage = read_csv(meadata_sub_mission_perimage_filepath)
-metadata_mission_perimage = read_csv(metadata_mission_perimage_filepath)
+metadata_perimage = read_csv(metadata_perimage_filepath)
 polygons_mission = st_read(polygons_mission_filepath)
 polygons_sub_mission = st_read(polygons_sub_mission_filepath)
 
 
 # Create image geospatial points, annotated with image-level metadata
-mission_points = st_as_sf(metadata_mission_perimage, coords = c("lon", "lat"), remove = FALSE, crs = 4326)
-sub_mission_points = st_as_sf(metadata_sub_mission_perimage, coords = c("lon", "lat"), remove = FALSE, crs = 4326)
+metadata_perimage = st_as_sf(metadata_perimage, coords = c("lon", "lat"), remove = FALSE, crs = 4326)
 
 # Create dataset footprint polygons, annotated with dataset-level metadata
 mission_polygons = polygons_mission |>
@@ -53,7 +50,6 @@ sub_mission_polygons = polygons_sub_mission |>
   mutate(across(where(~ is(.x, "hms")), ~ as.character(.x)))
 
 # Write the geospatial files
-st_write(mission_points, file.path(EXTRACTED_METADATA_PATH, paste0("mission-points-w-metadata_", IMAGERY_PROJECT_NAME, ".gpkg")), driver = "GPKG", delete_dsn = TRUE)
-st_write(sub_mission_points, file.path(EXTRACTED_METADATA_PATH, paste0("sub-mission-points-w-metadata_", IMAGERY_PROJECT_NAME, ".gpkg")), driver = "GPKG", delete_dsn = TRUE)
+st_write(metadata_perimage, file.path(EXTRACTED_METADATA_PATH, paste0("points-w-metadata_", IMAGERY_PROJECT_NAME, ".gpkg")), driver = "GPKG", delete_dsn = TRUE)
 st_write(mission_polygons, file.path(EXTRACTED_METADATA_PATH, paste0("mission-polygons-w-metadata_", IMAGERY_PROJECT_NAME, ".gpkg")), driver = "GPKG", delete_dsn = TRUE)
 st_write(sub_mission_polygons, file.path(EXTRACTED_METADATA_PATH, paste0("sub-mission-polygons-w-metadata_", IMAGERY_PROJECT_NAME, ".gpkg")), driver = "GPKG", delete_dsn = TRUE)
