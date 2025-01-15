@@ -58,16 +58,16 @@ compute_summary_statistics = function(
   # (either a mission or sub-mission)
   unique_dataset_ids = unique(image_metadata$dataset_id)
 
-  metadata_per_dataset <- lapply(unique_dataset_ids, function(unique_dataset_id) {
+  metadata_chunks_per_dataset <- lapply(unique_dataset_ids, function(unique_dataset_id) {
     dataset_metadata <- image_metadata |>
-      filter(dataset_id == unique_dataset_id)
+      filter(datasetsandbox/drone-imagery-ingestion/08_extract-exif-metadata-mission.R_id == unique_dataset_id)
     return(dataset_metadata)
   })
   # Run dataset-level metadata extraction across each subset
   print("Started computing dataset-level summary statistics")
   future::plan("multisession")
   summary_statistics = furrr::future_map(
-    metadata_per_dataset,
+    metadata_chunks_per_dataset,
     extract_imagery_dataset_metadata,
     crop_to_contiguous = TRUE,
     min_contig_area = 10000,
@@ -76,20 +76,19 @@ compute_summary_statistics = function(
   )
   print("Finished computing dataset-level summary statistics")
   # Extract the elements of the summary statistics
-  metadata_perdataset = dplyr::bind_rows(map(summary_statistics, "dataset_metadata"))
+  summaries_perdataset = dplyr::bind_rows(map(summary_statistics, "dataset_metadata"))
   polygon_perdataset = dplyr::bind_rows(map(summary_statistics, "mission_polygon"))
   images_retained = unlist(map(summary_statistics, "images_retained"))
 
-  metadata_perimage = dplyr::bind_rows(metadata_per_dataset)
   # Filter the extracted metadata to only include images that were retained in the dataset-level
   # metadata extraction based on intersection with the mission polygon
-  metadata_perimage = metadata_perimage |>
-    filter(image_id %in% images_retained)
+  image_metadata = image_metadata |> filter(image_id %in% images_retained)
+  # Drop the dataset_id column that was added by this function
+  image_metadata = image_metadata |> dplyr::select(-dplyr::one_of("dataset_id"))
 
-  # Save the metadata
+  # Identify and create the output folders
   folders = c(metadata_perimage_filepath, metadata_perdataset_filepath, polygons_filepath)
   folders = dirname(folders)
-
   purrr::walk(
     folders,
     create_dir
@@ -97,9 +96,9 @@ compute_summary_statistics = function(
 
   # Write out the results
   ## The per-dataset summary statistics
-  write_csv(metadata_perdataset, metadata_perdataset_filepath)
+  write_csv(summaries_perdataset, metadata_perdataset_filepath)
   # The per-image data for retained images
-  write_csv(metadata_perimage, metadata_perimage_filepath)
+  write_csv(image_metadata, metadata_perimage_filepath)
   # The polygon bounds
   sf::st_write(polygon_perdataset, polygons_filepath, delete_dsn = TRUE)
 }
