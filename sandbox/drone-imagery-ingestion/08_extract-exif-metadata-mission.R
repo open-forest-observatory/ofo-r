@@ -47,24 +47,22 @@ metadata_perimage_sub_mission_filepath = file.path(EXTRACTED_METADATA_PATH, past
 
 # Functions
 compute_summary_statistics = function(
-  image_metadata,
-  dataset_ids,
-  metadata_perimage_filepath,
-  metadata_perdataset_filepath,
-  polygons_filepath
-  ){
-  # Set the dataset ID to either the sub-mission or mission ID
-  image_metadata$dataset_id = dataset_ids
-
+    image_metadata,
+    column_to_split_on,
+    metadata_perimage_filepath,
+    metadata_perdataset_filepath,
+    polygons_filepath) {
+  # Set the dataset_id based on the provided column, either the submission_id or mission_id
+  image_metadata$dataset_id = image_metadata[[column_to_split_on]]
   # For parallelizing, make a list of subsets of the metadata dataframe, one for each dataset
   # (either a mission or sub-mission)
-  unique_dataset_ids = unique(dataset_ids)
+  unique_dataset_ids = unique(image_metadata$dataset_id)
+
   metadata_per_dataset <- lapply(unique_dataset_ids, function(unique_dataset_id) {
     dataset_metadata <- image_metadata |>
       filter(dataset_id == unique_dataset_id)
     return(dataset_metadata)
   })
-  # TODO this whole section is duplicated with step 07, so it could be made function
   # Run dataset-level metadata extraction across each subset
   print("Started computing dataset-level summary statistics")
   future::plan("multisession")
@@ -112,19 +110,10 @@ compute_summary_statistics = function(
 # Read in image-level metadata that was parsed in step 07
 image_metadata = read_csv(metadata_perimage_input_filepath)
 
-# Parse the dataset_id_image_level field to get the dataset identifier
-sub_mission_IDs = unlist(image_metadata$dataset_id_image_level)
-# The data is stored in the "<mission_ID>_<sub_mission_ID>" format
-mission_IDs = lapply(sub_mission_IDs, function(x) {
-  return(substr(x[[1]], 1, 6))
-})
-# Add the missions as a new column of the metadata
-mission_IDs = unlist(mission_IDs)
-
 # Compute the summary statistics based on missions
 compute_summary_statistics(
   image_metadata,
-  mission_IDs,
+  "mission_id",
   metadata_perimage_mission_filepath,
   metadata_per_mission_filepath,
   mission_polygons_filepath
@@ -132,7 +121,7 @@ compute_summary_statistics(
 # Compute the summary statistics based on sub-missions
 compute_summary_statistics(
   image_metadata,
-  sub_mission_IDs,
+  "submission_id",
   metadata_perimage_sub_mission_filepath,
   metadata_per_sub_mission_filepath,
   sub_mission_polygons_filepath
