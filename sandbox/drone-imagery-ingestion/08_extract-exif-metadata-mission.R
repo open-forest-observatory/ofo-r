@@ -33,23 +33,20 @@ crosswalk_filepath = file.path(FOLDER_BASEROW_CROSSWALK_PATH, paste0(IMAGERY_PRO
 
 # This per-image metadata was saved out in the last step
 metadata_perimage_input_filepath = file.path(EXTRACTED_METADATA_PATH, paste0("exif-metadata_perimage_", IMAGERY_PROJECT_NAME, ".csv"))
+# Data for the subset of images retained in both the mission polygons and sub-mission polygons are saved out here
+metadata_perimage_subset_filepath = file.path(EXTRACTED_METADATA_PATH, paste0("exif-metadata_perimage_subset_", IMAGERY_PROJECT_NAME, ".csv"))
 
-# Output files per
+# Output files per mission or sub-mission
 metadata_per_mission_filepath = file.path(EXTRACTED_METADATA_PATH, paste0("mission-exif-metadata_perdataset_", IMAGERY_PROJECT_NAME, ".csv"))
 mission_polygons_filepath = file.path(EXTRACTED_METADATA_PATH, paste0("mission-polygons_", IMAGERY_PROJECT_NAME, ".gpkg"))
-# Select only the images that were retained in the mission polygons
-metadata_perimage_mission_filepath = file.path(EXTRACTED_METADATA_PATH, paste0("mission-exif-metadata_perimage_", IMAGERY_PROJECT_NAME, ".csv"))
 
 metadata_per_sub_mission_filepath = file.path(EXTRACTED_METADATA_PATH, paste0("sub-mission-exif-metadata_perdataset_", IMAGERY_PROJECT_NAME, ".csv"))
 sub_mission_polygons_filepath = file.path(EXTRACTED_METADATA_PATH, paste0("sub-mission-polygons_", IMAGERY_PROJECT_NAME, ".gpkg"))
-# Select only the images that were retained in the sub-mission polygons
-metadata_perimage_sub_mission_filepath = file.path(EXTRACTED_METADATA_PATH, paste0("sub-mission-exif-metadata_perimage_", IMAGERY_PROJECT_NAME, ".csv"))
 
 # Functions
 compute_summary_statistics = function(
     image_metadata,
     column_to_split_on,
-    metadata_perimage_filepath,
     metadata_perdataset_filepath,
     polygons_filepath) {
   # Set the dataset_id based on the provided column, either the submission_id or mission_id
@@ -60,7 +57,7 @@ compute_summary_statistics = function(
 
   metadata_chunks_per_dataset <- lapply(unique_dataset_ids, function(unique_dataset_id) {
     dataset_metadata <- image_metadata |>
-      filter(datasetsandbox/drone-imagery-ingestion/08_extract-exif-metadata-mission.R_id == unique_dataset_id)
+      filter(dataset_id == unique_dataset_id)
     return(dataset_metadata)
   })
   # Run dataset-level metadata extraction across each subset
@@ -80,14 +77,8 @@ compute_summary_statistics = function(
   polygon_perdataset = dplyr::bind_rows(map(summary_statistics, "mission_polygon"))
   images_retained = unlist(map(summary_statistics, "images_retained"))
 
-  # Filter the extracted metadata to only include images that were retained in the dataset-level
-  # metadata extraction based on intersection with the mission polygon
-  image_metadata = image_metadata |> filter(image_id %in% images_retained)
-  # Drop the dataset_id column that was added by this function
-  image_metadata = image_metadata |> dplyr::select(-dplyr::one_of("dataset_id"))
-
   # Identify and create the output folders
-  folders = c(metadata_perimage_filepath, metadata_perdataset_filepath, polygons_filepath)
+  folders = c(metadata_perdataset_filepath, polygons_filepath)
   folders = dirname(folders)
   purrr::walk(
     folders,
@@ -97,10 +88,10 @@ compute_summary_statistics = function(
   # Write out the results
   ## The per-dataset summary statistics
   write_csv(summaries_perdataset, metadata_perdataset_filepath)
-  # The per-image data for retained images
-  write_csv(image_metadata, metadata_perimage_filepath)
   # The polygon bounds
   sf::st_write(polygon_perdataset, polygons_filepath, delete_dsn = TRUE)
+
+  return(images_retained)
 }
 
 
@@ -110,18 +101,24 @@ compute_summary_statistics = function(
 image_metadata = read_csv(metadata_perimage_input_filepath)
 
 # Compute the summary statistics based on missions
-compute_summary_statistics(
+images_retained_by_mission = compute_summary_statistics(
   image_metadata,
   "mission_id",
-  metadata_perimage_mission_filepath,
   metadata_per_mission_filepath,
   mission_polygons_filepath
 )
 # Compute the summary statistics based on sub-missions
-compute_summary_statistics(
+images_retained_by_sub_mission = compute_summary_statistics(
   image_metadata,
   "submission_id",
-  metadata_perimage_sub_mission_filepath,
   metadata_per_sub_mission_filepath,
   sub_mission_polygons_filepath
 )
+
+# Compute the images that were retained in both the mission polygons and the sub-mission polygons
+images_retained_in_both = intersect(images_retained_by_mission, images_retained_by_sub_mission)
+
+# Filter the image metadata to only include data for those images
+image_metadata = image_metadata |> filter(image_id %in% images_retained_in_both)
+# Write out the the filtered subset
+write_csv(image_metadata, metadata_perimage_subset_filepath)
