@@ -49,7 +49,7 @@ compute_summary_statistics = function(
     column_to_split_on,
     metadata_perdataset_filepath,
     polygons_filepath) {
-  # Set the dataset_id based on the provided column, either the submission_id or mission_id
+  # Set the dataset_id based on the provided column, either the sub_mission_id or mission_id
   image_metadata$dataset_id = image_metadata[[column_to_split_on]]
   # For parallelizing, make a list of subsets of the metadata dataframe, one for each dataset
   # (either a mission or sub-mission)
@@ -110,7 +110,7 @@ images_retained_by_mission = compute_summary_statistics(
 # Compute the summary statistics based on sub-missions
 images_retained_by_sub_mission = compute_summary_statistics(
   image_metadata,
-  "submission_id",
+  "sub_mission_id",
   metadata_per_sub_mission_filepath,
   sub_mission_polygons_filepath
 )
