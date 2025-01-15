@@ -289,11 +289,11 @@ extract_white_balance = function(exif) {
 #' @export
 
 extract_received_image_path = function(exif) {
-  received_image_path = stringr::str_split_fixed(exif$SourceFile, stringr::fixed(exif$submission_id), 2)
+  received_image_path = stringr::str_split_fixed(exif$SourceFile, stringr::fixed(exif$sub_mission_id), 2)
 
   received_image_path <- received_image_path[, 2]
 
-  received_image_path <- paste0(exif$submission_id, received_image_path)
+  received_image_path <- paste0(exif$sub_mission_id, received_image_path)
 
   return(received_image_path)
 }
@@ -404,8 +404,7 @@ extract_imagery_perimage_metadata = function(exif, platform_name, plot_flightpat
   missing_gps_rows = is.na(metadata$lat) | is.na(metadata$lon)
   n_missing_gps_rows = sum(missing_gps_rows)
   if (n_missing_gps_rows > 0) {
-    warning("Removing ", n_missing_gps_rows, " rows with missing GPS data from dataset", exif$submission_id[1])
-    # TODO consider whether submission_id can be renamed
+    warning("Removing ", n_missing_gps_rows, " rows with missing GPS data from dataset", exif$sub_mission_id[1])
 
     # Keep only rows with GPS data
     metadata = metadata[!missing_gps_rows, ]
