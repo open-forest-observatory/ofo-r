@@ -36,41 +36,41 @@ metadata_mission_filepath = file.path(EXTRACTED_METADATA_PATH, paste0("mission-b
 # Read in the EXIF
 exif = read.csv(exif_filepath)
 # Read in the baserow metadata
-baserow_submission_metadata = read.csv(metadata_sub_mission_filepath)
+baserow_sub_mission_metadata = read.csv(metadata_sub_mission_filepath)
 
 # Compute the unique sub mission IDs. The metadata is extracted per-image, but the sub-mission
 # gives us information about the platform/sensor that is neccessary for interpreting the raw
 # metadata
-unique_submission_ids = unique(exif$submission_id)
+unique_sub_mission_ids = unique(exif$sub_mission_id)
 
-# For parallelizing, make a list of subsets of the exif dataframe, one for each submission
-exif_per_submission <- lapply(
-  unique_submission_ids,
-  function(unique_submission_id) {
+# For parallelizing, make a list of subsets of the exif dataframe, one for each sub-mission
+exif_per_sub_mission <- lapply(
+  unique_sub_mission_ids,
+  function(unique_sub_mission_id) {
     # Extract the exif rows matching that sub-mission ID
-    submission_exif <- exif |>
-      filter(submission_id == unique_submission_id)
-    return(submission_exif)
+    sub_mission_exif <- exif |>
+      filter(sub_mission_id == unique_sub_mission_id)
+    return(sub_mission_exif)
   }
 )
 
 # Get aircraft model name to use for determining the appropriate image-level metadata extractor
 # functions to use
 aircraft_model_names <- lapply(
-  unique_submission_ids,
-  function(unique_submission_id) {
+  unique_sub_mission_ids,
+  function(unique_sub_mission_id) {
     # Extract the baserow entries for this sub-mission ID
-    baserow_for_submission <- baserow_submission_metadata[
-      baserow_submission_metadata$sub_mission_id == unique_submission_id,
+    baserow_for_sub_mission <- baserow_sub_mission_metadata[
+      baserow_sub_mission_metadata$sub_mission_id == unique_sub_mission_id,
     ]
 
     # There should only be one matching row
-    if (nrow(baserow_for_submission) != 1) {
-      stop(paste("Error: there was not one corresponding baserow entry: ", baserow_for_submission))
+    if (nrow(baserow_for_sub_mission) != 1) {
+      stop(paste("Error: there was not one corresponding baserow entry: ", baserow_for_sub_mission))
     }
 
     # Extract the aircraft model name
-    aircraft_model_name = baserow_for_submission$aircraft_model_name
+    aircraft_model_name = baserow_for_sub_mission$aircraft_model_name
 
     return(aircraft_model_name)
   }
@@ -81,18 +81,18 @@ aircraft_model_names <- lapply(
 # to interpret the information.
 future::plan("future::multisession")
 print("Started extracting metadata per image to a standardized format")
-metadata_per_submission = furrr::future_map2(
-  .x = exif_per_submission,
+metadata_per_sub_mission = furrr::future_map2(
+  .x = exif_per_sub_mission,
   .y = aircraft_model_names,
   .f = extract_imagery_perimage_metadata,
   .progress = TRUE,
   .options = furrr::furrr_options(seed = TRUE)
 )
-# Bind the rows together across all submissions
-metadata_perimage = bind_rows(metadata_per_submission)
+# Bind the rows together across all sub-missions
+metadata_perimage = bind_rows(metadata_per_sub_mission)
 
 # Copy the sub-mission and mission ID to the output metadata
-metadata_perimage$submission_id = exif$submission_id
+metadata_perimage$sub_mission_id = exif$sub_mission_id
 metadata_perimage$mission_id = exif$mission_id
 # Pad the mission ID since it starts as an integer
 metadata_perimage = metadata_perimage |> mutate(mission_id = str_pad(mission_id, 6, pad = "0", side = "left"))
