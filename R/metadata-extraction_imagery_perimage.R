@@ -2,26 +2,6 @@
 # Originally written by Emily Marie Purvis, last updated March 27th 2024
 # Since updated by others
 
-#### dataset ID ####
-
-#' Extract dataset id
-#'
-#' Pulls the dataset id, to include in image-level metadata collation
-#'
-#' @param exif the exif metadata file
-#'
-#' @return dataset id
-#'
-#' @examples
-#' extract_dataset_id(exif)
-#'
-#' @export
-extract_dataset_id_perimage = function(exif) {
-  dataset_id_image_level = exif$dataset_id
-
-  return(dataset_id_image_level)
-}
-
 # Image ID, from filename
 #' @export
 extract_image_id = function(exif) {
@@ -309,11 +289,11 @@ extract_white_balance = function(exif) {
 #' @export
 
 extract_received_image_path = function(exif) {
-  received_image_path = stringr::str_split_fixed(exif$SourceFile, stringr::fixed(exif$dataset_id), 2)
+  received_image_path = stringr::str_split_fixed(exif$SourceFile, stringr::fixed(exif$submission_id), 2)
 
   received_image_path <- received_image_path[, 2]
 
-  received_image_path <- paste0(exif$dataset_id, received_image_path)
+  received_image_path <- paste0(exif$submission_id, received_image_path)
 
   return(received_image_path)
 }
@@ -353,7 +333,7 @@ extract_original_file_name = function(exif, candidate_file_name_columns = c("Ima
 #' wrapper)
 #' @param input_type the type of input, either "dataframe" or "filepath" to a .csv file
 #'
-#' @return a data.frame of dataset_id_image_level, datetime_local, lat, lon, rtk_fix, accuracy_x, accuracy_y, camera_pitch, camera_roll, camera_yaw, exposure, aperture, iso, white_balance, received_image_path, and altitude_asl
+#' @return a data.frame of datetime_local, lat, lon, rtk_fix, accuracy_x, accuracy_y, camera_pitch, camera_roll, camera_yaw, exposure, aperture, iso, white_balance, received_image_path, and altitude_asl
 #'
 #' @examples
 #' extract_metadata_emp(exif)
@@ -388,7 +368,6 @@ extract_imagery_perimage_metadata = function(exif, platform_name, plot_flightpat
   # Then, the appropriate parsing function would be called in this function, based on the platform.
   image_id = extract_image_id(exif)
   original_file_name = extract_original_file_name(exif)
-  dataset_id_image_level = extract_dataset_id_perimage(exif)
   datetime_local = extract_datetime_local(exif)
   lon_lat = extract_lon_lat(exif)
   rtk_fix = extract_rtk_fix(exif)
@@ -406,7 +385,6 @@ extract_imagery_perimage_metadata = function(exif, platform_name, plot_flightpat
   metadata = data.frame(
     image_id = image_id,
     original_file_name = original_file_name,
-    dataset_id_image_level = dataset_id_image_level,
     datetime_local = datetime_local,
     lon_lat,
     rtk_fix = rtk_fix,
@@ -426,7 +404,8 @@ extract_imagery_perimage_metadata = function(exif, platform_name, plot_flightpat
   missing_gps_rows = is.na(metadata$lat) | is.na(metadata$lon)
   n_missing_gps_rows = sum(missing_gps_rows)
   if (n_missing_gps_rows > 0) {
-    warning("Removing ", n_missing_gps_rows, " rows with missing GPS data from dataset", exif$dataset_id[1])
+    warning("Removing ", n_missing_gps_rows, " rows with missing GPS data from dataset", exif$submission_id[1])
+    # TODO consider whether submission_id can be renamed
 
     # Keep only rows with GPS data
     metadata = metadata[!missing_gps_rows, ]

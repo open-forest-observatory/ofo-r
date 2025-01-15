@@ -1,9 +1,7 @@
-# Purpose: Read a CSV file containing the EXIF data for all images in a dataset (multiple missions),
-# *at the sub-mission level* (i.e., a single date if a two-date mission; a single orientation of
-# a two-part grid mission) and extract/process into human-readable metadata at the image level and
-# sub-mission level using the metadata extraction functions of the ofo package.
+# Purpose: Read a CSV file containing the EXIF data for all images and extract standardized
+# metadata. The sensor/platform is used to correctly interpret the metadata conventions.
 
-# This needs to be included or else the bind_rows call to create polygon_perdataset fails. I don't
+# sf needs to be included or else the bind_rows call to create polygon_perdataset fails. I don't
 # understand the concept of dispatching and why this is required.
 library(sf)
 library(tidyverse)
@@ -38,47 +36,41 @@ metadata_mission_filepath = file.path(EXTRACTED_METADATA_PATH, paste0("mission-b
 # Read in the EXIF
 exif = read.csv(exif_filepath)
 # Read in the baserow metadata
-baserow_dataset_metadata = read.csv(metadata_sub_mission_filepath)
+baserow_submission_metadata = read.csv(metadata_sub_mission_filepath)
 
-# Assign the "dataset_id" parameter that is used in the metadata extraction functions. This is done
-# here as opposed to in the metadata extraction to keep those functions flexible as to how a dataset
-# is defined (e.g. a "mission" or a "sub-mission"). Here we are defining a dataset as a
-# "sub-mission".
-exif$dataset_id = exif$submission_id
-# Pad the mission ID
-exif = exif |> mutate(mission_id = str_pad(mission_id, 6, pad = "0", side = "left"))
+# Compute the unique sub mission IDs. The metadata is extracted per-image, but the sub-mission
+# gives us information about the platform/sensor that is neccessary for interpreting the raw
+# metadata
+unique_submission_ids = unique(exif$submission_id)
 
-# Compute the unique sub mission IDs
-unique_datasets = unique(exif$dataset_id)
-
-# For parallelizing, make a list of subsets of the exif dataframe, one for each dataset
-exif_per_dataset <- lapply(
-  unique_datasets,
-  function(unique_dataset) {
+# For parallelizing, make a list of subsets of the exif dataframe, one for each submission
+exif_per_submission <- lapply(
+  unique_submission_ids,
+  function(unique_submission_id) {
     # Extract the exif rows matching that sub-mission ID
-    dataset_exif <- exif |>
-      filter(dataset_id == unique_dataset)
-    return(dataset_exif)
+    submission_exif <- exif |>
+      filter(submission_id == unique_submission_id)
+    return(submission_exif)
   }
 )
 
 # Get aircraft model name to use for determining the appropriate image-level metadata extractor
 # functions to use
 aircraft_model_names <- lapply(
-  unique_datasets,
-  function(dataset_ID) {
+  unique_submission_ids,
+  function(unique_submission_id) {
     # Extract the baserow entries for this sub-mission ID
-    baserow_for_dataset <- baserow_dataset_metadata[
-      baserow_dataset_metadata$sub_mission_id == dataset_ID,
+    baserow_for_submission <- baserow_submission_metadata[
+      baserow_submission_metadata$sub_mission_id == unique_submission_id,
     ]
 
     # There should only be one matching row
-    if (nrow(baserow_for_dataset) != 1) {
-      stop(paste("Error: there was not one corresponding baserow entry: ", baserow_for_dataset))
+    if (nrow(baserow_for_submission) != 1) {
+      stop(paste("Error: there was not one corresponding baserow entry: ", baserow_for_submission))
     }
 
     # Extract the aircraft model name
-    aircraft_model_name = baserow_for_dataset$aircraft_model_name
+    aircraft_model_name = baserow_for_submission$aircraft_model_name
 
     return(aircraft_model_name)
   }
@@ -89,21 +81,23 @@ aircraft_model_names <- lapply(
 # to interpret the information.
 future::plan("future::multisession")
 print("Started extracting metadata per image to a standardized format")
-metadata_per_dataset = furrr::future_map2(
-  .x = exif_per_dataset,
+metadata_per_submission = furrr::future_map2(
+  .x = exif_per_submission,
   .y = aircraft_model_names,
   .f = extract_imagery_perimage_metadata,
   .progress = TRUE,
   .options = furrr::furrr_options(seed = TRUE)
 )
-# Bind the rows together across all datasets
-metadata_perimage = bind_rows(metadata_per_dataset)
+# Bind the rows together across all submissions
+metadata_perimage = bind_rows(metadata_per_submission)
 
-# Filter the extracted metadata to only include images that were retained in the dataset-level
-# metadata extraction based on intersection with the mission polygon
+# Copy the sub-mission and mission ID to the output metadata
+metadata_perimage$submission_id = exif$submission_id
+metadata_perimage$mission_id = exif$mission_id
+# Pad the mission ID since it starts as an integer
+metadata_perimage = metadata_perimage |> mutate(mission_id = str_pad(mission_id, 6, pad = "0", side = "left"))
 
 # Create the folder to save the image metadata in
 create_dir(dirname(metadata_perimage_filepath))
-
 # Write out the standardized metadata per image
 write_csv(metadata_perimage, metadata_perimage_filepath)
