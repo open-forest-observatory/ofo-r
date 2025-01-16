@@ -40,7 +40,7 @@ WEBSITE_CONTENT_PATH = file.path(WEBSITE_REPO_PATH, "content", "")
 
 # Data paths
 MISSION_POLYGONS_PATH = "/ofo-share/drone-imagery-organization/3c_metadata-extracted/all-mission-polygons-w-metadata.gpkg"
-MISSION_POINTS_PATH = "/ofo-share/drone-imagery-organization/3c_metadata-extracted/all-mission-points-w-metadata.gpkg"
+MISSION_POINTS_PATH = "/ofo-share/drone-imagery-organization/3c_metadata-extracted/all-points-w-metadata.gpkg"
 
 # The path to all the published files for the drone mission catalog
 PUBLISHED_DATA_PATH = "/ofo-share/drone-data-publish/01/"
@@ -54,11 +54,6 @@ DATA_SERVER_BASE_URL = "https://data.cyverse.org/dav-anon/iplant/projects/ofo/pu
 # Load and prep metadata
 mission_polygons_w_metadata = st_read(MISSION_POLYGONS_PATH)
 mission_points = st_read(MISSION_POINTS_PATH)
-# Remove the dataset_id column since it causes problems later on
-# TODO figure out if there's a better way to handle this upstream and/or what change made this
-# required
-mission_points = mission_points |> select(-one_of("dataset_id"))
-
 
 # Save header library files required by embedded HTML datatables and leaflet maps
 save_dt_header_files(WEBSITE_STATIC_PATH, DATATABLE_HEADER_FILES_DIR)
