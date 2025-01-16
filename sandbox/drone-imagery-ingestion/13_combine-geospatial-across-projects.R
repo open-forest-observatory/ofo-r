@@ -63,4 +63,4 @@ points = future_map(point_files, st_read) |>
 # Write the combined files
 st_write(mission_polygons, file.path(EXTRACTED_METADATA_PATH, "all-mission-polygons-w-metadata.gpkg"), driver = "GPKG", delete_dsn = TRUE)
 st_write(sub_mission_polygons, file.path(EXTRACTED_METADATA_PATH, "all-sub-mission-polygons-w-metadata.gpkg"), driver = "GPKG", delete_dsn = TRUE)
-st_write(points, file.path(EXTRACTED_METADATA_PATH, "all-mission-polygons-w-metadatal-points-w-metadata.gpkg"), driver = "GPKG", delete_dsn = TRUE)
+st_write(points, file.path(EXTRACTED_METADATA_PATH, "all-points-w-metadata.gpkg"), driver = "GPKG", delete_dsn = TRUE)
