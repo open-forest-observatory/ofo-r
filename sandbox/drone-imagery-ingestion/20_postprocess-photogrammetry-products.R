@@ -16,10 +16,12 @@ MISSION_FOOTPRINTS_PATH = "/ofo-share/drone-imagery-organization/3c_metadata-ext
 VISUALIZE = FALSE
 SKIP_EXISTING = FALSE
 
-RUN_CONVERSION = FALSE
+RUN_CONVERSION = TRUE
 RUN_CHM = TRUE
 RUN_THUMBNAIL = TRUE
 
+CONVERSION_LOWER_BOUND_DATASET = 1
+CONVERSION_UPPER_BOUND_DATASET = 10e+6
 
 RELEVANT_FILETYPES = c("dsm-ptcloud.tif", "dsm-mesh.tif", "dtm-ptcloud.tif", "model_local.ply", "model_georeferenced.ply", "ortho_dsm-mesh.tif", "cameras.xml", "points.laz", "log.txt")
 
@@ -33,7 +35,7 @@ get_timestamp = function(filename) {
   return(substr(filename, start = 8, stop = 20))
 }
 
-list_photogrammetry_outputs = function(input_folder) {
+list_photogrammetry_outputs = function(input_folder, lower_bounds_dataset = 0, upper_bound_dataset = 1e+06) {
   # List all files that start with six digits
   files = as.vector(list.files(input_folder, "^[0-9]{6}_"))
   # Extract the dataset IDs and timestamps from these filenames
@@ -46,6 +48,12 @@ list_photogrammetry_outputs = function(input_folder) {
     dataset_ID = dataset_ids,
     timestamp = timestamps
   )
+
+  # Convert dataset_ids to indices and determine which ones are within the specified range of IDs
+  int_dataset_ids = strtoi(dataset_ids, base = 10)
+  elements_in_bounds = (int_dataset_ids >= lower_bounds_dataset) & (int_dataset_ids <= upper_bound_dataset)
+  # Only retain the rows for datasets within the specified IDs
+  processed_files = processed_files[elements_in_bounds, ]
 
   processing_runs = processed_files |>
     dplyr::select(-file) |>
@@ -324,7 +332,11 @@ generate_thumbnails = function(exported_data_folder, output_max_dim = 512, skip_
 
 if (RUN_CONVERSION) {
   # Get all the output files from photogrammetry
-  photogrammetry_outputs = list_photogrammetry_outputs(METASHAPE_OUTPUTS_PATH)
+  photogrammetry_outputs = list_photogrammetry_outputs(
+    METASHAPE_OUTPUTS_PATH,
+    CONVERSION_LOWER_BOUND_DATASET,
+    CONVERSION_UPPER_BOUND_DATASET
+  )
   # Convert data to cloud optimized format
   convert_to_cloud_optimized(
     MISSION_FOOTPRINTS_PATH,
