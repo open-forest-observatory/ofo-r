@@ -1,10 +1,12 @@
 library(sf)
 library(exifr)
 
-FULL_IMAGERY_FOLDER = "/ofo-share/drone-imagery-organization/6_combined-across-projects/000439"
-SUBSET_IMAGERY_FOLDER = "/ofo-share/benchmark-datasets/raw-images/000439-subset"
+FULL_IMAGERY_FOLDER = "/ofo-share/traineeship/raw-drone-imagery/full-datasets/TK1_120"
+SUBSET_IMAGERY_FOLDER = "/ofo-share/traineeship/raw-drone-imagery/spatial-subsets/TK1_120"
 
-image_files = list.files(INPUT_IMAGERY_FOLDER, full.names = TRUE, recursive = TRUE, pattern = ".JPG$")
+SUBSET_METHOD = "center_circle_2_ha" # options: negative_buffer_50m, center_circle_2_ha
+
+image_files = list.files(FULL_IMAGERY_FOLDER, full.names = TRUE, recursive = TRUE, pattern = ".JPG$")
 
 # Get the column names so we know what to use for coords
 exif = read_exif(image_files[1])
@@ -22,8 +24,25 @@ bounds = pts |>
   st_union() |>
   st_buffer(-50)
 
-bounds_smaller = bounds |>
-  st_buffer(-50)
+
+if (SUBSET_METHOD == "negative buffer") {
+
+  bounds_smaller = bounds |>
+    st_buffer(-50)
+
+} else if (SUBSET_METHOD == "center_circle_2_ha") {
+
+  centroid = st_centroid(bounds)
+  # set the radius to buffer in m to make a 3 ha circle
+  buff_dist = sqrt(20000 / pi)
+  bounds_smaller = centroid |>
+    st_buffer(buff_dist)
+
+} else {
+
+  stop("Invalid SUBSET_METHOD")
+
+}
 
 pts_subset = pts |>
   st_transform(3310) |>
@@ -40,4 +59,3 @@ for (i in 1:nrow(pts_subset)) {
   file_out = file.path(SUBSET_IMAGERY_FOLDER, basename(file))
   file.link(file, file_out)
 }
-
