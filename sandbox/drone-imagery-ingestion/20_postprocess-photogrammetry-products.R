@@ -13,13 +13,20 @@ METASHAPE_OUTPUTS_PATH = "/ofo-share/drone-imagery-processed/01/metashape-output
 PHOTOGRAMMETRY_PUBLISH_PATH = "/ofo-share/drone-imagery-processed/01/photogrammetry-publish"
 MISSION_FOOTPRINTS_PATH = "/ofo-share/drone-imagery-organization/3c_metadata-extracted/all-mission-polygons-w-metadata.gpkg"
 
+# Visualize products as they are being created
 VISUALIZE = FALSE
+# Skip output files already present on disk. Does not check for validity.
 SKIP_EXISTING = FALSE
 
+# Move data to the publish_path and run cropping and conversion to cloud optimized format if
+# appropriate for that file type
 RUN_CONVERSION = TRUE
+# Create the canopy height model
 RUN_CHM = TRUE
+# Create the thumbnail image preview from raster data
 RUN_THUMBNAIL = TRUE
 
+# Upper/lower bounds for which dataset IDs to process
 CONVERSION_LOWER_BOUND_DATASET = 1
 CONVERSION_UPPER_BOUND_DATASET = 10e+6
 
