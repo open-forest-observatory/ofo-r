@@ -23,6 +23,10 @@ RUN_THUMBNAIL = TRUE
 CONVERSION_LOWER_BOUND_DATASET = 1
 CONVERSION_UPPER_BOUND_DATASET = 10e+6
 
+# What fraction of the system RAM can TERRA use. The terra default is 0.6, you cannot go above 0.9
+# without a warning.
+TERRA_MEMFRAC = 0.9
+
 RELEVANT_FILETYPES = c("dsm-ptcloud.tif", "dsm-mesh.tif", "dtm-ptcloud.tif", "model_local.ply", "model_georeferenced.ply", "ortho_dsm-mesh.tif", "cameras.xml", "points.laz", "log.txt")
 
 
@@ -164,6 +168,8 @@ convert_to_cloud_optimized = function(
         # Convert the polygon to the same CRS
         raster_crs = terra::crs(raster)
         mission_polygon_in_raster_crs = sf::st_transform(mission_polygon, raster_crs)
+        # Crop the raster to the minimum bounding rectangle of the polygon, filling in pixels outside
+        # the bounds with nan.
         cropped_raster = terra::crop(raster, mission_polygon_in_raster_crs, mask = TRUE)
 
         # Visualize if requested
@@ -172,7 +178,15 @@ convert_to_cloud_optimized = function(
           plot(mission_polygon_in_raster_crs["geom"], add = TRUE)
         }
         # Write out the cropped raster as a cloud-optimized geotif
-        terra::writeRaster(cropped_raster, output_file_path, filetype = "COG", overwrite = TRUE)
+        # Use bigtiff format if the size might be bigger than 4GB after compression. According to
+        # the docs, this is a heuristic and may fail. An alternative is "YES" to force bigtiff
+        terra::writeRaster(
+          cropped_raster,
+          output_file_path,
+          overwrite = TRUE,
+          filetype = "COG",
+          gdal = "BIGTIFF=IF_SAFER"
+        )
       } else if (extension == "laz") {
         # Process pointcloud data
         # Read the pointcloud
@@ -329,6 +343,7 @@ generate_thumbnails = function(exported_data_folder, output_max_dim = 512, skip_
 
 
 ## Workflow
+terra::terraOptions(memfrac = TERRA_MEMFRAC)
 
 if (RUN_CONVERSION) {
   # Get all the output files from photogrammetry
