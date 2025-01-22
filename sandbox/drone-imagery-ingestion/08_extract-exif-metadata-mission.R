@@ -27,93 +27,98 @@ EXIF_PATH = "/ofo-share/drone-imagery-organization/3b_exif-unprocessed/"
 
 EXTRACTED_METADATA_PATH = "/ofo-share/drone-imagery-organization/3c_metadata-extracted/"
 
-
 ## Derived constants
 exif_filepath = file.path(EXIF_PATH, paste0("exif_", IMAGERY_PROJECT_NAME, ".csv"))
 crosswalk_filepath = file.path(FOLDER_BASEROW_CROSSWALK_PATH, paste0(IMAGERY_PROJECT_NAME, "_crosswalk.csv"))
 
-metadata_perimage_filepath = file.path(EXTRACTED_METADATA_PATH, paste0("mission-exif-metadata_perimage_", IMAGERY_PROJECT_NAME, ".csv"))
-metadata_perdataset_filepath = file.path(EXTRACTED_METADATA_PATH, paste0("mission-exif-metadata_perdataset_", IMAGERY_PROJECT_NAME, ".csv"))
-polygons_filepath = file.path(EXTRACTED_METADATA_PATH, paste0("mission-polygons_", IMAGERY_PROJECT_NAME, ".gpkg"))
+# This per-image metadata was saved out in the last step
+metadata_perimage_input_filepath = file.path(EXTRACTED_METADATA_PATH, paste0("exif-metadata_perimage_", IMAGERY_PROJECT_NAME, ".csv"))
+# Data for the subset of images retained in both the mission polygons and sub-mission polygons are saved out here
+metadata_perimage_subset_filepath = file.path(EXTRACTED_METADATA_PATH, paste0("exif-metadata_perimage_subset_", IMAGERY_PROJECT_NAME, ".csv"))
 
-# The already exported sub-mission image-level metadata from previous workflow step (to select only
-# those images that were retained as a part of a sub-mission)
-metadata_perimage_sub_mission_filepath = file.path(EXTRACTED_METADATA_PATH, paste0("sub-mission-exif-metadata_perimage_", IMAGERY_PROJECT_NAME, ".csv"))
+# Output files per mission or sub-mission
+metadata_per_mission_filepath = file.path(EXTRACTED_METADATA_PATH, paste0("mission-exif-metadata_perdataset_", IMAGERY_PROJECT_NAME, ".csv"))
+mission_polygons_filepath = file.path(EXTRACTED_METADATA_PATH, paste0("mission-polygons_", IMAGERY_PROJECT_NAME, ".gpkg"))
+
+metadata_per_sub_mission_filepath = file.path(EXTRACTED_METADATA_PATH, paste0("sub-mission-exif-metadata_perdataset_", IMAGERY_PROJECT_NAME, ".csv"))
+sub_mission_polygons_filepath = file.path(EXTRACTED_METADATA_PATH, paste0("sub-mission-polygons_", IMAGERY_PROJECT_NAME, ".gpkg"))
+
+# Functions
+compute_summary_statistics = function(
+    image_metadata,
+    column_to_split_on,
+    metadata_perdataset_filepath,
+    polygons_filepath) {
+  # Set the dataset_id based on the provided column, either the sub_mission_id or mission_id
+  image_metadata$dataset_id = image_metadata[[column_to_split_on]]
+  # For parallelizing, make a list of subsets of the metadata dataframe, one for each dataset
+  # (either a mission or sub-mission)
+  unique_dataset_ids = unique(image_metadata$dataset_id)
+
+  metadata_chunks_per_dataset <- lapply(unique_dataset_ids, function(unique_dataset_id) {
+    dataset_metadata <- image_metadata |>
+      filter(dataset_id == unique_dataset_id)
+    return(dataset_metadata)
+  })
+  # Run dataset-level metadata extraction across each subset
+  print("Started computing dataset-level summary statistics")
+  future::plan("multisession")
+  summary_statistics = furrr::future_map(
+    metadata_chunks_per_dataset,
+    extract_imagery_dataset_metadata,
+    crop_to_contiguous = TRUE,
+    min_contig_area = 10000,
+    .progress = TRUE,
+    .options = furrr::furrr_options(seed = TRUE)
+  )
+  print("Finished computing dataset-level summary statistics")
+  # Extract the elements of the summary statistics
+  summaries_perdataset = dplyr::bind_rows(map(summary_statistics, "dataset_metadata"))
+  polygon_perdataset = dplyr::bind_rows(map(summary_statistics, "mission_polygon"))
+  images_retained = unlist(map(summary_statistics, "images_retained"))
+
+  # Identify and create the output folders
+  folders = c(metadata_perdataset_filepath, polygons_filepath)
+  folders = dirname(folders)
+  purrr::walk(
+    folders,
+    create_dir
+  )
+
+  # Write out the results
+  ## The per-dataset summary statistics
+  write_csv(summaries_perdataset, metadata_perdataset_filepath)
+  # The polygon bounds
+  sf::st_write(polygon_perdataset, polygons_filepath, delete_dsn = TRUE)
+
+  return(images_retained)
+}
+
 
 ## Workflow
 
-# Read in the EXIF
-exif = prep_exif(exif_filepath, plot_flightpath = FALSE)
+# Read in image-level metadata that was parsed in step 07
+image_metadata = read_csv(metadata_perimage_input_filepath)
 
-# Format columns
-exif = exif |>
-  mutate(mission_id = str_pad(mission_id, 6, pad = "0", side = "left"))
+# Compute the summary statistics based on missions
+images_retained_by_mission = compute_summary_statistics(
+  image_metadata,
+  "mission_id",
+  metadata_per_mission_filepath,
+  mission_polygons_filepath
+)
+# Compute the summary statistics based on sub-missions
+images_retained_by_sub_mission = compute_summary_statistics(
+  image_metadata,
+  "sub_mission_id",
+  metadata_per_sub_mission_filepath,
+  sub_mission_polygons_filepath
+)
 
-# Assign the "dataset_id" parameter that is used in the metadata extraction functions. This is done
-# here as opposed to in the metadata extraction to keep those functions flexible as to how a dataset
-# is defined (e.g. a "mission" or a "sub-mission"). Here we are defining a dataset as a
-# "sub-mission".
-exif$dataset_id = exif$mission_id
+# Compute the images that were retained in both the mission polygons and the sub-mission polygons
+images_retained_in_both = intersect(images_retained_by_mission, images_retained_by_sub_mission)
 
-# Extract image-level metadata, which can occur across all missions at once becuase there are no
-# hierarchical dependencies on mission-level data
-metadata_perimage = extract_imagery_perimage_metadata(exif,
-                                                      input_type = "dataframe")
-
-# Assign image_id to the exif dataframe so it can be used in the dataset-level metadata extraction
-exif$image_id = metadata_perimage$image_id
-
-# Filter the exif dataframe and extracted per-image metadata to include only images that were
-# retained in the previous workflow step of sub-mission-level metadata extraction
-metadata_perimage_sub_mission = read_csv(metadata_perimage_sub_mission_filepath)
-image_ids_retained = metadata_perimage_sub_mission$image_id
-exif = exif |>
-  filter(image_id %in% image_ids_retained)
-metadata_perimage = metadata_perimage |>
-  filter(image_id %in% image_ids_retained)
-
-
-# For sub-mission-level metadata, run sub-mission by sub-mission
-missions = unique(exif$mission_id)
-
-# For parallelizing, make a list of subsets of the exif dataframe, one for each sub-mission
-exif_list <- lapply(missions, function(mission) {
-  exif_foc <- exif |>
-    filter(mission_id == mission)
-  return(exif_foc)
-})
-
-# Run dataset-level metadata extraction across each subset
-
-future::plan("multisession")
-res = furrr::future_map(exif_list,
-                        extract_imagery_dataset_metadata,
-                        input_type = "dataframe",
-                        plot_flightpath = FALSE,
-                        crop_to_contiguous = TRUE,
-                        min_contig_area = 10000,
-                        .options = furrr_options(seed = TRUE))
-
-metadata_list = map(res, ~.x$dataset_metadata)
-polygon_list = map(res, ~.x$mission_polygon)
-images_retained_list = map(res, ~.x$images_retained)
-
-metadata_perdataset = bind_rows(metadata_list)
-polygon_perdataset = bind_rows(polygon_list)
-images_retained = unlist(images_retained_list)
-
-# Filter the extracted metadata to only include images that were retained in the dataset-level
-# metadata extraction based on intersection with the mission polygon
-metadata_perimage = metadata_perimage |>
-  filter(image_id %in% images_retained)
-
-# Save the metadata
-
-folders = c(metadata_perimage_filepath, metadata_perdataset_filepath, polygons_filepath)
-folders = dirname(folders)
-purrr::walk(folders,
-            create_dir)
-
-write_csv(metadata_perimage, metadata_perimage_filepath)
-write_csv(metadata_perdataset, metadata_perdataset_filepath)
-st_write(polygon_perdataset, polygons_filepath, delete_dsn = TRUE)
+# Filter the image metadata to only include data for those images
+image_metadata = image_metadata |> filter(image_id %in% images_retained_in_both)
+# Write out the the filtered subset
+write_csv(image_metadata, metadata_perimage_subset_filepath)

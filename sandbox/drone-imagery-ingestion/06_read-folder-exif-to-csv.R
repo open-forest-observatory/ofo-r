@@ -38,16 +38,16 @@ future::plan("multisession")
 exif_rows = furrr::future_map(image_paths, read_exif_drop_thumbnails, .progress = TRUE)
 exif = bind_rows(exif_rows)
 
-# Add the mission ID and submission ID to the EXIF data, assuming that the folder organization is:
+# Add the mission ID and sub_mission ID to the EXIF data, assuming that the folder organization is:
 # {any abs path}/<mission_id>/<submission_id>/<incrementing number per 10000 images>/<image>.jpg
 
-submission_path = dirname(dirname(image_paths))
-submission_id = basename(submission_path)
-mission_path = dirname(submission_path)
+sub_mission_path = dirname(dirname(image_paths))
+mission_path = dirname(sub_mission_path)
+
+sub_mission_id = basename(sub_mission_path)
 mission_id = basename(mission_path)
 
 exif$mission_id = mission_id
-exif$submission_id = submission_id
-
+exif$sub_mission_id = sub_mission_id
 
 write_csv(exif, file.path(EXIF_OUTPUT_PATH, paste0("exif_", IMAGERY_PROJECT_NAME, ".csv")))

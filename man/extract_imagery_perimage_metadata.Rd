@@ -13,7 +13,7 @@ wrapper)}
 \item{input_type}{the type of input, either "dataframe" or "filepath" to a .csv file}
 }
 \value{
-a data.frame of dataset_id_image_level, datetime_local, lat, lon, rtk_fix, accuracy_x, accuracy_y, camera_pitch, camera_roll, camera_yaw, exposure, aperture, iso, white_balance, received_image_path, and altitude_asl
+a data.frame of datetime_local, lat, lon, rtk_fix, accuracy_x, accuracy_y, camera_pitch, camera_roll, camera_yaw, exposure, aperture, iso, white_balance, received_image_path, and altitude_asl
 }
 \description{
 Extract image-level metadata parameters from EXIF datafram
