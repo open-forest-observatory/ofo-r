@@ -175,10 +175,16 @@ make_mission_details_map = function(mission_summary_foc,
 
   # Define color palettes
   pal_hourselapsed = colorNumeric("viridis", domain = mission_points_foc$hours_elapsed)
-  pal_asl = colorNumeric("viridis", domain = mission_points_foc$altitude_asl_drone)
   pal_pitch = colorNumeric("viridis", domain = mission_points_foc$camera_pitch)
   pal_rtk = colorFactor("viridis", domain = mission_points_foc$rtk)
   pal_sub_mission = colorFactor("viridis", domain = mission_points_foc$sub_mission)
+  # All the values of the altitude may be the same. In this case, use a categorical color map to
+  # ensure the value is still shown on the legend.
+  if (min(mission_points_foc$altitude_asl_drone) == max(mission_points_foc$altitude_asl_drone)) {
+    pal_asl = colorFactor("viridis", domain = mission_points_foc$altitude_asl_drone)
+  } else {
+    pal_asl = colorNumeric("viridis", domain = mission_points_foc$altitude_asl_drone)
+  }
 
   m = leaflet() |>
     addPolygons(data = mission_summary_foc, group = "bounds",
