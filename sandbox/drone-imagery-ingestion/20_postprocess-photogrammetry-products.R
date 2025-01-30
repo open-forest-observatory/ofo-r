@@ -62,7 +62,10 @@ list_photogrammetry_outputs = function(input_folder, lower_bounds_dataset = 0, u
 
   # Convert dataset_ids to indices and determine which ones are within the specified range of IDs
   int_dataset_ids = strtoi(dataset_ids, base = 10)
-  elements_in_bounds = (int_dataset_ids >= lower_bounds_dataset) & (int_dataset_ids <= upper_bound_dataset)
+  elements_in_bounds = which(
+    (int_dataset_ids >= lower_bounds_dataset) &
+      (int_dataset_ids <= upper_bound_dataset)
+  )
   # Only retain the rows for datasets within the specified IDs
   processed_files = processed_files[elements_in_bounds, ]
 
