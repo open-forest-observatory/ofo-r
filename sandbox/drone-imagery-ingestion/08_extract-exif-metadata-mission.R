@@ -100,19 +100,19 @@ compute_summary_statistics = function(
 # Read in image-level metadata that was parsed in step 07
 image_metadata = read_csv(metadata_perimage_input_filepath)
 
-# Compute the summary statistics based on missions
+# Compute the summary statistics based on missions and save to the provided file paths
 images_retained_by_mission = compute_summary_statistics(
-  image_metadata,
-  "mission_id",
-  metadata_per_mission_filepath,
-  mission_polygons_filepath
+  image_metadata = image_metadata,
+  column_to_split_on = "mission_id",
+  metadata_perdataset_filepath = metadata_per_mission_filepath,
+  polygons_filepath = mission_polygons_filepath
 )
-# Compute the summary statistics based on sub-missions
+# Compute the summary statistics based on sub-missions and save to the provided file paths
 images_retained_by_sub_mission = compute_summary_statistics(
-  image_metadata,
-  "sub_mission_id",
-  metadata_per_sub_mission_filepath,
-  sub_mission_polygons_filepath
+  image_metadata = image_metadata,
+  column_to_split_on = "sub_mission_id",
+  metadata_perdataset_filepath = metadata_per_sub_mission_filepath,
+  polygons_filepath = sub_mission_polygons_filepath
 )
 
 # Compute the images that were retained in both the mission polygons and the sub-mission polygons

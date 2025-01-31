@@ -27,12 +27,11 @@ exif_metadata = read_csv(exif_metadata_filepath)
 
 # dataset_id is confusing so it is just dropped in general
 # In the context of a mission, the sub_mission_id has different meanings in baserow and the exif.
-# In baserow, it means the sub-missions included in a mission. In the exif it is the sub-mission
-# that that image is a part of.
+# In baserow, it means the list of sub-missions included in the mission that a given image is part of.
+# In the exif it is just the sub-mission that a given image is a part of.
 baserow_mission = subset(baserow_mission, select = -c(dataset_id, sub_mission_id))
 baserow_sub_mission = subset(baserow_sub_mission, select = -dataset_id)
 
-# There are name collisions for mission_id and sub_mission_id
 metadata_mission = left_join(
   exif_metadata,
   baserow_mission,

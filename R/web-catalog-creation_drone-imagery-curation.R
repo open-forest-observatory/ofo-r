@@ -574,7 +574,7 @@ make_mission_details_pages = function(
   for (i in 1:ndatasets) {
     # Get a single row from the summary statistics
     dataset_id_foc = dataset_ids[[i]]
-    # Extract the image-level metadata that's associated with that dataset
+    # Extract the mission-level metadata that's associated with that dataset
     mission_summary_foc = mission_summary |> filter(dataset_id == dataset_id_foc)
     # Extract the image-level metadata that's associated with that dataset
     mission_points_foc = mission_points |> filter(dataset_id == dataset_id_foc)
