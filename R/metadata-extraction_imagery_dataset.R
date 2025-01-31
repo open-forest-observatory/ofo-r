@@ -535,49 +535,6 @@ extract_file_format_summary <- function(metadata) {
   return(file_format)
 }
 
-# TODO
-#' @export
-compute_summary_statistics = function(
-    image_metadata,
-    column_to_split_on,
-    metadata_perdataset_filepath,
-    polygons_filepath) {
-  print("Started computing dataset-level summary statistics")
-  future::plan("multisession")
-  image_metadata$dataset_id = image_metadata[[column_to_split_on]]
-  # Run dataset-level metadata extraction across each subset
-  metadata_chunks_per_dataset = split(image_metadata, image_metadata[[column_to_split_on]])
-
-  summary_statistics = furrr::future_map(
-    metadata_chunks_per_dataset,
-    extract_imagery_dataset_metadata,
-    crop_to_contiguous = TRUE,
-    min_contig_area = 10000,
-    .progress = TRUE,
-    .options = furrr::furrr_options(seed = TRUE)
-  )
-  print("Finished computing dataset-level summary statistics")
-  # Extract the elements of the summary statistics
-  summaries_perdataset = dplyr::bind_rows(purrr::map(summary_statistics, "dataset_metadata"))
-  polygon_perdataset = dplyr::bind_rows(purrr::map(summary_statistics, "mission_polygon"))
-  images_retained = unlist(purrr::map(summary_statistics, "images_retained"))
-
-  # Identify and create the output folders
-  folders = c(metadata_perdataset_filepath, polygons_filepath)
-  folders = dirname(folders)
-  purrr::walk(
-    folders,
-    create_dir
-  )
-
-  # Write out the results
-  ## The per-dataset summary statistics
-  write_csv(summaries_perdataset, metadata_perdataset_filepath)
-  # The polygon bounds
-  sf::st_write(polygon_perdataset, polygons_filepath, delete_dsn = TRUE)
-
-  return(images_retained)
-}
 
 # Preps the metadata data for passing to the
 # extraction functions, then calls all the individual extraction functions to extract the respecive attributes.
@@ -585,10 +542,7 @@ compute_summary_statistics = function(
 # than min_contig_areain m^2 (could be multiple clumps). It will always include the largest clump, even if
 # it is smaller than min_contig_area.
 #' @export
-extract_imagery_dataset_metadata = function(metadata,
-                                            plot_flightpath = FALSE,
-                                            crop_to_contiguous = TRUE,
-                                            min_contig_area = 1600) {
+extract_imagery_dataset_metadata = function(metadata, mission_polygon) {
   # Print which dataset is being processed
   dataset_id = metadata$dataset_id[1]
   message("Processing dataset ", dataset_id, "...")
@@ -596,36 +550,13 @@ extract_imagery_dataset_metadata = function(metadata,
   # Transform dataframe into sf object
   metadata = sf::st_as_sf(metadata, crs = 4326, coords = c("lon", "lat"))
 
-  # Compute the mission polygon and which images are within it
-  polygon_and_intersection_inds = extract_mission_polygon(
-    metadata = metadata,
-    image_merge_distance = 50,
-    min_contig_area = min_contig_area,
-    identify_images_in_polygon = TRUE,
-  )
-  mission_polygon = polygon_and_intersection_inds$polygon
-  intersection_idxs = polygon_and_intersection_inds$intersection_idxs
-
-  # Now go back to the original metadata df
-  full_metadata_length = nrow(metadata)
-  metadata = metadata[intersection_idxs[, 1], ]
-  cropped_metadata_length = nrow(metadata)
-  if (cropped_metadata_length < full_metadata_length) {
-    n_cropped = full_metadata_length - cropped_metadata_length
-    message("Dropped ", n_cropped, " images that were not within the largest contiguous patch(es) of images retained for dataset ", dataset_id, ".")
-  }
-
   # If there are < 10 images left in the largest contiguoug polygon, skip
   if (nrow(metadata) < 10) {
     message("Less than 10 images in the largest contiguous patch of images retained for dataset ", dataset_id, "; skipping metadata extraction.")
     return()
   }
 
-  # Extract the IDs of the images that were retained
-  images_retained = metadata$image_id
-
   # Extract/compute metadata attributes
-  dataset_id = extract_dataset_id_summary(metadata)
   flight_speed_derived = extract_flight_speed(metadata)
   flight_terrain_correlation_derived = extract_flight_terrain_correlation(metadata)
   camera_pitch = extract_camera_pitch_summary(metadata)
@@ -644,7 +575,6 @@ extract_imagery_dataset_metadata = function(metadata,
   file_format_derived = extract_file_format_summary(metadata)
 
   dataset_metadata = data.frame(
-    dataset_id,
     flight_speed_derived,
     flight_terrain_correlation_derived,
     camera_pitch, # this is a multi-column dataframe; preserving its column names
@@ -662,8 +592,5 @@ extract_imagery_dataset_metadata = function(metadata,
     file_format_derived
   )
 
-  mission_polygon = sf::st_as_sf(mission_polygon)
-  mission_polygon$dataset_id = dataset_id
-
-  return(list(dataset_metadata = dataset_metadata, mission_polygon = mission_polygon, images_retained = images_retained))
+  return(dataset_metadata)
 }

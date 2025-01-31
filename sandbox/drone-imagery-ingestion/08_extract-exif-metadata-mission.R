@@ -43,29 +43,94 @@ mission_polygons_filepath = file.path(EXTRACTED_METADATA_PATH, paste0("mission-p
 metadata_per_sub_mission_filepath = file.path(EXTRACTED_METADATA_PATH, paste0("sub-mission-exif-metadata_perdataset_", IMAGERY_PROJECT_NAME, ".csv"))
 sub_mission_polygons_filepath = file.path(EXTRACTED_METADATA_PATH, paste0("sub-mission-polygons_", IMAGERY_PROJECT_NAME, ".gpkg"))
 
+## Functions
+compute_polygons_and_images_retained = function(image_metadata, column_to_split_on) {
+  split_metadata = split(image_metadata, image_metadata[[column_to_split_on]])
+
+  polygons_and_inds = furrr::future_map(
+    split_metadata,
+    extract_mission_polygon,
+    image_merge_distance = 50,
+    identify_images_in_polygon = TRUE
+  )
+  polygons = dplyr::bind_rows(purrr::map(polygons_and_inds, "polygon"))
+  intersection_idxs = unlist(purrr::map(polygons_and_inds, "intersection_idxs"))
+  # Re-assemble the image metadata in the same order as the intersection IDs
+  unsplit_metadata = dplyr::bind_rows(split_metadata)
+  retained_image_IDs = unsplit_metadata[intersection_idxs, ]$image_id
+
+  return(list(polygons = polygons, retained_image_IDs = retained_image_IDs))
+}
+
+# TODO
+#' @export
+compute_and_save_summary_statistics = function(
+    image_metadata,
+    polygons_perdataset,
+    column_to_split_on,
+    metadata_perdataset_filepath,
+    polygons_filepath) {
+  print("Started computing dataset-level summary statistics")
+  future::plan("multisession")
+  # Run dataset-level metadata extraction across each subset
+  metadata_chunks_per_dataset = split(image_metadata, image_metadata[[column_to_split_on]])
+
+  summaries_perdataset = furrr::future_map2(
+    metadata_chunks_per_dataset,
+    polygons_perdataset,
+    extract_imagery_dataset_metadata,
+    .progress = TRUE,
+    .options = furrr::furrr_options(seed = TRUE)
+  )
+  print("Finished computing dataset-level summary statistics")
+  # Extract the elements of the summary statistics
+  summaries_perdataset = dplyr::bind_rows(summaries_perdataset)
+
+  # Write out the results
+  ## The per-dataset summary statistics
+  readr::write_csv(summaries_perdataset, metadata_perdataset_filepath)
+  # The polygon bounds
+  sf::st_write(polygons_perdataset, polygons_filepath, delete_dsn = TRUE)
+}
+
 ## Workflow
 # Read in image-level metadata that was parsed in step 07
 image_metadata = read_csv(metadata_perimage_input_filepath)
 
-# Compute the summary statistics based on missions and save to the provided file paths
-images_retained_by_mission = compute_summary_statistics(
-  image_metadata = image_metadata,
-  column_to_split_on = "mission_id",
-  metadata_perdataset_filepath = metadata_per_mission_filepath,
-  polygons_filepath = mission_polygons_filepath
+mission_res = compute_polygons_and_images_retained(
+  image_metadata = image_metadata, column_to_split_on = "mission_id"
 )
-# Compute the summary statistics based on sub-missions and save to the provided file paths
-images_retained_by_sub_mission = compute_summary_statistics(
-  image_metadata = image_metadata,
-  column_to_split_on = "sub_mission_id",
-  metadata_perdataset_filepath = metadata_per_sub_mission_filepath,
-  polygons_filepath = sub_mission_polygons_filepath
+sub_mission_res = compute_polygons_and_images_retained(
+  image_metadata = image_metadata, column_to_split_on = "sub_mission_id"
 )
 
 # Compute the images that were retained in both the mission polygons and the sub-mission polygons
-images_retained_in_both = intersect(images_retained_by_mission, images_retained_by_sub_mission)
+images_retained_in_both = intersect(
+  mission_res$retained_image_IDs, sub_mission_res$retained_image_IDs
+)
 
+# TODO consider reporting how many were droppped per dataset
 # Filter the image metadata to only include data for those images
 image_metadata = image_metadata |> filter(image_id %in% images_retained_in_both)
+
 # Write out the the filtered subset
 write_csv(image_metadata, metadata_perimage_subset_filepath)
+
+# Create the output folder
+create_dir(EXTRACTED_METADATA_PATH)
+# Compute summary statistics and save out results for mission-level data
+compute_and_save_summary_statistics(
+  image_metadata = image_metadata,
+  column_to_split_on = "mission_id",
+  polygons_perdataset = mission_res$polygons,
+  metadata_perdataset_filepath = metadata_per_mission_filepath,
+  polygons_filepath = mission_polygons_filepath
+)
+# Compute summary statistics and save out results for sub-mission-level data
+compute_and_save_summary_statistics(
+  image_metadata = image_metadata,
+  column_to_split_on = "sub_mission_id",
+  polygons_perdataset = sub_mission_res$polygons,
+  metadata_perdataset_filepath = metadata_per_sub_mission_filepath,
+  polygons_filepath = sub_mission_polygons_filepath
+)
