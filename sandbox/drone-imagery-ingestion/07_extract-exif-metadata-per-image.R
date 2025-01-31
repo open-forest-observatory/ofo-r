@@ -31,8 +31,37 @@ polygons_filepath = file.path(EXTRACTED_METADATA_PATH, paste0("sub-mission-polyg
 metadata_sub_mission_filepath = file.path(EXTRACTED_METADATA_PATH, paste0("sub-mission-baserow-metadata_", IMAGERY_PROJECT_NAME, ".csv"))
 metadata_mission_filepath = file.path(EXTRACTED_METADATA_PATH, paste0("mission-baserow-metadata_", IMAGERY_PROJECT_NAME, ".csv"))
 
-## Workflow
 
+## Functions
+# Note that `exif` will be defined in the global environment
+extract_sub_mission_exif = function(unique_sub_mission_id) {
+  # Extract the exif rows matching that sub-mission ID
+  sub_mission_exif <- exif |>
+    filter(sub_mission_id == unique_sub_mission_id)
+  return(sub_mission_exif)
+}
+
+# Note that `baserow_sub_mission_metadata` will be defined in the global environment
+extract_aircraft_model_name = function(unique_sub_mission_id) {
+  # Extract the baserow entries for this sub-mission ID
+  baserow_for_sub_mission <- baserow_sub_mission_metadata[
+    baserow_sub_mission_metadata$sub_mission_id == unique_sub_mission_id,
+  ]
+
+  # There should only be one matching row
+  if (nrow(baserow_for_sub_mission) == 1) {
+    # Extract the aircraft model name
+    aircraft_model_name = baserow_for_sub_mission$aircraft_model_name
+  } else {
+    print(paste("There were ", nrow(baserow_for_sub_mission), " rows in baserow matching ", unique_sub_mission_id))
+    # Default value indicating a single corresponding entry could not be found
+    aircraft_model_name = NaN
+  }
+
+  return(aircraft_model_name)
+}
+
+## Workflow
 # Read in the EXIF
 exif = read.csv(exif_filepath)
 # Read in the baserow metadata
@@ -46,35 +75,19 @@ unique_sub_mission_ids = unique(exif$sub_mission_id)
 # For parallelizing, make a list of subsets of the exif dataframe, one for each sub-mission
 exif_per_sub_mission <- lapply(
   unique_sub_mission_ids,
-  function(unique_sub_mission_id) {
-    # Extract the exif rows matching that sub-mission ID
-    sub_mission_exif <- exif |>
-      filter(sub_mission_id == unique_sub_mission_id)
-    return(sub_mission_exif)
-  }
+  extract_sub_mission_exif
 )
 
 # Get aircraft model name to use for determining the appropriate image-level metadata extractor
 # functions to use
 aircraft_model_names <- lapply(
   unique_sub_mission_ids,
-  function(unique_sub_mission_id) {
-    # Extract the baserow entries for this sub-mission ID
-    baserow_for_sub_mission <- baserow_sub_mission_metadata[
-      baserow_sub_mission_metadata$sub_mission_id == unique_sub_mission_id,
-    ]
-
-    # There should only be one matching row
-    if (nrow(baserow_for_sub_mission) != 1) {
-      stop(paste("Error: there was not one corresponding baserow entry: ", baserow_for_sub_mission))
-    }
-
-    # Extract the aircraft model name
-    aircraft_model_name = baserow_for_sub_mission$aircraft_model_name
-
-    return(aircraft_model_name)
-  }
+  extract_aircraft_model_name
 )
+
+# Only retain sub-missions for which there was valid baserow data identifying the aircraft model
+exif_per_sub_mission = exif_per_sub_mission[!is.na(aircraft_model_names)]
+aircraft_model_names = aircraft_model_names[!is.na(aircraft_model_names)]
 
 # Extract the metadata in a standardized manner no matter the platform
 # This is run on a per-image basis, but requires the per-sub-mission platform name to understand how
@@ -90,6 +103,8 @@ metadata_per_sub_mission = furrr::future_map2(
 )
 # Bind the rows together across all sub-missions
 metadata_perimage = bind_rows(metadata_per_sub_mission)
+# Ensure that the exif data is ordered in the same way and any dropped sub-missions are reflected
+exif = bind_rows(exif_per_sub_mission)
 
 # Copy the sub-mission and mission ID to the output metadata
 metadata_perimage$sub_mission_id = exif$sub_mission_id
