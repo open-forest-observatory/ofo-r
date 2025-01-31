@@ -491,6 +491,49 @@ extract_file_format_summary <- function(metadata) {
   return(file_format)
 }
 
+# TODO
+#' @export
+compute_summary_statistics = function(
+    image_metadata,
+    column_to_split_on,
+    metadata_perdataset_filepath,
+    polygons_filepath) {
+  print("Started computing dataset-level summary statistics")
+  future::plan("multisession")
+  image_metadata$dataset_id = image_metadata[[column_to_split_on]]
+  # Run dataset-level metadata extraction across each subset
+  metadata_chunks_per_dataset = split(image_metadata, image_metadata[[column_to_split_on]])
+
+  summary_statistics = furrr::future_map(
+    metadata_chunks_per_dataset,
+    extract_imagery_dataset_metadata,
+    crop_to_contiguous = TRUE,
+    min_contig_area = 10000,
+    .progress = TRUE,
+    .options = furrr::furrr_options(seed = TRUE)
+  )
+  print("Finished computing dataset-level summary statistics")
+  # Extract the elements of the summary statistics
+  summaries_perdataset = dplyr::bind_rows(purrr::map(summary_statistics, "dataset_metadata"))
+  polygon_perdataset = dplyr::bind_rows(purrr::map(summary_statistics, "mission_polygon"))
+  images_retained = unlist(purrr::map(summary_statistics, "images_retained"))
+
+  # Identify and create the output folders
+  folders = c(metadata_perdataset_filepath, polygons_filepath)
+  folders = dirname(folders)
+  purrr::walk(
+    folders,
+    create_dir
+  )
+
+  # Write out the results
+  ## The per-dataset summary statistics
+  write_csv(summaries_perdataset, metadata_perdataset_filepath)
+  # The polygon bounds
+  sf::st_write(polygon_perdataset, polygons_filepath, delete_dsn = TRUE)
+
+  return(images_retained)
+}
 
 # Preps the metadata data for passing to the
 # extraction functions, then calls all the individual extraction functions to extract the respecive attributes.

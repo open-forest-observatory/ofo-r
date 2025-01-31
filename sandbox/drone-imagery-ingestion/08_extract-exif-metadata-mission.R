@@ -43,60 +43,7 @@ mission_polygons_filepath = file.path(EXTRACTED_METADATA_PATH, paste0("mission-p
 metadata_per_sub_mission_filepath = file.path(EXTRACTED_METADATA_PATH, paste0("sub-mission-exif-metadata_perdataset_", IMAGERY_PROJECT_NAME, ".csv"))
 sub_mission_polygons_filepath = file.path(EXTRACTED_METADATA_PATH, paste0("sub-mission-polygons_", IMAGERY_PROJECT_NAME, ".gpkg"))
 
-# Functions
-compute_summary_statistics = function(
-    image_metadata,
-    column_to_split_on,
-    metadata_perdataset_filepath,
-    polygons_filepath) {
-  # Set the dataset_id based on the provided column, either the sub_mission_id or mission_id
-  image_metadata$dataset_id = image_metadata[[column_to_split_on]]
-  # For parallelizing, make a list of subsets of the metadata dataframe, one for each dataset
-  # (either a mission or sub-mission)
-  unique_dataset_ids = unique(image_metadata$dataset_id)
-
-  metadata_chunks_per_dataset <- lapply(unique_dataset_ids, function(unique_dataset_id) {
-    dataset_metadata <- image_metadata |>
-      filter(dataset_id == unique_dataset_id)
-    return(dataset_metadata)
-  })
-  # Run dataset-level metadata extraction across each subset
-  print("Started computing dataset-level summary statistics")
-  future::plan("multisession")
-  summary_statistics = furrr::future_map(
-    metadata_chunks_per_dataset,
-    extract_imagery_dataset_metadata,
-    crop_to_contiguous = TRUE,
-    min_contig_area = 10000,
-    .progress = TRUE,
-    .options = furrr::furrr_options(seed = TRUE)
-  )
-  print("Finished computing dataset-level summary statistics")
-  # Extract the elements of the summary statistics
-  summaries_perdataset = dplyr::bind_rows(map(summary_statistics, "dataset_metadata"))
-  polygon_perdataset = dplyr::bind_rows(map(summary_statistics, "mission_polygon"))
-  images_retained = unlist(map(summary_statistics, "images_retained"))
-
-  # Identify and create the output folders
-  folders = c(metadata_perdataset_filepath, polygons_filepath)
-  folders = dirname(folders)
-  purrr::walk(
-    folders,
-    create_dir
-  )
-
-  # Write out the results
-  ## The per-dataset summary statistics
-  write_csv(summaries_perdataset, metadata_perdataset_filepath)
-  # The polygon bounds
-  sf::st_write(polygon_perdataset, polygons_filepath, delete_dsn = TRUE)
-
-  return(images_retained)
-}
-
-
 ## Workflow
-
 # Read in image-level metadata that was parsed in step 07
 image_metadata = read_csv(metadata_perimage_input_filepath)
 
