@@ -28,6 +28,7 @@ extract_flight_speed = function(metadata) {
 #' @export
 extract_mission_polygon = function(
     metadata,
+    dataset_id,
     image_merge_distance,
     min_contig_area = 1600,
     boundary_method = "dilate_erode",
@@ -63,7 +64,7 @@ extract_mission_polygon = function(
 
   # Error out if there are no contigious images
   if (n_polys == 0) {
-    stop("No contiguous images in dataset ", metadata$dataset_id[1])
+    stop("No contiguous images in dataset ", dataset_id)
   }
 
   # Check if multipolygon and if so, keep only the poly parts > min aea, and if any removed, return
@@ -85,7 +86,7 @@ extract_mission_polygon = function(
       warning(
         n_polys,
         " non-contiguous image clusters in dataset ",
-        metadata$dataset_id[1],
+        dataset_id,
         ". Retaining only the ",
         n_polys_filtered,
         " clusters with area > ",
@@ -96,7 +97,7 @@ extract_mission_polygon = function(
       warning(
         n_polys,
         " non-contiguous image clusters in dataset ",
-        metadata$dataset_id[1],
+        dataset_id,
         ". Retaining all becaus all have area > ",
         min_contig_area,
         " m^2."
@@ -542,9 +543,8 @@ extract_file_format_summary <- function(metadata) {
 # than min_contig_areain m^2 (could be multiple clumps). It will always include the largest clump, even if
 # it is smaller than min_contig_area.
 #' @export
-extract_imagery_dataset_metadata = function(metadata, mission_polygon) {
+extract_imagery_dataset_metadata = function(metadata, mission_polygon, dataset_id) {
   # Print which dataset is being processed
-  dataset_id = metadata$dataset_id[1]
   message("Processing dataset ", dataset_id, "...")
 
   # Transform dataframe into sf object
@@ -552,7 +552,11 @@ extract_imagery_dataset_metadata = function(metadata, mission_polygon) {
 
   # If there are < 10 images left in the largest contiguoug polygon, skip
   if (nrow(metadata) < 10) {
-    message("Less than 10 images in the largest contiguous patch of images retained for dataset ", dataset_id, "; skipping metadata extraction.")
+    message(
+      "Less than 10 images in the largest contiguous patch of images retained for dataset ",
+      dataset_id,
+      "; skipping metadata extraction."
+    )
     return()
   }
 

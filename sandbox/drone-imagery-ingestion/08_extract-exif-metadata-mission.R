@@ -45,10 +45,15 @@ sub_mission_polygons_filepath = file.path(EXTRACTED_METADATA_PATH, paste0("sub-m
 
 ## Functions
 compute_polygons_and_images_retained = function(image_metadata, column_to_split_on) {
+  # Split the metadata by the values in the requested column
   split_metadata = split(image_metadata, image_metadata[[column_to_split_on]])
+  # Those unique values are used as the dataset_id for logging purposes
+  dataset_ids = names(split_metadata)
 
-  polygons_and_inds = furrr::future_map(
+  # Extract the polygons for each chunk of metadata
+  polygons_and_inds = furrr::future_map2(
     split_metadata,
+    dataset_ids,
     extract_mission_polygon,
     image_merge_distance = 50,
     identify_images_in_polygon = TRUE
@@ -62,8 +67,6 @@ compute_polygons_and_images_retained = function(image_metadata, column_to_split_
   return(list(polygons = polygons, retained_image_IDs = retained_image_IDs))
 }
 
-# TODO
-#' @export
 compute_and_save_summary_statistics = function(
     image_metadata,
     polygons_perdataset,
@@ -75,9 +78,15 @@ compute_and_save_summary_statistics = function(
   # Run dataset-level metadata extraction across each subset
   metadata_chunks_per_dataset = split(image_metadata, image_metadata[[column_to_split_on]])
 
-  summaries_perdataset = furrr::future_map2(
-    metadata_chunks_per_dataset,
-    polygons_perdataset,
+  # Take only the polygons that have a non-zero number of images retained
+  polygons_perdataset = polygons_perdataset[names(metadata_chunks_per_dataset)]
+
+  # Extract the "dataset_id" from each metadata chunk
+  dataset_ids = names(metadata_chunks_per_dataset)
+
+  # Extract the summary statistics from each metadata chunk
+  summaries_perdataset = furrr::future_pmap(
+    list(metadata_chunks_per_dataset, polygons_perdataset, dataset_ids),
     extract_imagery_dataset_metadata,
     .progress = TRUE,
     .options = furrr::furrr_options(seed = TRUE)
