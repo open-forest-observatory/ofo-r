@@ -99,7 +99,12 @@ compute_and_save_summary_statistics = function(
   ## The per-dataset summary statistics
   readr::write_csv(summaries_perdataset, metadata_perdataset_filepath)
   # The polygon bounds
-  sf::st_write(polygons_perdataset, polygons_filepath, delete_dsn = TRUE)
+  polygons_perdataset_do_call = do.call(rbind, polygons_perdataset)
+  pdc_as_tbl = as_tibble(polygons_perdataset_do_call)
+  pdc_as_tbl["dataset_id"] = row.names(polygons_perdataset_do_call)
+  pdc_as_tbl_renamed = dplyr::rename(pdc_as_tbl, "geometry" = "V1")
+  pdc_as_sf = sf::st_as_sf(pdc_as_tbl_renamed)
+  sf::st_write(pdc_as_sf, polygons_filepath, delete_dsn = TRUE)
 }
 
 ## Workflow
