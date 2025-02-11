@@ -97,14 +97,22 @@ compute_and_save_summary_statistics = function(
 
   # Write out the results
   ## The per-dataset summary statistics
-  readr::write_csv(summaries_perdataset, metadata_perdataset_filepath)
-  # The polygon bounds
-  polygons_perdataset_do_call = do.call(rbind, polygons_perdataset)
-  pdc_as_tbl = as_tibble(polygons_perdataset_do_call)
-  pdc_as_tbl["dataset_id"] = row.names(polygons_perdataset_do_call)
-  pdc_as_tbl_renamed = dplyr::rename(pdc_as_tbl, "geometry" = "V1")
-  pdc_as_sf = sf::st_as_sf(pdc_as_tbl_renamed)
-  sf::st_write(pdc_as_sf, polygons_filepath, delete_dsn = TRUE)
+  # readr::write_csv(summaries_perdataset, metadata_perdataset_filepath)
+  # Apply several steps to transform the polygons into the appropriate format. The polygons begin
+  # as a named list, with the names corresponding to the dataset ID ("column_to_split_on"). The
+  # goal is to convert it to a sf object with each row representing a different dataset ID and the
+  # associated multi-polygon bounds.
+  # Convert into a dataframe
+  polygons_perdataset_df = do.call(rbind, polygons_perdataset)
+  # And then a tibble
+  polygons_perdataset_tbl = dplyr::as_tibble(polygons_perdataset_df)
+  # The tibble no longer has the dataset IDs, so add those back
+  polygons_perdataset_tbl[column_to_split_on] = row.names(polygons_perdataset_df)
+  # Rename the unnamed column to geometry
+  polygons_perdataset_tbl = dplyr::rename(polygons_perdataset_tbl, "geometry" = "V1")
+  # Convert to a sf object and then write
+  polygons_perdataset_sf = sf::st_sfc(polygons_perdataset_tbl)
+  sf::st_write(polygons_perdataset_sf, polygons_filepath, delete_dsn = TRUE)
 }
 
 ## Workflow
