@@ -560,24 +560,20 @@ make_mission_details_pages = function(
     mission_details_page_dir,
     published_data_path = "",
     data_server_base_url = "") {
-  # Sort the summary statistics by dataset_id (mission_id)
-  mission_summary = mission_summary |> dplyr::arrange(dataset_id)
+  mission_summary = mission_summary |> dplyr::arrange(mission_id)
 
-  dataset_ids = mission_summary$dataset_id
-  ndatasets = length(dataset_ids)
+  mission_ids = mission_summary$mission_id
+  ndatasets = length(mission_ids)
 
   mission_centroids = sf::st_centroid(mission_summary)
 
-  # Rename mission_id to dataset_id
-  mission_points = mission_points |> dplyr::rename(dataset_id = mission_id)
-
   for (i in 1:ndatasets) {
     # Get a single row from the summary statistics
-    dataset_id_foc = dataset_ids[[i]]
+    mission_id_foc = mission_ids[[i]]
     # Extract the mission-level metadata that's associated with that dataset
-    mission_summary_foc = mission_summary |> filter(dataset_id == dataset_id_foc)
+    mission_summary_foc = mission_summary |> filter(mission_id == mission_id_foc)
     # Extract the image-level metadata that's associated with that dataset
-    mission_points_foc = mission_points |> filter(dataset_id == dataset_id_foc)
+    mission_points_foc = mission_points |> filter(mission_id == mission_id_foc)
 
     cat("\rGenerating details pages (", i, "of", ndatasets, ")    ")
 
@@ -600,11 +596,11 @@ make_mission_details_pages = function(
     )
 
     # Compute previous and next dataset, looping around as needed
-    next_dataset_id = ifelse(i < ndatasets, dataset_ids[i + 1], dataset_ids[1])
-    previous_dataset_id = ifelse(i > 1, dataset_ids[i - 1], dataset_ids[ndatasets])
+    next_mission_id = ifelse(i < ndatasets, mission_ids[i + 1], mission_ids[1])
+    previous_mission_id = ifelse(i > 1, mission_ids[i - 1], mission_ids[ndatasets])
 
-    next_dataset_page_path = paste0("/", mission_details_page_dir, "/", next_dataset_id)
-    previous_dataset_page_path = paste0("/", mission_details_page_dir, "/", previous_dataset_id)
+    next_dataset_page_path = paste0("/", mission_details_page_dir, "/", next_mission_id)
+    previous_dataset_page_path = paste0("/", mission_details_page_dir, "/", previous_mission_id)
 
     # Render plot details page from template
     render_mission_details_page(
