@@ -113,7 +113,8 @@ extract_mission_polygon = function(
     simplified_poly_buffer = simplified_poly |> sf::st_buffer(simplification_tol)
     intersection_idxs = sf::st_intersects(metadata, simplified_poly_buffer, sparse = FALSE)
     # Transform back to the initial CRS
-    simplified_poly = sf::st_transform(simplified_poly, crs = initial_crs)
+    simplified_poly = sf::st_transform(simplified_poly, crs = initial_crs) |> sf::st_cast("MULTIPOLYGON")
+
     return(list(polygon = simplified_poly, intersection_idxs = intersection_idxs))
   }
 
