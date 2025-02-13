@@ -39,13 +39,13 @@ metadata_perimage = st_as_sf(metadata_perimage, coords = c("lon", "lat"), remove
 # Create dataset footprint polygons, annotated with dataset-level metadata
 mission_polygons = polygons_mission |>
   st_transform(4326) |>
-  left_join(metadata_mission_perdataset, by = c("dataset_id" = "dataset_id")) |>
+  left_join(metadata_mission_perdataset, by = c("mission_id" = "mission_id")) |>
   # Convert non-permitted column types (e.g. time) to character
   mutate(across(where(~ is(.x, "hms")), ~ as.character(.x)))
 
 sub_mission_polygons = polygons_sub_mission |>
   st_transform(4326) |>
-  left_join(metadata_sub_mission_perdataset, by = c("dataset_id" = "dataset_id")) |>
+  left_join(metadata_sub_mission_perdataset, by = c("sub_mission_id" = "sub_mission_id")) |>
   # Convert non-permitted column types (e.g. time) to character
   mutate(across(where(~ is(.x, "hms")), ~ as.character(.x)))
 

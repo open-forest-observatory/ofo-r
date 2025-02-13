@@ -94,6 +94,10 @@ compute_and_save_summary_statistics = function(
   print("Finished computing dataset-level summary statistics")
   # Extract the elements of the summary statistics
   summaries_perdataset = dplyr::bind_rows(summaries_perdataset)
+  # Add the identifying column
+  summaries_perdataset[column_to_split_on] = dataset_ids
+  # Write out
+  readr::write_csv(summaries_perdataset, metadata_perdataset_filepath)
 
   # Write out the results
   ## The per-dataset summary statistics
@@ -108,7 +112,7 @@ compute_and_save_summary_statistics = function(
   polygons_perdataset_tbl = dplyr::as_tibble(polygons_perdataset_df)
   # The tibble no longer has the dataset IDs, so add those back
   polygons_perdataset_tbl[column_to_split_on] = row.names(polygons_perdataset_df)
-  # Rename the unnamed column to geometry
+  # Rename the unnamed column to geometry and the misssion_id to dataset_id
   polygons_perdataset_tbl = dplyr::rename(polygons_perdataset_tbl, "geometry" = "V1")
   # Convert to a sf object and then write
   # TODO in the future we might want to ensure that all the polygons have the same CRS but for now
