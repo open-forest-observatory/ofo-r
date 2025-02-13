@@ -111,7 +111,10 @@ compute_and_save_summary_statistics = function(
   # Rename the unnamed column to geometry
   polygons_perdataset_tbl = dplyr::rename(polygons_perdataset_tbl, "geometry" = "V1")
   # Convert to a sf object and then write
-  polygons_perdataset_sf = sf::st_sfc(polygons_perdataset_tbl)
+  # TODO in the future we might want to ensure that all the polygons have the same CRS but for now
+  # they should all be EPSG::4326
+  crs = sf::st_crs(polygons_perdataset[[1]])
+  polygons_perdataset_sf = sf::st_as_sf(polygons_perdataset_tbl, crs = crs)
   sf::st_write(polygons_perdataset_sf, polygons_filepath, delete_dsn = TRUE)
 }
 
