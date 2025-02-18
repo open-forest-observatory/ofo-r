@@ -25,15 +25,14 @@ PUBLISHABLE_MISSION_FOOTPRINTS_PATH = "/ofo-share/drone-imagery-processed/01/mis
 mission_footprints = st_read(MISSION_FOOTPRINTS_PATH)
 
 # Get all the mission IDs
-mission_ids = mission_footprints$dataset_id |> unique()
+mission_ids = mission_footprints$mission_id |> unique()
 
 
 # Split out the footprint of each mission and save to file in the expected directory structure
 
 for (mission_id_foc in mission_ids) {
-
   mission_footprint = mission_footprints |>
-    filter(dataset_id == mission_id_foc) |>
+    filter(mission_id == mission_id_foc) |>
     st_as_sfc()
 
   mission_footprint_path = file.path(PUBLISHABLE_MISSION_FOOTPRINTS_PATH, mission_id_foc, "footprint", "footprint.gpkg")

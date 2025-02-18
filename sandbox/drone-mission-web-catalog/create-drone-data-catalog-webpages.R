@@ -40,7 +40,7 @@ WEBSITE_CONTENT_PATH = file.path(WEBSITE_REPO_PATH, "content", "")
 
 # Data paths
 MISSION_POLYGONS_PATH = "/ofo-share/drone-imagery-organization/3c_metadata-extracted/all-mission-polygons-w-metadata.gpkg"
-MISSION_POINTS_PATH = "/ofo-share/drone-imagery-organization/3c_metadata-extracted/all-mission-points-w-metadata.gpkg"
+MISSION_POINTS_PATH = "/ofo-share/drone-imagery-organization/3c_metadata-extracted/all-points-w-metadata.gpkg"
 
 # The path to all the published files for the drone mission catalog
 PUBLISHED_DATA_PATH = "/ofo-share/drone-data-publish/01/"
@@ -102,6 +102,7 @@ reset_detail_dirs(
 ## Loop through each mission and make a details page, including its media (map and datatable)
 make_mission_details_pages(
   mission_summary = mission_polygons_w_summary_data,
+  mission_points = mission_points,
   website_static_path = WEBSITE_STATIC_PATH,
   website_content_path = WEBSITE_CONTENT_PATH,
   leaflet_header_files_dir = LEAFLET_HEADER_FILES_DIR,

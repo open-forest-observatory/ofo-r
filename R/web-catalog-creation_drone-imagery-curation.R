@@ -555,6 +555,7 @@ render_mission_details_page = function(
 ## Loop through each mission and make a details page, including its media (map and datatable)
 make_mission_details_pages = function(
     mission_summary,
+    mission_points,
     website_static_path,
     website_content_path,
     leaflet_header_files_dir,
@@ -565,28 +566,24 @@ make_mission_details_pages = function(
     mission_details_page_dir,
     published_data_path = "",
     data_server_base_url = "") {
+  mission_summary = mission_summary |> dplyr::arrange(mission_id)
 
-  mission_summary = mission_summary |>
-    dplyr::arrange(dataset_id)
-
-  dataset_ids = mission_summary$dataset_id
-  ndatasets = length(dataset_ids)
+  mission_ids = mission_summary$mission_id
+  ndatasets = length(mission_ids)
 
   mission_centroids = sf::st_centroid(mission_summary)
 
   for (i in 1:ndatasets) {
-
-    dataset_id_foc = dataset_ids[i]
+    # Get a single row from the summary statistics
+    mission_id_foc = mission_ids[[i]]
+    # Extract the mission-level metadata that's associated with that dataset
+    mission_summary_foc = mission_summary |> filter(mission_id == mission_id_foc)
+    # Extract the image-level metadata that's associated with that dataset
+    mission_points_foc = mission_points |> filter(mission_id == mission_id_foc)
 
     cat("\rGenerating details pages (", i, "of", ndatasets, ")    ")
 
-    mission_summary_foc = mission_summary |>
-      filter(dataset_id == dataset_id_foc)
-
-    mission_points_foc = mission_points |>
-      rename(dataset_id = dataset_id_image_level) |>
-      filter(dataset_id == dataset_id_foc)
-
+    # Make details map and datatable
     mission_details_map_path = make_mission_details_map(
       mission_summary_foc = mission_summary_foc,
       mission_points_foc = mission_points_foc,
@@ -604,11 +601,12 @@ make_mission_details_pages = function(
       mission_details_datatable_dir = mission_details_datatable_dir
     )
 
-    next_dataset_id = ifelse(i < ndatasets, dataset_ids[i + 1], dataset_ids[1])
-    previous_dataset_id = ifelse(i > 1, dataset_ids[i - 1], dataset_ids[ndatasets])
+    # Compute previous and next dataset, looping around as needed
+    next_mission_id = ifelse(i < ndatasets, mission_ids[i + 1], mission_ids[1])
+    previous_mission_id = ifelse(i > 1, mission_ids[i - 1], mission_ids[ndatasets])
 
-    next_dataset_page_path = paste0("/", mission_details_page_dir, "/", next_dataset_id)
-    previous_dataset_page_path = paste0("/", mission_details_page_dir, "/", previous_dataset_id)
+    next_dataset_page_path = paste0("/", mission_details_page_dir, "/", next_mission_id)
+    previous_dataset_page_path = paste0("/", mission_details_page_dir, "/", previous_mission_id)
 
     # Render plot details page from template
     render_mission_details_page(

@@ -3,29 +3,45 @@
 
 library(tidyverse)
 
-IMAGERY_PROJECT_NAME = "2020-dispersal"
+# Handle difference in how the current directory is set between debugging and command line call
+if (file.exists("sandbox/drone-imagery-ingestion/imagery_project_name.txt")) {
+  IMAGERY_PROJECT_NAME_FILE = "sandbox/drone-imagery-ingestion/imagery_project_name.txt"
+} else {
+  IMAGERY_PROJECT_NAME_FILE = "imagery_project_name.txt"
+}
+IMAGERY_PROJECT_NAME = readr::read_lines(IMAGERY_PROJECT_NAME_FILE)
 
 EXTRACTED_METADATA_PATH = "/ofo-share/drone-imagery-organization/3c_metadata-extracted/"
 
 # Derived constants
 baserow_sub_mission_filepath = file.path(EXTRACTED_METADATA_PATH, paste0("sub-mission-baserow-metadata_", IMAGERY_PROJECT_NAME, ".csv"))
 baserow_mission_filepath = file.path(EXTRACTED_METADATA_PATH, paste0("mission-baserow-metadata_", IMAGERY_PROJECT_NAME, ".csv"))
-exif_sub_mission_filepath = file.path(EXTRACTED_METADATA_PATH, paste0("sub-mission-exif-metadata_perdataset_", IMAGERY_PROJECT_NAME, ".csv"))
-exif_mission_filepath = file.path(EXTRACTED_METADATA_PATH, paste0("mission-exif-metadata_perdataset_", IMAGERY_PROJECT_NAME, ".csv"))
+exif_metadata_filepath = file.path(EXTRACTED_METADATA_PATH, paste0("exif-metadata_perimage_subset_", IMAGERY_PROJECT_NAME, ".csv"))
 full_metadata_mission_filepath = file.path(EXTRACTED_METADATA_PATH, paste0("mission-full-metadata_", IMAGERY_PROJECT_NAME, ".csv"))
 full_metadata_sub_mission_filepath = file.path(EXTRACTED_METADATA_PATH, paste0("sub-mission-full-metadata_", IMAGERY_PROJECT_NAME, ".csv"))
 
 # Load the metadata
 baserow_sub_mission = read_csv(baserow_sub_mission_filepath)
 baserow_mission = read_csv(baserow_mission_filepath)
-exif_sub_mission = read_csv(exif_sub_mission_filepath)
-exif_mission = read_csv(exif_mission_filepath)
+exif_metadata = read_csv(exif_metadata_filepath)
 
+# dataset_id is confusing so it is just dropped in general
+# In the context of a mission, the sub_mission_id has different meanings in baserow and the exif.
+# In baserow, it means the list of sub-missions included in the mission that a given image is part of.
+# In the exif it is just the sub-mission that a given image is a part of.
+baserow_mission = subset(baserow_mission, select = -c(dataset_id, sub_mission_id))
+baserow_sub_mission = subset(baserow_sub_mission, select = -dataset_id)
 
-# Combine at the mission level
-metadata_mission = left_join(exif_mission, baserow_mission, by = c("dataset_id" = "dataset_id"))
-metadata_sub_mission = left_join(exif_sub_mission, baserow_sub_mission, by = c("dataset_id" = "dataset_id"))
-
+metadata_mission = left_join(
+  exif_metadata,
+  baserow_mission,
+  by = c("mission_id" = "mission_id"),
+)
+metadata_sub_mission = left_join(
+  exif_metadata,
+  baserow_sub_mission,
+  by = c("sub_mission_id" = "sub_mission_id", "mission_id" = "mission_id"),
+)
 
 # Write the result
 write_csv(metadata_mission, full_metadata_mission_filepath)

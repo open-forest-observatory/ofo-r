@@ -43,12 +43,10 @@ for (dataset in datasets) {
 scenarios$output_path = METASHAPE_OUTPUT_PATH
 scenarios$project_path = METASHAPE_PROJECT_PATH
 
-scenarios
-
 make_derived_configs(
   base_yaml_filepath = BASE_YAML_FILEPATH,
   scenarios,
   derived_yaml_out_folder = derived_yaml_out_folder,
   automate_metashape_path = AUTOMATE_METASHAPE_PATH,
-  n_shell_splits = N_SHELL_SPLITS
+  n_shell_splits = min(N_SHELL_SPLITS, nrow(scenarios)) # Make sure we don't request more splits than config files
 )

@@ -26,8 +26,28 @@ extract_flight_speed = function(metadata) {
 # image_merge_distance: The horizontal distance between images below which they are merged into one
 # mission polygon. Keep only contiguous patches > min_contig_area.
 #' @export
-extract_mission_polygon = function(metadata, image_merge_distance, min_contig_area = 1600, boundary_method = "dilate_erode") {
-  # TODO we could check that it's a meters-based projected CRS
+extract_mission_polygon = function(
+    metadata,
+    dataset_id,
+    image_merge_distance,
+    min_contig_area = 1600,
+    boundary_method = "dilate_erode",
+    simplification_tol = 10.0,
+    identify_images_in_polygon = FALSE) {
+  # Check if the data is a data_frame, in which case it needs to be converted into an SF object.
+  # Otherwise, it's assumed to be a valid SF object.
+  if (is.data.frame(metadata)) {
+    # TODO ensure that these columns are always the correct/only ones to use
+    metadata = sf::st_as_sf(metadata, crs = 4326, coords = c("lon", "lat"))
+  }
+
+  # Retain the initial CRS to transform back to at the end
+  initial_crs = sf::st_crs(metadata)
+
+  # Transform to a meters-based CRS that is appropriate for that region
+  metadata = transform_to_local_utm(metadata)
+
+  # Extract the boundary using one of two different methods
   if (boundary_method == "concaveman") {
     poly = concaveman::concaveman(metadata, concavity = 4)
     poly = poly |> sf::st_cast("MULTIPOLYGON")
@@ -42,10 +62,10 @@ extract_mission_polygon = function(metadata, image_merge_distance, min_contig_ar
 
   n_polys = length(sf::st_geometry(poly)[[1]])
 
+  # Error out if there are no contigious images
   if (n_polys == 0) {
-    stop("No contiguous images in dataset ", metadata$dataset_id[1])
+    stop("No contiguous images in dataset ", dataset_id)
   }
-
 
   # Check if multipolygon and if so, keep only the poly parts > min aea, and if any removed, return
   # warning of how many removed
@@ -60,21 +80,47 @@ extract_mission_polygon = function(metadata, image_merge_distance, min_contig_ar
       sf::st_cast("MULTIPOLYGON")
 
     n_polys_filtered = length(parts_filtered)
-    # TODO it's possible all polygons could be filtered out in this step
 
+    # TODO it's possible all polygons could be filtered out in this step
     if (n_polys_filtered < n_polys) {
-      warning(n_polys, " non-contiguous image clusters in dataset ", metadata$dataset_id[1], ". Retaining only the ", n_polys_filtered, " clusters with area > ", min_contig_area, " m^2.")
+      warning(
+        n_polys,
+        " non-contiguous image clusters in dataset ",
+        dataset_id,
+        ". Retaining only the ",
+        n_polys_filtered,
+        " clusters with area > ",
+        min_contig_area,
+        " m^2."
+      )
     } else {
-      warning(n_polys, " non-contiguous image clusters in dataset ", metadata$dataset_id[1], ". Retaining all becaus all have area > ", min_contig_area, " m^2.")
+      warning(
+        n_polys,
+        " non-contiguous image clusters in dataset ",
+        dataset_id,
+        ". Retaining all becaus all have area > ",
+        min_contig_area,
+        " m^2."
+      )
     }
-  } else if (n_polys == 0) {
-    stop("No contiguous images in dataset ", metadata$dataset_id[1])
+  }
+  # Simplify the polygon
+  simplified_poly = sf::st_simplify(poly, dTolerance = simplification_tol) |> sf::st_cast("MULTIPOLYGON")
+
+  # Identify which images are within the polygon if requested
+  if (identify_images_in_polygon) {
+    # increase the region to account for the simplified polygon
+    simplified_poly_buffer = simplified_poly |> sf::st_buffer(simplification_tol)
+    intersection_idxs = sf::st_intersects(metadata, simplified_poly_buffer, sparse = FALSE)
+    # Transform back to the initial CRS
+    simplified_poly = sf::st_transform(simplified_poly, crs = initial_crs) |> sf::st_cast("MULTIPOLYGON")
+
+    return(list(polygon = simplified_poly, intersection_idxs = intersection_idxs))
   }
 
-
-  polysimp = sf::st_simplify(poly, dTolerance = 10) |> sf::st_cast("MULTIPOLYGON")
-
-  return(polysimp)
+  # Transform back to the initial CRS
+  simplified_poly = sf::st_transform(simplified_poly, crs = initial_crs)
+  return(simplified_poly)
 }
 
 # Extract camera pitch, detecting if smart oblique, and if so, report the oblique value (which is
@@ -498,50 +544,24 @@ extract_file_format_summary <- function(metadata) {
 # than min_contig_areain m^2 (could be multiple clumps). It will always include the largest clump, even if
 # it is smaller than min_contig_area.
 #' @export
-extract_imagery_dataset_metadata = function(metadata,
-                                            plot_flightpath = FALSE,
-                                            crop_to_contiguous = TRUE,
-                                            min_contig_area = 1600) {
-
+extract_imagery_dataset_metadata = function(metadata, mission_polygon, dataset_id) {
   # Print which dataset is being processed
-  dataset_id = metadata$dataset_id[1]
   message("Processing dataset ", dataset_id, "...")
 
-  # Convert from dataframe to SF object
-  # TODO ensure that these columns are always the correct/only ones to use
+  # Transform dataframe into sf object
   metadata = sf::st_as_sf(metadata, crs = 4326, coords = c("lon", "lat"))
-  # Transform to a meters-based CRS that is appropriate for that region
-  metadata_proj = transform_to_local_utm(metadata)
-  # Compute geospatial features
-  mission_polygon = extract_mission_polygon(metadata_proj, image_merge_distance = 50, min_contig_area = min_contig_area)
-
-  if (crop_to_contiguous) {
-    # Keep only the images within the largest contiguous patch of images, buffered to 10 m to
-    # account for the simplified polygon
-    # TODO ensure that the CRS is set appropriately
-    polygon_proj_buffer = mission_polygon |> sf::st_buffer(10)
-    intersection_idxs = sf::st_intersects(metadata_proj, polygon_proj_buffer, sparse = FALSE)
-    # Now go back to the original metadata df
-    full_metadata_length = nrow(metadata)
-    metadata = metadata[intersection_idxs[, 1], ]
-    cropped_metadata_length = nrow(metadata)
-    if (cropped_metadata_length < full_metadata_length) {
-      n_cropped = full_metadata_length - cropped_metadata_length
-      message("Dropped ", n_cropped, " images that were not within the largest contiguous patch(es) of images retained for dataset ", dataset_id, ".")
-    }
-  }
 
   # If there are < 10 images left in the largest contiguoug polygon, skip
   if (nrow(metadata) < 10) {
-    message("Less than 10 images in the largest contiguous patch of images retained for dataset ", dataset_id, "; skipping metadata extraction.")
+    message(
+      "Less than 10 images in the largest contiguous patch of images retained for dataset ",
+      dataset_id,
+      "; skipping metadata extraction."
+    )
     return()
   }
 
-  # Extract the IDs of the images that were retained
-  images_retained = metadata$image_id
-
   # Extract/compute metadata attributes
-  dataset_id = extract_dataset_id_summary(metadata)
   flight_speed_derived = extract_flight_speed(metadata)
   flight_terrain_correlation_derived = extract_flight_terrain_correlation(metadata)
   camera_pitch = extract_camera_pitch_summary(metadata)
@@ -560,7 +580,6 @@ extract_imagery_dataset_metadata = function(metadata,
   file_format_derived = extract_file_format_summary(metadata)
 
   dataset_metadata = data.frame(
-    dataset_id,
     flight_speed_derived,
     flight_terrain_correlation_derived,
     camera_pitch, # this is a multi-column dataframe; preserving its column names
@@ -578,8 +597,5 @@ extract_imagery_dataset_metadata = function(metadata,
     file_format_derived
   )
 
-  mission_polygon = sf::st_as_sf(mission_polygon)
-  mission_polygon$dataset_id = dataset_id
-
-  return(list(dataset_metadata = dataset_metadata, mission_polygon = mission_polygon, images_retained = images_retained))
+  return(dataset_metadata)
 }
