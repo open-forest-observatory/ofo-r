@@ -13,13 +13,26 @@ METASHAPE_OUTPUTS_PATH = "/ofo-share/drone-imagery-processed/01/metashape-output
 PHOTOGRAMMETRY_PUBLISH_PATH = "/ofo-share/drone-imagery-processed/01/photogrammetry-publish"
 MISSION_FOOTPRINTS_PATH = "/ofo-share/drone-imagery-organization/3c_metadata-extracted/all-mission-polygons-w-metadata.gpkg"
 
+# Visualize products as they are being created
 VISUALIZE = FALSE
+# Skip output files already present on disk. Does not check for validity.
 SKIP_EXISTING = FALSE
 
-RUN_CONVERSION = FALSE
+# Move data to the publish_path and run cropping and conversion to cloud optimized format if
+# appropriate for that file type
+RUN_CONVERSION = TRUE
+# Create the canopy height model
 RUN_CHM = TRUE
+# Create the thumbnail image preview from raster data
 RUN_THUMBNAIL = TRUE
 
+# Upper/lower bounds for which dataset IDs to process
+CONVERSION_LOWER_BOUND_DATASET = 1
+CONVERSION_UPPER_BOUND_DATASET = 10e+6
+
+# What fraction of the system RAM can TERRA use. The terra default is 0.6, you cannot go above 0.9
+# without a warning.
+TERRA_MEMFRAC = 0.9
 
 RELEVANT_FILETYPES = c("dsm-ptcloud.tif", "dsm-mesh.tif", "dtm-ptcloud.tif", "model_local.ply", "model_georeferenced.ply", "ortho_dsm-mesh.tif", "cameras.xml", "points.laz", "log.txt")
 
@@ -33,7 +46,7 @@ get_timestamp = function(filename) {
   return(substr(filename, start = 8, stop = 20))
 }
 
-list_photogrammetry_outputs = function(input_folder) {
+list_photogrammetry_outputs = function(input_folder, lower_bounds_dataset = 0, upper_bound_dataset = 1e+06) {
   # List all files that start with six digits
   files = as.vector(list.files(input_folder, "^[0-9]{6}_"))
   # Extract the dataset IDs and timestamps from these filenames
@@ -46,6 +59,15 @@ list_photogrammetry_outputs = function(input_folder) {
     dataset_ID = dataset_ids,
     timestamp = timestamps
   )
+
+  # Convert dataset_ids to indices and determine which ones are within the specified range of IDs
+  int_dataset_ids = strtoi(dataset_ids, base = 10)
+  elements_in_bounds = which(
+    (int_dataset_ids >= lower_bounds_dataset) &
+      (int_dataset_ids <= upper_bound_dataset)
+  )
+  # Only retain the rows for datasets within the specified IDs
+  processed_files = processed_files[elements_in_bounds, ]
 
   processing_runs = processed_files |>
     dplyr::select(-file) |>
@@ -156,6 +178,8 @@ convert_to_cloud_optimized = function(
         # Convert the polygon to the same CRS
         raster_crs = terra::crs(raster)
         mission_polygon_in_raster_crs = sf::st_transform(mission_polygon, raster_crs)
+        # Crop the raster to the minimum bounding rectangle of the polygon, filling in pixels outside
+        # the bounds with nan.
         cropped_raster = terra::crop(raster, mission_polygon_in_raster_crs, mask = TRUE)
 
         # Visualize if requested
@@ -164,7 +188,15 @@ convert_to_cloud_optimized = function(
           plot(mission_polygon_in_raster_crs["geom"], add = TRUE)
         }
         # Write out the cropped raster as a cloud-optimized geotif
-        terra::writeRaster(cropped_raster, output_file_path, filetype = "COG", overwrite = TRUE)
+        # Use bigtiff format if the size might be bigger than 4GB after compression. According to
+        # the docs, this is a heuristic and may fail. An alternative is "YES" to force bigtiff
+        terra::writeRaster(
+          cropped_raster,
+          output_file_path,
+          overwrite = TRUE,
+          filetype = "COG",
+          gdal = "BIGTIFF=IF_SAFER"
+        )
       } else if (extension == "laz") {
         # Process pointcloud data
         # Read the pointcloud
@@ -321,10 +353,15 @@ generate_thumbnails = function(exported_data_folder, output_max_dim = 512, skip_
 
 
 ## Workflow
+terra::terraOptions(memfrac = TERRA_MEMFRAC)
 
 if (RUN_CONVERSION) {
   # Get all the output files from photogrammetry
-  photogrammetry_outputs = list_photogrammetry_outputs(METASHAPE_OUTPUTS_PATH)
+  photogrammetry_outputs = list_photogrammetry_outputs(
+    METASHAPE_OUTPUTS_PATH,
+    CONVERSION_LOWER_BOUND_DATASET,
+    CONVERSION_UPPER_BOUND_DATASET
+  )
   # Convert data to cloud optimized format
   convert_to_cloud_optimized(
     MISSION_FOOTPRINTS_PATH,
