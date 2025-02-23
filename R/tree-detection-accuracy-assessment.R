@@ -128,6 +128,8 @@ prep_pred_map = function(pred, obs_bound, edge_buffer) {
   # Crop the predicted map to the observed map
   pred = sf::st_intersection(pred, obs_bound)
 
+  if(nrow(pred) == 0) return(pred)
+
   # Assign an incremental unique ID to each predicted tree
   pred$pred_tree_id = 1:nrow(pred)
 
