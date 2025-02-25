@@ -60,6 +60,7 @@ make_derived_yaml = function(cfg_base, replacements, derived_yaml_dir) {
 
 # Take a base yaml file and a set of scenarios (value replacements for specific keys) and write them
 # all
+#' @export
 make_derived_configs = function(base_yaml_filepath,
                                 scenarios, derived_yaml_out_folder = "",
                                 automate_metashape_path = "",
