@@ -138,7 +138,7 @@ convert_to_cloud_optimized = function(
     dataset_ID = row[["dataset_ID"]]
 
     # Determine the corresponding mission polygon
-    mission_polygon = mission_polygons[mission_polygons$dataset_id == dataset_ID, ]
+    mission_polygon = mission_polygons[mission_polygons$mission_id == dataset_ID, ]
 
     # Construct the output folder and create it if needed
     output_folder = file.path(cloud_optimized_output_folder, dataset_ID, paste0("processed-", timestamp), "full")
