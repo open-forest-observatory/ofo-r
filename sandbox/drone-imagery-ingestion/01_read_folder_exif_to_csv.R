@@ -35,19 +35,28 @@ get_image_data = function(dataset_folder) {
   date_null = is.null(exif$DateTimeOriginal)
   model_null = is.null(exif$Model)
   serialnumber_null = is.null(exif$SerialNumber)
-  if(date_null || model_null || serialnumber_null) {
+
+  if (date_null || model_null) {
     warning("Null values (likely complete image corruption) found in ", base_folder, ". Skipping.")
     return(NULL)
   }
 
-  image_data_onefolder = data.frame(folder_in = base_folder,
-                           image_path = image_filepaths,
-                           date = exif$DateTimeOriginal,
-                           model = exif$Model,
-                           serialnumber = exif$SerialNumber)
+  # If the serial number is missing (as in the case of the Matrice 100) replace it with the model
+  if (serialnumber_null) {
+    serial_number = exif$Model
+  } else {
+    serial_number = exif$SerialNumber
+  }
+
+  image_data_onefolder = data.frame(
+    folder_in = base_folder,
+    image_path = image_filepaths,
+    date = exif$DateTimeOriginal,
+    model = exif$Model,
+    serialnumber = serial_number
+  )
 
   return(image_data_onefolder)
-
 }
 
 
