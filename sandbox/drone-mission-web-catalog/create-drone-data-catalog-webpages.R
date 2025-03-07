@@ -99,6 +99,10 @@ reset_detail_dirs(
   MISSION_DETAILS_DATATABLE_DIR
 )
 
+# Add dataset_id field to match expected format
+mission_polygons_w_summary_data$dataset_id = mission_polygons_w_summary_data$mission_id
+mission_points$dataset_id = mission_points$mission_id
+
 ## Loop through each mission and make a details page, including its media (map and datatable)
 make_mission_details_pages(
   mission_summary = mission_polygons_w_summary_data,
