@@ -33,13 +33,31 @@ metadata_mission_filepath = file.path(EXTRACTED_METADATA_PATH, paste0("mission-b
 
 
 # Pull in the baserow (human-entered) metadata
-baserow = read_csv(file.path(BASEROW_DATA_PATH, "export - datasets-imagery.csv"))
-dataset_associations = read.csv(file.path(BASEROW_DATA_PATH, "export - dataset-associations - Grid.csv"))
+baserow_datasets = read_csv(file.path(BASEROW_DATA_PATH, "export - datasets-imagery.csv"))
+baserow_projects = read_csv(file.path(BASEROW_DATA_PATH, "export - acquisition-projects.csv"))
+baserow_dataset_associations = read.csv(file.path(BASEROW_DATA_PATH, "export - dataset-associations - Grid.csv"))
 
 # Fix the formatting of the Baserow dataset_id, and remove the internal baserow 'id' column
-baserow = baserow |>
+baserow_datasets = baserow_datasets |>
   mutate(dataset_id = str_pad(dataset_id, 6, pad = "0", side = "left")) |>
   select(-id)
+
+# Merge some project-level data into the dataset-level data:
+# - contributor_names
+# - contact_info
+# - license
+# - objectives
+baserow_projects = baserow_projects |>
+  select(project_id, contributor_names, contact_info, license, objectives)
+baserow_datasets = baserow_datasets |>
+  left_join(baserow_projects, by = c("project_id" = "project_id")) |>
+  select(-project_id)
+
+# Apply any dataset-level contributor overrides
+baserow_datasets = baserow_datasets |>
+  mutate(contributor_names = ifelse(!is.na(contributor_names_override), contributor_names_override, contributor_names),
+         contact_info = ifelse(!is.na(contact_info_override), contact_info_override, contact_info)) |>
+  select(-contributor_names_override, contact_info_override)
 
 
 # Load the crosswalk linking sub-dataset folder names to baserow rows. If there is more than one sub-mission for
@@ -53,7 +71,7 @@ crosswalk = read_csv(crosswalk_filepath)
 # pulled from both matching baserow rows and concatenated
 
 # Start with the sub-mission-level Baserow attributes
-sub_mission_baserow = left_join(crosswalk, baserow, by = c("dataset_id_baserow" = "dataset_id")) |>
+sub_mission_baserow = left_join(crosswalk, baserow_datasets, by = c("dataset_id_baserow" = "dataset_id")) |>
   select(-dataset_id_baserow) |>
   rename(sub_mission_id = dataset_id_imagefolder) |>
   # Get the mission ID as the first part of the sub-mission ID
@@ -89,7 +107,7 @@ mission_baserow = sub_mission_baserow |>
 # mission IDs, not sub-mission IDs) from the dataset_associations table that have an association
 # type of "multi-orientation"
 
-grid_missions = dataset_associations |>
+grid_missions = baserow_dataset_associations |>
   filter(assoc_type == "multi-orientation") |>
   pull(dataset_ids) |>
   str_split(pattern = ",") |>
