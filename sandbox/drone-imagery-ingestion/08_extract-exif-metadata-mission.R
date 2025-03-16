@@ -3,10 +3,6 @@
 # two-part grid mission) and extract/process into human-readable metadata at the image level and
 # sub-mission level using the metadata extraction functions of the ofo package.
 
-# TODO: This script is very similar to script 07_extract-exif-metadata-sub-mission.R, but it
-# operates at the mission level instead of the sub-mission level. Consider refactoring into (more)
-# shared functions to reduce repetition.
-
 library(tidyverse)
 library(sf)
 
@@ -50,21 +46,28 @@ compute_polygons_and_images_retained = function(image_metadata, column_to_split_
   # Those unique values are used as the dataset_id for logging purposes
   dataset_ids = names(split_metadata)
 
-  # Extract the polygons for each chunk of metadata
+  # Extract the polygons for each chunk (mission or sub-mission) of metadata
   polygons_and_inds = furrr::future_map2(
     split_metadata,
     dataset_ids,
     extract_mission_polygon,
     image_merge_distance = 50,
-    identify_images_in_polygon = TRUE
+    identify_images_in_polygon = TRUE,
+    .options = furrr::furrr_options(seed = TRUE)
   )
-  polygons = dplyr::bind_rows(purrr::map(polygons_and_inds, "polygon"))
+
+  polygons_sfc = purrr::map(polygons_and_inds, "polygon")
+  polygons_sf = purrr::map(polygons_sfc, st_as_sf)
+
   intersection_idxs = unlist(purrr::map(polygons_and_inds, "intersection_idxs"))
+  # ^ It's not really indexes but a boolean vector with a value for all images, indicating whether
+  # they are retained in the polygon
+
   # Re-assemble the image metadata in the same order as the intersection IDs
-  unsplit_metadata = dplyr::bind_rows(split_metadata)
+  unsplit_metadata = dplyr::bind_rows(split_metadata) # Or can we just use `image_metadata`?
   retained_image_IDs = unsplit_metadata[intersection_idxs, ]$image_id
 
-  return(list(polygons = polygons, retained_image_IDs = retained_image_IDs))
+  return(list(polygons = polygons_sf, retained_image_IDs = retained_image_IDs))
 }
 
 compute_and_save_summary_statistics = function(
@@ -99,26 +102,20 @@ compute_and_save_summary_statistics = function(
   # Write out
   readr::write_csv(summaries_perdataset, metadata_perdataset_filepath)
 
-  # Write out the results
-  ## The per-dataset summary statistics
-  # readr::write_csv(summaries_perdataset, metadata_perdataset_filepath)
-  # Apply several steps to transform the polygons into the appropriate format. The polygons begin
-  # as a named list, with the names corresponding to the dataset ID ("column_to_split_on"). The
-  # goal is to convert it to a sf object with each row representing a different dataset ID and the
-  # associated multi-polygon bounds.
-  # Convert into a dataframe
-  polygons_perdataset_df = do.call(rbind, polygons_perdataset)
-  # And then a tibble
-  polygons_perdataset_tbl = dplyr::as_tibble(polygons_perdataset_df)
-  # The tibble no longer has the dataset IDs, so add those back
-  polygons_perdataset_tbl[column_to_split_on] = row.names(polygons_perdataset_df)
-  # Rename the unnamed column to geometry and the misssion_id to dataset_id
-  polygons_perdataset_tbl = dplyr::rename(polygons_perdataset_tbl, "geometry" = "V1")
-  # Convert to a sf object and then write
-  # TODO in the future we might want to ensure that all the polygons have the same CRS but for now
-  # they should all be EPSG::4326
-  crs = sf::st_crs(polygons_perdataset[[1]])
-  polygons_perdataset_sf = sf::st_as_sf(polygons_perdataset_tbl, crs = crs)
+  # Transform the polygons into the appropriate format. The polygons begin as a named list, with the
+  # names corresponding to the dataset ID ("column_to_split_on"). The goal is to convert it to a sf
+  # object with each row representing a different dataset ID and the associated multi-polygon
+  # bounds.
+
+  polygons_perdataset_sf = dplyr::bind_rows(polygons_perdataset)
+  polygons_perdataset_sf[, column_to_split_on] = names(polygons_perdataset)
+
+  # TODO: ^ the geometry col is named 'x', may need to rename 'geometry', or may not be necessary
+  # since it seems to save correctly
+
+  # TODO: ^ in the future we might want to ensure that all the polygons have the same CRS but for
+  # now they should all be EPSG::4326, and the bind_rows step should error out if they don't
+
   sf::st_write(polygons_perdataset_sf, polygons_filepath, delete_dsn = TRUE)
 }
 
@@ -138,12 +135,20 @@ images_retained_in_both = intersect(
   mission_res$retained_image_IDs, sub_mission_res$retained_image_IDs
 )
 
-# TODO consider reporting how many were droppped per dataset
 # Filter the image metadata to only include data for those images
+# TODO consider reporting how many were droppped per dataset
 image_metadata = image_metadata |> filter(image_id %in% images_retained_in_both)
 
 # Write out the the filtered subset
 write_csv(image_metadata, metadata_perimage_subset_filepath)
+
+# Re-compute the polygons now that extraneous images have been filtered out
+mission_res = compute_polygons_and_images_retained(
+  image_metadata = image_metadata, column_to_split_on = "mission_id"
+)
+sub_mission_res = compute_polygons_and_images_retained(
+  image_metadata = image_metadata, column_to_split_on = "sub_mission_id"
+)
 
 # Create the output folder
 create_dir(EXTRACTED_METADATA_PATH)
