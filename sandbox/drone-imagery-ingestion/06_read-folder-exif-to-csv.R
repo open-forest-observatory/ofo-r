@@ -7,7 +7,9 @@ library(tidyverse)
 library(exifr)
 library(furrr)
 
-devtools::load_all()
+# devtools::install("/ofo-share/utils/ofo-r/")
+
+library(ofo)
 
 # Handle difference in how the current directory is set between debugging and command line call
 if (file.exists("sandbox/drone-imagery-ingestion/imagery_project_name.txt")) {
