@@ -7,7 +7,7 @@ library(tidyverse)
 library(exifr)
 library(furrr)
 
-# devtools::install("/ofo-share/utils/ofo-r/")
+# devtools::install()
 
 library(ofo)
 
