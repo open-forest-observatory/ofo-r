@@ -6,8 +6,12 @@
 library(tidyverse)
 library(sf)
 
-# devtools::document(); devtools::install()
+# devtools::document()
+# devtools::install()
 library(ofo)
+
+IMAGE_MERGE_DISTANCE = 50
+
 
 # Handle difference in how the current directory is set between debugging and command line call
 if (file.exists("sandbox/drone-imagery-ingestion/imagery_project_name.txt")) {
@@ -16,6 +20,11 @@ if (file.exists("sandbox/drone-imagery-ingestion/imagery_project_name.txt")) {
   IMAGERY_PROJECT_NAME_FILE = "imagery_project_name.txt"
 }
 IMAGERY_PROJECT_NAME = read_lines(IMAGERY_PROJECT_NAME_FILE)
+
+# For NRS datasets, use a larger merge distance because some datasets used very low overlap
+if (IMAGERY_PROJECT_NAME %in% c("2020-ucnrs", "2023-ucnrs", "2024-ucnrs")) {
+  IMAGE_MERGE_DISTANCE = 100
+}
 
 BASEROW_DATA_PATH = "/ofo-share/drone-imagery-organization/ancillary/baserow-snapshots"
 FOLDER_BASEROW_CROSSWALK_PATH = "/ofo-share/drone-imagery-organization/1c_exif-for-sorting/"
@@ -40,7 +49,7 @@ metadata_per_sub_mission_filepath = file.path(EXTRACTED_METADATA_PATH, paste0("s
 sub_mission_polygons_filepath = file.path(EXTRACTED_METADATA_PATH, paste0("sub-mission-polygons_", IMAGERY_PROJECT_NAME, ".gpkg"))
 
 ## Functions
-compute_polygons_and_images_retained = function(image_metadata, column_to_split_on) {
+compute_polygons_and_images_retained = function(image_metadata, column_to_split_on, image_merge_distance) {
   # Split the metadata by the values in the requested column
   split_metadata = split(image_metadata, image_metadata[[column_to_split_on]])
   # Those unique values are used as the dataset_id for logging purposes
@@ -51,23 +60,36 @@ compute_polygons_and_images_retained = function(image_metadata, column_to_split_
     split_metadata,
     dataset_ids,
     extract_mission_polygon,
-    image_merge_distance = 50,
+    image_merge_distance = image_merge_distance,
     identify_images_in_polygon = TRUE,
     .options = furrr::furrr_options(seed = TRUE)
   )
 
+  # get count of retained images per dataset
+  intersection_image_ids = purrr::map(polygons_and_inds, "intersection_image_ids")
+  image_counts = purrr::map(intersection_image_ids, length)
+
+  # get the ones that had < 10 images retained
+  too_few_images_bool = image_counts < 10
+
+  if (any(too_few_images_bool)) {
+    too_few_images_names = names(which(too_few_images_bool))
+    too_fes_images_names_string = paste(too_few_images_names, collapse = ", ")
+    warning(
+      paste0("The following missions/sub-missions had fewer than 10 images retained in the computed polygons and were dropped entirely: ", too_fes_images_names_string)
+    )
+  }
+
+  # Drop the polygons (and image IDs) that had too few images retained
+  polygons_and_inds = polygons_and_inds[!too_few_images_bool]
+
   polygons_sfc = purrr::map(polygons_and_inds, "polygon")
   polygons_sf = purrr::map(polygons_sfc, st_as_sf)
+  intersection_image_ids = purrr::map(polygons_and_inds, "intersection_image_ids")
 
-  intersection_idxs = unlist(purrr::map(polygons_and_inds, "intersection_idxs"))
-  # ^ It's not really indexes but a boolean vector with a value for all images, indicating whether
-  # they are retained in the polygon
+  intersection_image_ids = unlist(intersection_image_ids, use.names = FALSE)
 
-  # Re-assemble the image metadata in the same order as the intersection IDs
-  unsplit_metadata = dplyr::bind_rows(split_metadata) # Or can we just use `image_metadata`?
-  retained_image_IDs = unsplit_metadata[intersection_idxs, ]$image_id
-
-  return(list(polygons = polygons_sf, retained_image_IDs = retained_image_IDs))
+  return(list(polygons = polygons_sf, retained_image_IDs = intersection_image_ids))
 }
 
 compute_and_save_summary_statistics = function(
@@ -124,10 +146,14 @@ compute_and_save_summary_statistics = function(
 image_metadata = read_csv(metadata_perimage_input_filepath)
 
 mission_res = compute_polygons_and_images_retained(
-  image_metadata = image_metadata, column_to_split_on = "mission_id"
+  image_metadata = image_metadata,
+  column_to_split_on = "mission_id",
+  image_merge_distance = IMAGE_MERGE_DISTANCE
 )
 sub_mission_res = compute_polygons_and_images_retained(
-  image_metadata = image_metadata, column_to_split_on = "sub_mission_id"
+  image_metadata = image_metadata,
+  column_to_split_on = "sub_mission_id",
+  image_merge_distance = IMAGE_MERGE_DISTANCE
 )
 
 # Compute the images that were retained in both the mission polygons and the sub-mission polygons
@@ -144,10 +170,14 @@ write_csv(image_metadata, metadata_perimage_subset_filepath)
 
 # Re-compute the polygons now that extraneous images have been filtered out
 mission_res = compute_polygons_and_images_retained(
-  image_metadata = image_metadata, column_to_split_on = "mission_id"
+  image_metadata = image_metadata,
+  column_to_split_on = "mission_id",
+  image_merge_distance = IMAGE_MERGE_DISTANCE
 )
 sub_mission_res = compute_polygons_and_images_retained(
-  image_metadata = image_metadata, column_to_split_on = "sub_mission_id"
+  image_metadata = image_metadata,
+  column_to_split_on = "sub_mission_id",
+  image_merge_distance = IMAGE_MERGE_DISTANCE
 )
 
 # Create the output folder

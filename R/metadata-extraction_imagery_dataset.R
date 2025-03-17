@@ -107,15 +107,38 @@ extract_mission_polygon = function(
   # Simplify the polygon
   simplified_poly = sf::st_simplify(poly, dTolerance = simplification_tol) |> sf::st_cast("MULTIPOLYGON")
 
+  # If the polygon was simplified so much that it became empty, then redo with less simp
+  if (sf::st_is_empty(simplified_poly)) {
+    simplified_poly = sf::st_simplify(poly,
+                                      dTolerance = simplification_tol / 10) |>
+      sf::st_cast("MULTIPOLYGON")
+  }
+
+  if (sf::st_is_empty(simplified_poly)) {
+    simplified_poly = sf::st_simplify(poly,
+                                      dTolerance = simplification_tol / 100) |>
+      sf::st_cast("MULTIPOLYGON")
+  }
+
+  if (sf::st_is_empty(simplified_poly)) {
+    warning("Simplification of polygon for mission/sub-mission",
+            dataset_id,
+            "resulted in an empty polygon. No images will be retained.")
+  }
+
   # Identify which images are within the polygon if requested
   if (identify_images_in_polygon) {
     # increase the region to account for the simplified polygon
     simplified_poly_buffer = simplified_poly |> sf::st_buffer(simplification_tol)
-    intersection_idxs = sf::st_intersects(metadata, simplified_poly_buffer, sparse = FALSE)
+    intersection_mat = sf::st_intersects(metadata, simplified_poly_buffer, sparse = FALSE)
+    # Does the image intersect any of the polygons?
+    intersection_bool = apply(intersection_mat, 1, any) 
+    # Get the image IDs of the images that intersect the polygon
+    intersection_image_ids = metadata[intersection_bool, ]$image_id
     # Transform back to the initial CRS
     simplified_poly = sf::st_transform(simplified_poly, crs = initial_crs) |> sf::st_cast("MULTIPOLYGON")
 
-    return(list(polygon = simplified_poly, intersection_idxs = intersection_idxs))
+    return(list(polygon = simplified_poly, intersection_image_ids = intersection_image_ids))
   }
 
   # Transform back to the initial CRS
