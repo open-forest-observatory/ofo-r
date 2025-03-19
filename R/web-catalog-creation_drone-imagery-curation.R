@@ -1,16 +1,27 @@
 
 # Pull in all attributes to the plot summary table, compute relevant columns for display, (like
 # plot area in ha instead of m2), round numeric columns, create links to project and dataset pages
-compile_mission_summary_data = function(mission_level_metadata, base_ofo_url, mission_details_dir) {
+compile_mission_summary_data = function(mission_level_metadata, base_ofo_url, mission_details_dir, dataset_type = "mission") {
+  # dataset_type can be "mission" or "sub-mission"
 
-  # TODO: join relevant data to the mission metadata
+  # TODO: The dataset_id determination is flexible to either mission or sub-mission, but there is
+  # other hardcoded references to mission that would need to be updated if sub-mission is a
+  # possibility
 
-  # Select relevant columns to display
+  if (dataset_type == "mission") {
+    dataset_id_column = "mission_id"
+  } else if (dataset_type == "sub-mission") {
+    dataset_id_column = "sub_mission_id"
+  } else {
+    stop("dataset_type must be either 'mission' or 'sub-mission'")
+  }
+
+  mission_level_metadata$dataset_id = pull(mission_level_metadata, dataset_id_column)
+
+  # Pre-process the display text for the relevant attributes, based on the metadata in the database
   d = mission_level_metadata |>
     dplyr::mutate(
       overlap_combined_nominal = paste(overlap_front_nominal, overlap_side_nominal, sep = "/"),
-      license = "CC-BY 4.0",
-      creator = "Dr. Derek Young and UC Davis FOCAL Lab",
       dataset_id_link = paste0('<a href="', base_ofo_url, mission_details_dir, dataset_id, '/"', ' target="_PARENT">', dataset_id, "</a>"),
       time_range_local_derived = paste0(earliest_time_local_derived, " to ", latest_time_local_derived),
       overlap_front_side_nominal = paste0(overlap_front_nominal, "/", overlap_side_nominal),
@@ -18,6 +29,27 @@ compile_mission_summary_data = function(mission_level_metadata, base_ofo_url, mi
       altitude_agl_mean_derived = NA,
       embargoed = FALSE, # Dummy, need to remove if add this attribute to the database
       display_message = NA) # Dummy, need to remove if add this attribute to the database
+  
+  # Image count is currently a list of sub-mission image counts. Turn it into a total with
+  # sub-counts in the format: "total (sub1 + sub2 + sub3 + ...)"
+  image_counts_sep = str_split(d$n_images, fixed(", "))
+  totals = sapply(image_counts_sep, function(x) sum(as.numeric(x)))
+
+  make_sub_count = function(x) {
+    if (length(x) > 1) {
+      x = paste0("(", paste(x, collapse = " + "), ")")
+      return(x)
+    } else {
+      return("")
+    }
+  }
+
+  sub_counts = sapply(image_counts_sep, make_sub_count)
+
+  d$image_count_w_subtotals = paste(totals, sub_counts)
+
+  # remove trailing whitespace
+  d$image_count_w_subtotals = gsub("\\s+$", "", d$image_count_w_subtotals)
 
   return(d)
 
@@ -342,7 +374,7 @@ make_mission_details_datatable = function(mission_summary_foc,
       "File format" = file_format_derived,
       "Project ID" = project_id,
       "Contributor dataset name" = contributor_dataset_name,
-      "Creator" = creator,
+      "Creator" = contributor_names,
       "License" = license
     ) |>
       # Pivot longer
