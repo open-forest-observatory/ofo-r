@@ -331,6 +331,117 @@ make_mission_details_map = function(mission_summary_foc,
 
 
 
+#### Make mission-level leaflet map of image points and flight path
+make_itd_map = function(mission_summary_foc,
+                                    itd_points_foc,
+                                    mission_polygons_for_mission_details_map,
+                                    mission_centroids,
+                                    website_static_path,
+                                    leaflet_header_files_dir,
+                                    itd_map_dir) {
+
+  dataset_id = mission_summary_foc$dataset_id
+
+  #mission_summary_foc is the polygon. Buffer it in by 10 because that's the area if detected trees
+  #that we retained
+
+  mission_summary_foc = mission_summary_foc |>
+    transform_to_local_utm() |>
+    st_buffer(-10) |>
+    st_transform(4326)
+
+  itd_points_foc = itd_points_foc |>
+    mutate(height = round(Z, 1)) |>
+    # Create a popup text
+    mutate(popup = paste0("<b>Height: </b>", height, " m<br> 
+                          <b>Predicted species: </b> <i>coming soon</i><br>")) |>
+    st_transform(4326)
+
+  # Optoinal addl rows for popup
+    #   "<b>Altitude ASL: </b>", altitude_asl_drone, " m<br>",
+    # "<b>Camera pitch: </b>", camera_pitch, " deg<br>",
+    # "<b>RTK fix: </b>", rtk_fix, "<br>",
+    # "<b>Capture datetime: </b>", datetime_local, "<br>",
+    # "<b>Hours elapsed: </b>", round(hours_elapsed, 2), "<br>",
+    # "<b>Sub-mission: </b>", sub_mission
+
+  # Make leaflet map
+
+  js_for_legend = function(x) {
+    htmlwidgets::onRender(x, "
+      function(el, x) {
+        var updateLegend = function () {
+          var selectedGroup = document.querySelectorAll('input:checked')[0].nextSibling.innerText.substr(1).replace(/[^a-zA-Z]+/g, '');
+          document.querySelectorAll('.legend').forEach( a => a.hidden=true );
+          document.querySelectorAll('.legend').forEach( l => { if (l.classList.contains(selectedGroup)) l.hidden=false; } );
+        };
+        updateLegend();
+        this.on('baselayerchange', el => updateLegend());
+        }"
+    )
+  }
+
+  # Define color palettes
+  pal_height = colorNumeric("viridis", domain = mission_points_foc$height)
+
+  m = leaflet() |>
+    addPolygons(data = mission_summary_foc, group = "bounds",
+                fillOpacity = 0) |>
+    addProviderTiles(providers$Esri.WorldTopo, group = "Topo",
+                     options = providerTileOptions(minZoom = 1, maxZoom = 20)) |>
+    addProviderTiles(providers$Esri.WorldImagery, group = "Imagery",
+                     options = providerTileOptions(minZoom = 1, maxZoom = 20)) |>
+    addLayersControl(overlayGroups = c("Imagery", "Topo"), #  ", Nearby missions"
+                     options = layersControlOptions(collapsed = FALSE)) |>
+    # # Nearby mission polygons and centroids
+    # addMarkers(data = mission_centroids, popup = ~dataset_id_link, clusterOptions = markerClusterOptions(freezeAtZoom = 16), group = "Nearby missions") |>
+    # addPolygons(data = mission_polygons_for_mission_details_map, popup = ~dataset_id_link, group = "Nearby missions") |>
+    # ITD points
+    addCircleMarkers(data = itd_points_foc,
+                    radius = itd_points_foc$height/5,
+                      stroke = FALSE,
+                      fillOpacity = 1,
+                    #  popup = ~popup,
+                      color = pal_height(itd_points_foc$height),
+                      group = "Height") |>
+    addLegend(pal = pal_height,
+              values = itd_points_foc$height,
+              title = "Height", opacity = 1,
+              group = "Height",
+              className = "info legend Height") |>
+    # Invisible markers on top of all for popup
+    addCircleMarkers(data = itd_points_foc,
+                    radius = 10,
+                    stroke = FALSE,
+                    fillOpacity = 0,
+                    popup = ~popup,
+                    group = "dummyforpopup") |>
+    hideGroup("Imagery") |>
+    hideGroup("Topo") |>
+    hideGroup("Nearby missions") |>
+    js_for_legend()
+
+  # Customize background color (can also use this to make transparent)
+  backg <- htmltools::tags$style(".leaflet-container { background: rgba(200,200,200,1) }")
+  m = prependContent(m, backg)
+
+  # -- Save map HTML to website repo
+  itd_map_filename = paste0(dataset_id, ".html")
+  save_widget_html(m,
+                    website_static_path = website_static_path,
+                    header_files_dir = leaflet_header_files_dir,
+                    html_dir = itd_map_dir,
+                    html_filename = itd_map_filename)
+
+  # Record where it was saved to
+  map_html_path = paste(itd_map_dir, itd_map_filename, sep = "/")
+
+  return(map_html_path)
+
+}
+
+
+
 make_mission_details_datatable = function(mission_summary_foc,
                                           website_static_path,
                                           datatable_header_files_dir,
@@ -422,6 +533,7 @@ render_mission_details_page = function(
     template_filepath,
     mission_summary_foc,
     mission_details_map_path,
+    itd_map_path,
     mission_details_datatable_path,
     next_dataset_page_path,
     previous_dataset_page_path,
@@ -470,6 +582,8 @@ render_mission_details_page = function(
   cameras_url = NULL
   log_exists = FALSE
   log_url = NULL
+  ttops_exists = FALSE
+  ttops_url = NULL
 
 
   if (display_data) {
@@ -482,6 +596,12 @@ render_mission_details_page = function(
     # In case there is more than one match, take the first (of the reversed data frame -- so
     # actually the most recent)
     sfm_folder = sfm_folder[1]
+    
+    # Check if ITD products exist and if so, get the URLs needed to add them to the page
+    sfm_path = file.path(published_data_path, dataset_id, sfm_folder)
+    itd_folder = list.files(sfm_path, full.names = FALSE, pattern = "^itd-", include.dirs = TRUE) |> rev()
+    itd_folder = itd_folder[1]
+    ttops_file_path = file.path(sfm_path, itd_folder, "treetops.gpkg")
 
     # Check if products exist and if so, get the URLs needed to add them to the page
 
@@ -533,6 +653,10 @@ render_mission_details_page = function(
     log_exists = file.exists(file.path(published_data_path, dataset_id, sfm_folder, "full", "log.txt"))
     log_url = paste(data_server_base_url, dataset_id, sfm_folder, "full/log.txt", sep = "/")
 
+    # ITD
+    ttops_exists = file.exists(ttops_file_path)
+    ttops_url = paste(data_server_base_url, dataset_id, sfm_folder, itd_folder, "treetops.gpkg", sep = "/")
+
   }
 
 
@@ -541,6 +665,7 @@ render_mission_details_page = function(
     dataset_id = dataset_id,
     oblique = oblique,
     map_html_path = mission_details_map_path,
+    itd_map_html_path = itd_map_path,
     datatable_html_path = mission_details_datatable_path,
     next_dataset_page_path = next_dataset_page_path,
     previous_dataset_page_path = previous_dataset_page_path,
@@ -571,6 +696,8 @@ render_mission_details_page = function(
     cameras_url = cameras_url,
     log_exists = log_exists,
     log_url = log_url,
+    ttops_exists = ttops_exists,
+    ttops_url = ttops_url,
     .config = jinjar_config(variable_open = "{*", variable_close = "*}")
   )
 
@@ -594,6 +721,7 @@ make_mission_details_pages = function(
     datatable_header_files_dir,
     mission_details_datatable_dir,
     mission_details_map_dir,
+    itd_map_dir,
     mission_details_template_filepath,
     mission_details_page_dir,
     published_data_path = "",
@@ -632,6 +760,44 @@ make_mission_details_pages = function(
       datatable_header_files_dir = datatable_header_files_dir,
       mission_details_datatable_dir = mission_details_datatable_dir
     )
+    
+    # Make detected tree map, if ITD data exists
+    # Get the ITD folder name (for now taking the first if there are multiple)
+    sfm_folder = list.files(file.path(published_data_path, mission_id_foc),
+                            pattern = "^processed-",
+                            full.names = FALSE,
+                            recursive = FALSE) |> rev()
+    # In case there is more than one match, take the first (of the reversed data frame -- so
+    # actually the most recent)
+    sfm_folder = sfm_folder[1]
+
+    # Check if ITD products exist and if so, get the data needed to add them to the page
+    sfm_path = file.path(published_data_path, mission_id_foc, sfm_folder)
+    itd_folder = list.files(sfm_path, full.names = FALSE, pattern = "^itd-", include.dirs = TRUE) |> rev()
+    itd_folder = itd_folder[1]
+    ttops_file_path = file.path(sfm_path, itd_folder, "treetops.gpkg")
+    ttops_exists = file.exists(ttops_file_path)
+
+    if (ttops_exists) {
+      ttops_url = paste(data_server_base_url, mission_id_foc, sfm_folder, itd_folder, "treetops.gpkg", sep = "/")
+
+      itd_points = st_read(ttops_file_path)
+
+      # Make ITD map
+      itd_map_path = make_itd_map(
+        mission_summary_foc = mission_summary_foc,
+        itd_points_foc = itd_points,
+        mission_polygons_for_mission_details_map = mission_summary,
+        mission_centroids = mission_centroids,
+        website_static_path = website_static_path,
+        leaflet_header_files_dir = leaflet_header_files_dir,
+        itd_map_dir = itd_map_dir
+      )
+    } else {
+      itd_map_path = NA
+    }
+
+
 
     # Compute previous and next dataset, looping around as needed
     next_mission_id = ifelse(i < ndatasets, mission_ids[i + 1], mission_ids[1])
@@ -645,6 +811,7 @@ make_mission_details_pages = function(
       template_filepath = mission_details_template_filepath,
       mission_summary_foc = mission_summary_foc,
       mission_details_map_path = mission_details_map_path,
+      itd_map_path = itd_map_path,
       mission_details_datatable_path = mission_details_datatable_path,
       next_dataset_page_path = next_dataset_page_path,
       previous_dataset_page_path = previous_dataset_page_path,
