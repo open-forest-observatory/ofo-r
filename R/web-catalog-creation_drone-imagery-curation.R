@@ -382,7 +382,7 @@ make_itd_map = function(mission_summary_foc,
   }
 
   # Define color palettes
-  pal_height = colorNumeric("viridis", domain = mission_points_foc$height)
+  pal_height = colorNumeric("viridis", domain = itd_points_foc$height)
 
   m = leaflet() |>
     addPolygons(data = mission_summary_foc, group = "bounds",
