@@ -28,6 +28,16 @@ profile: false
 
 {% endif -%}
 
+
+{% if ttops_exists -%}
+
+## Detected trees
+
+<iframe src="{* itd_map_html_path *}" frameborder="0" scrolling="yes" seamless="seamless" style="display:block; width:100%; height:75vh; background: rgba(0,0,0,0);" class="tester"></iframe>
+
+[Download tree points]({* ttops_url *})
+{% endif -%}
+
 {% if ortho_exists -%}
 
 ## Orthomosaic
