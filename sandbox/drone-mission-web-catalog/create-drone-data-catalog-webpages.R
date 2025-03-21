@@ -56,10 +56,6 @@ DATA_SERVER_BASE_URL = "https://data.cyverse.org/dav-anon/iplant/projects/ofo/pu
 mission_polygons_w_metadata = st_read(MISSION_POLYGONS_PATH)
 mission_points = st_read(MISSION_POINTS_PATH)
 
-#!!! Temporary fix until I re-generate the mission points file from scratch
-mission_points$mission_id = mission_points$dataset_id_image_level
-
-
 # Add dataset_id field to match expected format (for mission_polygons this is done in
 # compile_mission_summary_data)
 mission_points$dataset_id = mission_points$mission_id
