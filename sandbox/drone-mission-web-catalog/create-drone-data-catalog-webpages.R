@@ -55,6 +55,10 @@ DATA_SERVER_BASE_URL = "https://data.cyverse.org/dav-anon/iplant/projects/ofo/pu
 mission_polygons_w_metadata = st_read(MISSION_POLYGONS_PATH)
 mission_points = st_read(MISSION_POINTS_PATH)
 
+# Add dataset_id field to match expected format (for mission_polygons this is done in
+# compile_mission_summary_data)
+mission_points$dataset_id = mission_points$mission_id
+
 # Save header library files required by embedded HTML datatables and leaflet maps
 save_dt_header_files(WEBSITE_STATIC_PATH, DATATABLE_HEADER_FILES_DIR)
 save_leaflet_header_files(WEBSITE_STATIC_PATH, LEAFLET_HEADER_FILES_DIR)
@@ -98,10 +102,6 @@ reset_detail_dirs(
   MISSION_DETAILS_MAP_DIR,
   MISSION_DETAILS_DATATABLE_DIR
 )
-
-# Add dataset_id field to match expected format
-mission_polygons_w_summary_data$dataset_id = mission_polygons_w_summary_data$mission_id
-mission_points$dataset_id = mission_points$mission_id
 
 ## Loop through each mission and make a details page, including its media (map and datatable)
 make_mission_details_pages(
