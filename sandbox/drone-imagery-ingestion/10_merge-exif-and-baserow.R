@@ -40,7 +40,7 @@ baserow_mission = baserow_mission |>
 
 baserow_sub_mission = subset(baserow_sub_mission, select = -dataset_id)
 
-# Generate image-level metadata
+# Generate mission and sub-mission-level metadata
 metadata_mission = right_join(
   baserow_mission,
   exif_metadata_mission,
