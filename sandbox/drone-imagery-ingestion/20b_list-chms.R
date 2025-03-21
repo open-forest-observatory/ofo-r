@@ -1,5 +1,4 @@
-# Purpose: For all CHMs within a specified mission ID range, detect treetops and save results to a
-# file.
+# Purpose: Get a lit of all CHMs on CyVerse Data Store
 
 library(tidyverse)
 library(sf)
