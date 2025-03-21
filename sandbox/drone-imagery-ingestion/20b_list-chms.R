@@ -1,11 +1,3 @@
-# Purpose: Get a lit of all CHMs on CyVerse Data Store
-
-library(tidyverse)
-library(sf)
-library(lidR)
-
-PUBLISHED_DATA_RECORDS_DIR = "/ofo-share/drone-imagery-organization/8_published-data-records"
-
 # Purpose: Obtain the list of processed mesh-based CHM files from the Data Store, including the
 # mission ID, processing run ID, and the full path to the file on the data store. Save to a CSV
 # file.
@@ -20,6 +12,8 @@ PUBLISHED_DATA_RECORDS_DIR = "/ofo-share/drone-imagery-organization/8_published-
 library(stringr)
 library(tidyverse)
 library(processx)
+
+PUBLISHED_DATA_RECORDS_DIR = "/ofo-share/drone-imagery-organization/8_published-data-records"
 
 Sys.setenv(RCLONE_CONFIG_PASS = "mypass")
 system('rclone ls cvftp:shared/ofo/public/metadata')
