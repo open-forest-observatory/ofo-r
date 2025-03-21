@@ -57,7 +57,7 @@ baserow_datasets = baserow_datasets |>
 baserow_datasets = baserow_datasets |>
   mutate(contributor_names = ifelse(!is.na(contributor_names_override), contributor_names_override, contributor_names),
          contact_info = ifelse(!is.na(contact_info_override), contact_info_override, contact_info)) |>
-  select(-contributor_names_override, contact_info_override)
+  select(-contributor_names_override, -contact_info_override)
 
 
 # Load the crosswalk linking sub-dataset folder names to baserow rows. If there is more than one sub-mission for
