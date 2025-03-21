@@ -111,10 +111,12 @@ reset_detail_dirs = function(website_static_path,
                                   website_content_path,
                                   plot_details_page_dir,
                                   plot_details_map_dir,
+                                  itd_map_dir,
                                   plot_details_datatable_dir) {
 
   plot_details_page_path = file.path(website_content_path, plot_details_page_dir)
   plot_details_map_path = file.path(website_static_path, plot_details_map_dir)
+  itd_map_path = file.path(website_static_path, itd_map_dir)
   plot_details_datatable_path = file.path(website_static_path, plot_details_datatable_dir)
 
   if (dir.exists(plot_details_page_path)) unlink(plot_details_page_path, recursive = TRUE)
@@ -123,6 +125,9 @@ reset_detail_dirs = function(website_static_path,
 
   if (dir.exists(plot_details_map_path)) unlink(plot_details_map_path, recursive = TRUE)
   dir.create(plot_details_map_path)
+  
+  if (dir.exists(itd_map_path)) unlink(itd_map_path, recursive = TRUE)
+  dir.create(itd_map_path)
 
   if (dir.exists(plot_details_datatable_path)) unlink(plot_details_datatable_path, recursive = TRUE)
   dir.create(plot_details_datatable_path)

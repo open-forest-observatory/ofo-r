@@ -34,6 +34,7 @@ MISSION_CATALOG_MAP_DIR = "/drone-mission-catalog-map/"
 MISSION_CATALOG_MAP_FILENAME = "drone-mission-catalog-map.html"
 MISSION_DETAILS_DATATABLE_DIR = "/drone-mission-details-datatables"
 MISSION_DETAILS_MAP_DIR = "/drone-mission-details-maps"
+ITD_MAP_DIR = "/itd-maps"
 
 WEBSITE_STATIC_PATH = file.path(WEBSITE_REPO_PATH, "static", "")
 WEBSITE_CONTENT_PATH = file.path(WEBSITE_REPO_PATH, "content", "")
@@ -100,6 +101,7 @@ reset_detail_dirs(
   WEBSITE_CONTENT_PATH,
   MISSION_DETAILS_PAGE_DIR,
   MISSION_DETAILS_MAP_DIR,
+  ITD_MAP_DIR,
   MISSION_DETAILS_DATATABLE_DIR
 )
 
@@ -113,6 +115,7 @@ make_mission_details_pages(
   datatable_header_files_dir = DATATABLE_HEADER_FILES_DIR,
   mission_details_datatable_dir = MISSION_DETAILS_DATATABLE_DIR,
   mission_details_map_dir = MISSION_DETAILS_MAP_DIR,
+  itd_map_dir = ITD_MAP_DIR,
   mission_details_template_filepath = MISSION_DETAILS_TEMPLATE_FILEPATH,
   mission_details_page_dir = MISSION_DETAILS_PAGE_DIR,
   published_data_path = PUBLISHED_DATA_PATH,
