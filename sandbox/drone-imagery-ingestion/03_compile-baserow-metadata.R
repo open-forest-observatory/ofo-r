@@ -50,8 +50,7 @@ baserow_datasets = baserow_datasets |>
 baserow_projects = baserow_projects |>
   select(project_id, contributor_names, contact_info, license, objectives)
 baserow_datasets = baserow_datasets |>
-  left_join(baserow_projects, by = c("project_id" = "project_id")) |>
-  select(-project_id)
+  left_join(baserow_projects, by = c("project_id" = "project_id"))
 
 # Apply any dataset-level contributor overrides
 baserow_datasets = baserow_datasets |>
