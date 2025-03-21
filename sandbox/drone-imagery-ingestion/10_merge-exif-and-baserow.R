@@ -34,7 +34,10 @@ exif_metadata_sub_mission = read_csv(exif_metadata_sub_mission_filepath)
 # In the context of a mission, the sub_mission_id has different meanings in baserow and the exif.
 # In baserow, it means the list of sub-missions included in the mission that a given image is part of.
 # In the exif it is just the sub-mission that a given image is a part of.
-baserow_mission = subset(baserow_mission, select = -c(dataset_id, sub_mission_id))
+baserow_mission = baserow_mission |>
+  rename(sub_mission_ids = sub_mission_id) |>
+  select(-dataset_id)
+
 baserow_sub_mission = subset(baserow_sub_mission, select = -dataset_id)
 
 # Generate image-level metadata

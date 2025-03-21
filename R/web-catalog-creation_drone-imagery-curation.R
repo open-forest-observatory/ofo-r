@@ -453,7 +453,7 @@ make_mission_details_datatable = function(mission_summary_foc,
     # Select just what's needed for a datatable
     dplyr::select(
       "Mission ID" = dataset_id,
-      "Sub-mission IDs" = sub_mission_id,
+      "Sub-mission IDs" = sub_mission_ids,
       "Date" = earliest_date_derived,
       "Altitude (nominal) (m)" = altitude_agl_nominal,
       "Altitude AGL mean (actual) (m)" = altitude_agl_mean_derived,
