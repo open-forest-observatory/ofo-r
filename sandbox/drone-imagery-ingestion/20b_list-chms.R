@@ -21,7 +21,7 @@ base_path = "shared/ofo/public/missions"
 base_with_remote = paste0("cvftp:", base_path)
 
 # Run the system command and store output, but also display it for tracking progress since it takes
-# to long to run. From
+# so long to run. From
 # https://stackoverflow.com/questions/62902042/simultaneously-save-and-print-r-system-call-output
 proc <- processx::process$new("rclone", args = c("ls", base_with_remote, "--include", "**/chm-mesh.tif", "--transfers", "64"), stdout = "|")
 output <- character(0)
