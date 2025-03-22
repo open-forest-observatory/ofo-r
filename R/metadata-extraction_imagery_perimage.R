@@ -140,6 +140,11 @@ extract_file_format = function(exif) {
   return(file_format)
 }
 
+extract_file_size = function(exif) {
+  file_size_gb = exif$FileSize / 1000000000
+  return(file_size_gb)
+}
+
 #### pitch_roll_yaw: camera_pitch (Units: deg, degrees up from nadir), camera_roll (Units: deg, degrees clockwise from up), camera_yaw (Units: deg, degrees right from true north) ####
 
 #' Returns camera pitch, camera roll, and camera yaw. Units: degrees.
@@ -381,6 +386,7 @@ extract_imagery_perimage_metadata = function(exif, platform_name, plot_flightpat
   altitude_asl_drone = extract_altitude_asl(exif)
   image_shape = extract_image_shape(exif)
   file_format = extract_file_format(exif)
+  file_size_gb = extract_file_size(exif)
 
   metadata = data.frame(
     image_id = image_id,
@@ -397,7 +403,8 @@ extract_imagery_perimage_metadata = function(exif, platform_name, plot_flightpat
     received_image_path = received_image_path,
     altitude_asl_drone = altitude_asl_drone,
     image_shape,
-    file_format = file_format
+    file_format = file_format,
+    file_size_gb = file_size_gb
   )
 
   # Remove any rows with missing GPS data

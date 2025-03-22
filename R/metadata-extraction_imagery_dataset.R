@@ -352,7 +352,7 @@ extract_image_count = function(metadata) {
 #'
 #' @export
 extract_file_size_summary = function(metadata) {
-  file_size = sum(metadata$FileSize) / 1000000000
+  file_size = sum(metadata$file_size_gb)
 
   file_size = round(file_size, 2)
 
