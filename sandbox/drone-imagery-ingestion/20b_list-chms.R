@@ -16,19 +16,13 @@ library(processx)
 PUBLISHED_DATA_RECORDS_DIR = "/ofo-share/drone-imagery-organization/8_published-data-records"
 
 Sys.setenv(RCLONE_CONFIG_PASS = "mypass")
-system('rclone ls cvftp:shared/ofo/public/metadata')
 
 base_path = "shared/ofo/public/missions"
 base_with_remote = paste0("cvftp:", base_path)
 
-system_call = paste0("rclone ls cvftp:", base_path, " --include '**/chm-mesh.tif' --transfers 64")
-system_call_no_rclone = paste0("ls ", base_path, " --include '**/chm-mesh.tif'")
-
-a = system(system_call, intern = TRUE)
-
-processx::run("rclone", args = c("ls", base_with_remote, "--include", "**/chm-mesh.tif", "--transfers", "64"), stdout = "|")
-
-# From https://stackoverflow.com/questions/62902042/simultaneously-save-and-print-r-system-call-output
+# Run the system command and store output, but also display it for tracking progress since it takes
+# to long to run. From
+# https://stackoverflow.com/questions/62902042/simultaneously-save-and-print-r-system-call-output
 proc <- processx::process$new("rclone", args = c("ls", base_with_remote, "--include", "**/chm-mesh.tif", "--transfers", "64"), stdout = "|")
 output <- character(0)
 while (proc$is_alive()) {
@@ -40,9 +34,9 @@ while (proc$is_alive()) {
     message(thisout_msg)
   }
 }
-# proc$kill()
+# If you start a process incorrectly and need to kill it: proc$kill()
 
-# Remove leading white space from output
+# Parse the rclone output into the relevant attributes
 output = str_trim(output)
 parts = map(output, str_split_1, " ")
 filepaths = map(parts, 2)
@@ -66,7 +60,7 @@ chm_files = tibble(
 write_csv(chm_files, file.path(PUBLISHED_DATA_RECORDS_DIR, "chm_mesh_files.csv"))
 
 
-## Tested but rejected alternatives (incomplete and broken)
+############### Tested but rejected alternatives (incomplete and broken)
 
 # library(rirods)
 # library(webdav)
@@ -109,3 +103,11 @@ write_csv(chm_files, file.path(PUBLISHED_DATA_RECORDS_DIR, "chm_mesh_files.csv")
 # system_call_no_rclone = paste0("ls ", base_path, " --include '**/chm-mesh.tif'")
 
 # a = system(system_call, intern = TRUE)
+
+
+# system_call = paste0("rclone ls cvftp:", base_path, " --include '**/chm-mesh.tif' --transfers 64")
+# system_call_no_rclone = paste0("ls ", base_path, " --include '**/chm-mesh.tif'")
+
+# a = system(system_call, intern = TRUE)
+
+# processx::run("rclone", args = c("ls", base_with_remote, "--include", "**/chm-mesh.tif", "--transfers", "64"), stdout = "|")
