@@ -26,20 +26,12 @@ if (IMAGERY_PROJECT_NAME %in% c("2020-ucnrs", "2023-ucnrs", "2024-ucnrs")) {
   IMAGE_MERGE_DISTANCE = 100
 }
 
-BASEROW_DATA_PATH = "/ofo-share/drone-imagery-organization/ancillary/baserow-snapshots"
-FOLDER_BASEROW_CROSSWALK_PATH = "/ofo-share/drone-imagery-organization/1c_exif-for-sorting/"
-EXIF_PATH = "/ofo-share/drone-imagery-organization/3b_exif-unprocessed/"
-
 EXTRACTED_METADATA_PATH = "/ofo-share/drone-imagery-organization/3c_metadata-extracted/"
 
 ## Derived constants
-exif_filepath = file.path(EXIF_PATH, paste0("exif_", IMAGERY_PROJECT_NAME, ".csv"))
-crosswalk_filepath = file.path(FOLDER_BASEROW_CROSSWALK_PATH, paste0(IMAGERY_PROJECT_NAME, "_crosswalk.csv"))
 
 # This per-image metadata was saved out in the last step
 metadata_perimage_input_filepath = file.path(EXTRACTED_METADATA_PATH, paste0("exif-metadata_perimage_", IMAGERY_PROJECT_NAME, ".csv"))
-# Data for the subset of images retained in both the mission polygons and sub-mission polygons are saved out here
-metadata_perimage_subset_filepath = file.path(EXTRACTED_METADATA_PATH, paste0("exif-metadata_perimage_subset_", IMAGERY_PROJECT_NAME, ".csv"))
 
 # Output files per mission or sub-mission
 metadata_per_mission_filepath = file.path(EXTRACTED_METADATA_PATH, paste0("mission-exif-metadata_perdataset_", IMAGERY_PROJECT_NAME, ".csv"))
@@ -47,6 +39,10 @@ mission_polygons_filepath = file.path(EXTRACTED_METADATA_PATH, paste0("mission-p
 
 metadata_per_sub_mission_filepath = file.path(EXTRACTED_METADATA_PATH, paste0("sub-mission-exif-metadata_perdataset_", IMAGERY_PROJECT_NAME, ".csv"))
 sub_mission_polygons_filepath = file.path(EXTRACTED_METADATA_PATH, paste0("sub-mission-polygons_", IMAGERY_PROJECT_NAME, ".gpkg"))
+
+# Output data for the subset of images retained in both the mission polygons and sub-mission polygons are saved out here
+metadata_perimage_subset_filepath = file.path(EXTRACTED_METADATA_PATH, paste0("exif-metadata_perimage_subset_", IMAGERY_PROJECT_NAME, ".csv"))
+
 
 ## Functions
 compute_polygons_and_images_retained = function(image_metadata, column_to_split_on, image_merge_distance) {

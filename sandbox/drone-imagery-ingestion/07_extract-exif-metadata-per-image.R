@@ -15,21 +15,18 @@ if (file.exists("sandbox/drone-imagery-ingestion/imagery_project_name.txt")) {
 }
 IMAGERY_PROJECT_NAME = read_lines(IMAGERY_PROJECT_NAME_FILE)
 
-BASEROW_DATA_PATH = "/ofo-share/drone-imagery-organization/ancillary/baserow-snapshots"
-FOLDER_BASEROW_CROSSWALK_PATH = "/ofo-share/drone-imagery-organization/1c_exif-for-sorting/"
 EXIF_PATH = "/ofo-share/drone-imagery-organization/3b_exif-unprocessed/"
 
 EXTRACTED_METADATA_PATH = "/ofo-share/drone-imagery-organization/3c_metadata-extracted/"
 
 
 # Derived constants
+# Input files
 exif_filepath = file.path(EXIF_PATH, paste0("exif_", IMAGERY_PROJECT_NAME, ".csv"))
-crosswalk_filepath = file.path(FOLDER_BASEROW_CROSSWALK_PATH, paste0(IMAGERY_PROJECT_NAME, "_crosswalk.csv"))
-
-metadata_perimage_filepath = file.path(EXTRACTED_METADATA_PATH, paste0("exif-metadata_perimage_", IMAGERY_PROJECT_NAME, ".csv"))
-polygons_filepath = file.path(EXTRACTED_METADATA_PATH, paste0("sub-mission-polygons_", IMAGERY_PROJECT_NAME, ".gpkg"))
 metadata_sub_mission_filepath = file.path(EXTRACTED_METADATA_PATH, paste0("sub-mission-baserow-metadata_", IMAGERY_PROJECT_NAME, ".csv"))
-metadata_mission_filepath = file.path(EXTRACTED_METADATA_PATH, paste0("mission-baserow-metadata_", IMAGERY_PROJECT_NAME, ".csv"))
+
+# Output files
+metadata_perimage_filepath = file.path(EXTRACTED_METADATA_PATH, paste0("exif-metadata_perimage_", IMAGERY_PROJECT_NAME, ".csv"))
 
 
 ## Functions
@@ -53,7 +50,7 @@ extract_aircraft_model_name = function(unique_sub_mission_id) {
     # Extract the aircraft model name
     aircraft_model_name = baserow_for_sub_mission$aircraft_model_name
   } else {
-    print(paste("There were ", nrow(baserow_for_sub_mission), " rows in baserow matching ", unique_sub_mission_id))
+    warning(paste("There were ", nrow(baserow_for_sub_mission), " rows in baserow matching ", unique_sub_mission_id))
     # Default value indicating a single corresponding entry could not be found
     aircraft_model_name = NaN
   }
