@@ -24,14 +24,15 @@ IMAGERY_PROJECT_NAME = readr::read_lines(IMAGERY_PROJECT_NAME_FILE)
 BASEROW_DATA_PATH = "/ofo-share/drone-imagery-organization/ancillary/baserow-snapshots"
 FOLDER_BASEROW_CROSSWALK_PATH = "/ofo-share/drone-imagery-organization/1c_exif-for-sorting/"
 
-EXTRACTED_METADATA_PATH = "/ofo-share/drone-imagery-organization/3c_metadata-extracted/"
+# Out
+EXTRACTED_METADATA_PER_MISSION_PATH = "/ofo-share/drone-imagery-organization/metadata/intermediate/contributed-per-mission/"
+EXTRACTED_METADATA_PER_SUB_MISSION_PATH = "/ofo-share/drone-imagery-organization/metadata/intermediate/contributed-per-sub-mission/"
 
 # Derived constants
 crosswalk_filepath = file.path(FOLDER_BASEROW_CROSSWALK_PATH, paste0(IMAGERY_PROJECT_NAME, "_crosswalk.csv"))
-metadata_sub_mission_filepath = file.path(EXTRACTED_METADATA_PATH, paste0("sub-mission-baserow-metadata_", IMAGERY_PROJECT_NAME, ".csv"))
-metadata_mission_filepath = file.path(EXTRACTED_METADATA_PATH, paste0("mission-baserow-metadata_", IMAGERY_PROJECT_NAME, ".csv"))
-
-
+# metadata_sub_mission_filepath = file.path(EXTRACTED_METADATA_PATH, paste0("sub-mission-baserow-metadata_", IMAGERY_PROJECT_NAME, ".csv"))
+# metadata_mission_filepath = file.path(EXTRACTED_METADATA_PATH, paste0("mission-baserow-metadata_",
+# IMAGERY_PROJECT_NAME, ".csv"))
 # Pull in the baserow (human-entered) metadata
 baserow_datasets = read_csv(file.path(BASEROW_DATA_PATH, "export - datasets-imagery.csv"))
 baserow_projects = read_csv(file.path(BASEROW_DATA_PATH, "export - acquisition-projects.csv"))
@@ -127,6 +128,32 @@ grid_mission_ids = crosswalk |>
 # "grid"
 mission_baserow[mission_baserow$mission_id %in% grid_mission_ids, "flight_pattern"] = "grid"
 
-# Save out the metadata
-write_csv(sub_mission_baserow, metadata_sub_mission_filepath)
-write_csv(mission_baserow, metadata_mission_filepath)
+# Save out the metadata, one file per mission or sub-mission
+dir.create(EXTRACTED_METADATA_PER_MISSION_PATH, recursive = TRUE, showWarnings = FALSE)
+dir.create(EXTRACTED_METADATA_PER_SUB_MISSION_PATH, recursive = TRUE, showWarnings = FALSE)
+
+mission_ids = unique(mission_baserow$mission_id)
+
+for (mission_id_foc in mission_ids) {
+
+  mission_baserow_foc = mission_baserow |>
+    filter(mission_id == mission_id_foc)
+
+  file_out = file.path(EXTRACTED_METADATA_PER_MISSION_PATH, paste0(mission_id_foc, ".csv"))
+
+  write_csv(mission_baserow_foc, file_out)
+
+}
+
+sub_mission_ids = unique(sub_mission_baserow$sub_mission_id)
+
+for (sub_mission_id_foc in sub_mission_ids) {
+
+  sub_mission_baserow_foc = sub_mission_baserow |>
+    filter(sub_mission_id == sub_mission_id_foc)
+
+  file_out = file.path(EXTRACTED_METADATA_PER_SUB_MISSION_PATH, paste0(sub_mission_id_foc, ".csv"))
+
+  write_csv(sub_mission_baserow_foc, file_out)
+
+}
