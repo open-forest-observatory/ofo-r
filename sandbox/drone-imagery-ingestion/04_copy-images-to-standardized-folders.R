@@ -4,6 +4,7 @@
 # listing the original image path and the new image path.
 
 library(tidyverse)
+library(furrr)
 
 # Handle difference in how the current directory is set between debugging and command line call
 if (file.exists("sandbox/drone-imagery-ingestion/imagery_project_name.txt")) {
@@ -14,15 +15,13 @@ if (file.exists("sandbox/drone-imagery-ingestion/imagery_project_name.txt")) {
 IMAGERY_PROJECT_NAME = read_lines(IMAGERY_PROJECT_NAME_FILE)
 
 # In
-PROCESSED_EXIF_PATH = "/ofo-share/drone-imagery-organization/1c_exif-for-sorting"
+PROCESSED_EXIF_PATH = "/ofo-share/drone-imagery-organization/metadata/1_reconciling-contributions/2_sorting-plan/"
 
 # Out
-SORTED_IMAGERY_OUT_FOLDER = "/ofo-share/drone-imagery-organization/2_sorted-notcleaned"
-SORTED_IMAGERY_CROSSWALK_FOLDER = "/ofo-share/drone-imagery-organization/2b_filepath-crosswalk"
+SORTED_IMAGERY_OUT_FOLDER = "/ofo-share/drone-imagery-organization/2_sorted-sub-mission"
+SORTED_IMAGERY_CROSSWALK_FOLDER = "/ofo-share/drone-imagery-organization/metadata/1_reconciling-contributions/4_contributed-to-sorted-path-crosswalk/"
 
-exif_path = file.path(PROCESSED_EXIF_PATH, paste0(IMAGERY_PROJECT_NAME, "_exif.csv"))
-sorted_imagery_out_folder = file.path(SORTED_IMAGERY_OUT_FOLDER, IMAGERY_PROJECT_NAME)
-sorted_imagery_crosswalk_folder = file.path(SORTED_IMAGERY_CROSSWALK_FOLDER, IMAGERY_PROJECT_NAME)
+exif_path = file.path(PROCESSED_EXIF_PATH, paste0(IMAGERY_PROJECT_NAME, ".csv"))
 
 # Processing
 
@@ -45,7 +44,7 @@ exif = exif |>
   mutate(subfolder = floor((image_number) / 10000)) |>
   mutate(subfolder_str = str_pad(subfolder, 2, pad = "0")) |>
   mutate(image_path_out_rel = file.path(folder_out_final, subfolder_str, image_filename_out)) |>
-  mutate(image_path_out = file.path(sorted_imagery_out_folder, image_path_out_rel))
+  mutate(image_path_out = file.path(SORTED_IMAGERY_OUT_FOLDER, image_path_out_rel))
 
 # Save the crosswalk CSV, one file for each dataset (output folder)
 crosswalk = exif |>
@@ -53,25 +52,25 @@ crosswalk = exif |>
          original_image_path = image_path_rel,
          sorted_image_path = image_path_out_rel)
 
-dir.create(sorted_imagery_crosswalk_folder, recursive = TRUE)
+dir.create(SORTED_IMAGERY_CROSSWALK_FOLDER, recursive = TRUE)
 
 for (folder_out_foc in unique(exif$folder_out_final)) {
   crosswalk_foc = crosswalk |>
     filter(dataset_id == folder_out_foc) |>
     select(original_image_path, sorted_image_path)
-  write_csv(crosswalk_foc, file.path(sorted_imagery_crosswalk_folder, paste0(folder_out_foc, ".csv")))
+  write_csv(crosswalk_foc, file.path(SORTED_IMAGERY_CROSSWALK_FOLDER, paste0(folder_out_foc, ".csv")))
 }
 
-# also save an overall crosswalk for this project
-write_csv(crosswalk, file.path(sorted_imagery_crosswalk_folder, "ALL.csv"))
-
+# # also save an overall crosswalk for this project
+# write_csv(crosswalk, file.path(sorted_imagery_crosswalk_folder, "ALL.csv"))
 
 # Perform the file copy, specifically as hardlinks
 
 # Create the output folder(s)
 folders_out_rel = unique(dirname(exif$image_path_out_rel))
-folders_out_abs = file.path(sorted_imagery_out_folder, folders_out_rel)
+folders_out_abs = file.path(SORTED_IMAGERY_OUT_FOLDER, folders_out_rel)
 sapply(folders_out_abs, dir.create, recursive = TRUE)
 
 # Copy files as hardlinks
-file.link(exif$image_path, exif$image_path_out)
+future::plan(multisession, workers = future::availableCores() * 1.9)
+future_walk2(exif$image_path, exif$image_path_out, file.link, .progress = TRUE, .options = furrr_options(seed = TRUE))
