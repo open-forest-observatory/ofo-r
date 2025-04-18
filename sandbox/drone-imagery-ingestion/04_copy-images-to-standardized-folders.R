@@ -13,7 +13,10 @@ if (file.exists("sandbox/drone-imagery-ingestion/imagery_project_name.txt")) {
 }
 IMAGERY_PROJECT_NAME = read_lines(IMAGERY_PROJECT_NAME_FILE)
 
+# In
 PROCESSED_EXIF_PATH = "/ofo-share/drone-imagery-organization/1c_exif-for-sorting"
+
+# Out
 SORTED_IMAGERY_OUT_FOLDER = "/ofo-share/drone-imagery-organization/2_sorted-notcleaned"
 SORTED_IMAGERY_CROSSWALK_FOLDER = "/ofo-share/drone-imagery-organization/2b_filepath-crosswalk"
 
