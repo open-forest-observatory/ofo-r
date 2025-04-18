@@ -17,8 +17,10 @@ library(ofo)
 # File paths
 
 RAW_IMAGES_PATH = "/ofo-share/drone-imagery-organization/6_combined-across-projects"
-RAW_IMAGES_METADATA_PATH = "/ofo-share/drone-imagery-organization/3c_metadata-extracted/all-points-w-metadata.gpkg"
-MISSION_FOOTPRINTS_PATH = "/ofo-share/drone-imagery-organization/3c_metadata-extracted/all-mission-polygons-w-metadata.gpkg"
+PUBLISHABLE_MISSION_FOOTPRINTS_PATH = "/ofo-share/drone-imagery-processed/01/mission-footprints-publish"
+PUBLISHABLE_MISSION_POINTS_PATH = "/ofo-share/drone-imagery-processed/01/mission-points-publish"
+# RAW_IMAGES_METADATA_PATH = "/ofo-share/drone-imagery-organization/3c_metadata-extracted/all-points-w-metadata.gpkg"
+# MISSION_FOOTPRINTS_PATH = "/ofo-share/drone-imagery-organization/3c_metadata-extracted/all-mission-polygons-w-metadata.gpkg"
 PUBLISHABLE_IMAGES_PATH = "/ofo-share/drone-imagery-organization/7_to-publish"
 IN_PROCESS_PATH = "/ofo-share/tmp/raw-imagery-publish-prep-progress-tracking/"
 
@@ -34,7 +36,7 @@ MAX_MISSION_ID = "100000"
 ## Functions
 
 # Function to do all the imagery prep for a given mission, with pre-subsetted metadata and footprint
-imagery_publish_prep_mission = function(mission_id_foc, mission_images_metadata, mission_footprint) {
+imagery_publish_prep_mission = function(mission_id_foc) {
 
   cat("Processing mission", mission_id_foc, "\n")
 
@@ -51,6 +53,14 @@ imagery_publish_prep_mission = function(mission_id_foc, mission_images_metadata,
   processing_file = file.path(IN_PROCESS_PATH, paste0(mission_id_foc, ".csv"))
   fake_df = data.frame(a = 1, b = 1)
   write.csv(fake_df, processing_file)
+
+  # Get the mission images metadata (points gpkg)
+  points_filepath = file.path(PUBLISHABLE_MISSION_POINTS_PATH, mission_id_foc, "points", "points.gpkg")
+  mission_images_metadata = st_read(points_filepath)
+
+  # Get the mission footprint (polygon gpkg)
+  footprint_filepath = file.path(PUBLISHABLE_MISSION_FOOTPRINTS_PATH, mission_id_foc, "footprint", "footprint.gpkg")
+  mission_footprint = st_read(footprint_filepath)
 
   # Project mission image locs and footprint to the local UTM zone
   mission_images_metadata = transform_to_local_utm(mission_images_metadata)
@@ -158,31 +168,19 @@ imagery_publish_prep_mission = function(mission_id_foc, mission_images_metadata,
 
 ## Workflow
 
-future::plan("multisession")
+future::plan("multisession", workers = future::availableCores() * 1.9)
 magick:::magick_threads(1)
 
-# Read in the raw image locations and the mission footptings (both with metadata)
-raw_images_metadata = st_read(RAW_IMAGES_METADATA_PATH)
-mission_footprints = st_read(MISSION_FOOTPRINTS_PATH)
+# # Read in the raw image locations and the mission footptings (both with metadata)
+# raw_images_metadata = st_read(RAW_IMAGES_METADATA_PATH)
+# mission_footprints = st_read(MISSION_FOOTPRINTS_PATH)
 
-# Get all the mission IDs
-mission_ids = raw_images_metadata$mission_id |> unique()
+# Get all the mission IDs, from the folders of images
+mission_ids = list.files(RAW_IMAGES_PATH) |> unique()
+
 # Subset the mission IDs
 mission_ids_to_run = mission_ids[mission_ids >= MIN_MISSION_ID & mission_ids <= MAX_MISSION_ID]
 
-
-# Split the raw images metadata and mission footprints by mission ID
-mission_images_metadata_list = list()
-mission_footprints_list = list()
-for (mission_id_foc in mission_ids_to_run) {
-
-  # Get the mission metadata (for image locations)
-  mission_images_metadata_list[[mission_id_foc]] = raw_images_metadata |> filter(mission_id == mission_id_foc)
-
-  # Get the mission footprint
-  mission_footprints_list[[mission_id_foc]] = mission_footprints |> filter(mission_id == mission_id_foc)
-
-}
 
 # # Run the imagery prep for each mission
 # pwalk(
@@ -193,12 +191,8 @@ for (mission_id_foc in mission_ids_to_run) {
 #   ),
 #   imagery_publish_prep_mission)
 
-future_pwalk(
-  list(
-    mission_id_foc = mission_ids_to_run,
-    mission_images_metadata = mission_images_metadata_list,
-    mission_footprint = mission_footprints_list
-  ),
+future_walk(
+  mission_ids_to_run,
   imagery_publish_prep_mission,
   .options = furrr_options(seed = TRUE,
                            scheduling = Inf))
