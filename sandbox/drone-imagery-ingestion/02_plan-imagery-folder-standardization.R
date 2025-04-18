@@ -14,8 +14,9 @@ if (file.exists("sandbox/drone-imagery-ingestion/imagery_project_name.txt")) {
 IMAGERY_PROJECT_NAME = read_lines(IMAGERY_PROJECT_NAME_FILE)
 
 BASEROW_DATA_PATH = "/ofo-share/drone-imagery-organization/ancillary/baserow-snapshots"
-EXIF_INPUT_PATH = "/ofo-share/drone-imagery-organization/1b_exif-unprocessed"
-PROCESSED_EXIF_OUTPUT_PATH = "/ofo-share/drone-imagery-organization/1c_exif-for-sorting"
+EXIF_INPUT_PATH = "/ofo-share/drone-imagery-organization/metadata/1_reconciling-contributions/1_raw-exif/"
+PROCESSED_EXIF_OUTPUT_PATH = "/ofo-share/drone-imagery-organization/metadata/1_reconciling-contributions/2_sorting-plan/"
+CROSSWALK_OUTPUT_PATH = "/ofo-share/drone-imagery-organization/metadata/1_reconciling-contributions/3_contributed-to-sorted-crosswalk/"
 
 # What is the padding width for the dataset ID in the folder names of the imagery folders to be ingested? (New format) This is used to
 # force the Baserow dataset ID column to conform to the image folder names, so this should reflect
@@ -26,9 +27,15 @@ FOLDER_DATASET_ID_PADDING = 6
 
 ## Set up derived constants
 exif_input_path = file.path(EXIF_INPUT_PATH, paste0(IMAGERY_PROJECT_NAME, ".csv"))
-exif_output_path = file.path(PROCESSED_EXIF_OUTPUT_PATH, paste0(IMAGERY_PROJECT_NAME, "_exif.csv"))
-crosswalk_output_path = file.path(PROCESSED_EXIF_OUTPUT_PATH, paste0(IMAGERY_PROJECT_NAME, "_crosswalk.csv"))
+exif_output_path = file.path(PROCESSED_EXIF_OUTPUT_PATH, paste0(IMAGERY_PROJECT_NAME, ".csv"))
+crosswalk_output_path = file.path(CROSSWALK_OUTPUT_PATH, paste0(IMAGERY_PROJECT_NAME, ".csv"))
 
+if (!dir.exists(PROCESSED_EXIF_OUTPUT_PATH)) {
+  dir.create(PROCESSED_EXIF_OUTPUT_PATH, recursive = TRUE)
+}
+if (!dir.exists(CROSSWALK_OUTPUT_PATH)) {
+  dir.create(CROSSWALK_OUTPUT_PATH, recursive = TRUE)
+}
 
 ## Prep baserow metadata
 

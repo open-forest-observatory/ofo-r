@@ -14,7 +14,7 @@ if (file.exists("sandbox/drone-imagery-ingestion/imagery_project_name.txt")) {
 IMAGERY_PROJECT_NAME = read_lines(IMAGERY_PROJECT_NAME_FILE)
 
 IMAGERY_INPUT_PATH = "/ofo-share/drone-imagery-organization/1_manually-cleaned"
-EXIF_OUTPUT_PATH = "/ofo-share/drone-imagery-organization/1b_exif-unprocessed/"
+EXIF_OUTPUT_PATH = "/ofo-share/drone-imagery-organization/metadata/1_reconciling-contributions/1_raw-exif/"
 
 
 get_image_data = function(dataset_folder) {
@@ -26,7 +26,7 @@ get_image_data = function(dataset_folder) {
   image_filepaths = list.files(dataset_folder, full.names = TRUE, recursive = TRUE, pattern = "(.jpg$)|(.jpeg$)|(.JPG$)|(.JPEG$)")
 
   # Get exif data
-  exif = read_exif(image_filepaths)
+  exif = read_exif(image_filepaths, tags = c("DateTimeOriginal", "Model", "SerialNumber"))
 
   # Compile relevant per-image info (including potential ways to distinguish two drones) into data
   # frame
@@ -56,6 +56,11 @@ get_image_data = function(dataset_folder) {
     serialnumber = serial_number
   )
 
+  # remove the exif object to free up memory
+  rm(exif)
+
+  gc()
+
   return(image_data_onefolder)
 }
 
@@ -66,9 +71,13 @@ imagery_input_path = file.path(IMAGERY_INPUT_PATH, IMAGERY_PROJECT_NAME)
 folders = list.dirs(imagery_input_path, full.names = TRUE, recursive = FALSE)
 
 plan = future::plan(multicore)
-l = future_map(folders, get_image_data, .progress = TRUE)
+l = future_map(folders, get_image_data, .progress = TRUE, .options = furrr_options(seed = TRUE, 
+                                                                                   scheduling = Inf))
 
 image_data = bind_rows(l)
 
 exif_output_path = file.path(EXIF_OUTPUT_PATH, paste0(IMAGERY_PROJECT_NAME, ".csv"))
+if(!dir.exists(dirname(exif_output_path))) {
+  dir.create(dirname(exif_output_path), recursive = TRUE)
+}
 write_csv(image_data, file.path(exif_output_path))
