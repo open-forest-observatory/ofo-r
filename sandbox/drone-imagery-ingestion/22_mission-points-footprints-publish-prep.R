@@ -5,6 +5,7 @@
 
 library(tidyverse)
 library(sf)
+library(furrr)
 
 ## Constants
 
@@ -76,7 +77,6 @@ points = future_map(point_files, st_read) |>
 # Get all the mission IDs
 mission_ids = mission_polygons$mission_id |> unique()
 
-
 # Split out the footprint of each mission and save to file in the expected directory structure
 for (mission_id_foc in mission_ids) {
   mission_footprint = mission_polygons |>
@@ -93,24 +93,28 @@ for (mission_id_foc in mission_ids) {
 
 }
 
-# Get all the sub-mission IDs
-sub_mission_ids = sub_mission_polygons$sub_mission_id |> unique()
 
-# Split out the footprint of each sub-mission and save to file in the expected directory structure
-for (sub_mission_id_foc in sub_mission_ids) {
-  sub_mission_footprint = sub_mission_polygons |>
-    filter(sub_mission_id == sub_mission_id_foc) |>
-    st_as_sfc()
+# NOTE: Commented out because for now we are not publishing sub-mission footprints. If we decide to,
+# this will require a little reworking to save the sub-mission footprints beneath the mission
+# footprint folder (now, the sub-mission folders are parallel to the mission folders)
+# # Get all the sub-mission IDs
+# sub_mission_ids = sub_mission_polygons$sub_mission_id |> unique()
 
-  sub_mission_footprint_path = file.path(PUBLISHABLE_SUB_MISSION_FOOTPRINTS_PATH, mission_id_foc, "footprint", "footprint.gpkg")
+# # Split out the footprint of each sub-mission and save to file in the expected directory structure
+# for (sub_mission_id_foc in sub_mission_ids) {
+#   sub_mission_footprint = sub_mission_polygons |>
+#     filter(sub_mission_id == sub_mission_id_foc) |>
+#     st_as_sfc()
 
-  # Make sure the directory exists
-  dir.create(dirname(sub_mission_footprint_path), recursive = TRUE, showWarnings = FALSE)
+#   sub_mission_footprint_path = file.path(PUBLISHABLE_SUB_MISSION_FOOTPRINTS_PATH, sub_mission_id_foc, "footprint", "footprint.gpkg")
 
-  # Write the footprint to file
-  st_write(mission_footprint, sub_mission_footprint_path, delete_dsn = TRUE)
+#   # Make sure the directory exists
+#   dir.create(dirname(sub_mission_footprint_path), recursive = TRUE, showWarnings = FALSE)
 
-}
+#   # Write the footprint to file
+#   st_write(sub_mission_footprint, sub_mission_footprint_path, delete_dsn = TRUE)
+
+# }
 
 
 # Get all mission IDs according to the points
