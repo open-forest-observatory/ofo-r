@@ -27,8 +27,8 @@ N_EXAMPLE_IMAGES = 4
 THUMBNAIL_SIZE = "512"
 SKIP_EXISTING = TRUE # Skip processing for missions that already have all outputs
 # Only process mission IDs between these two values (inclusive)
-MIN_MISSION_ID = "000000"
-MAX_MISSION_ID = "100000"
+MIN_MISSION_ID = "000643"
+MAX_MISSION_ID = "001537"
 
 
 ## Functions

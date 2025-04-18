@@ -35,13 +35,13 @@ copy_images_to_combined_folder = function(mission_folder, project_folder, raw_im
 
 ## Workflow
 
-future::plan(future::multisession(workers = future::availableCores() * 3))
+future::plan(future::multisession(workers = future::availableCores() * 1.9))
 
 # Get all the project folders
 project_folders = list.dirs(RAW_IMAGES_PATH, full.names = FALSE, recursive = FALSE)
 # Make sure they follow the expected naming convention, like 2021-tahoe-aspen (so we don't include other ancillary folders
 # like "archive" that may be in this folder)
-project_folders = project_folders[grepl(pattern = "^20[1-2][0-9]-[a-z-]+$", project_folders)]
+project_folders = project_folders[grepl(pattern = "^20[1-2][0-9]-[a-z-]+.$", project_folders)]
 
 # Loop through each project folder to list and copy over the images
 for (project_folder in project_folders) {
