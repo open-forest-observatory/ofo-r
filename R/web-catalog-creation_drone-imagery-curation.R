@@ -1,3 +1,57 @@
+# Turn a data store path into a public HTTP url
+cyverse_url = function(data_store_path) {
+  # data_store_path is the path to a file in the CyVerse Data Store, e.g. "/iplant/home/shared/ofo/public/missions/000001/processed_000001-0001/full/chm-mesh.tif"
+  # Returns a public HTTP URL to the file, e.g. "https://data.cyverse.org/dav-anon/iplant/home/shared/ofo/public/missions/000001/processed_000001-0001/full/chm-mesh.tif"
+
+  base_url = "https://data.cyverse.org/dav-anon/"
+  url = paste0(base_url, data_store_path)
+  return(url)
+}
+
+# Query cyverse data store for a list of files matching a provided directory pattern and file
+# pattern (with % as wildcard)
+cyverse_list_files = function(dir_pattern, file_pattern) {
+  # dir_pattern is the directory pattern to search for, e.g. "/iplant/projects/ofo/public/missions/%/processed_%/full"
+  # file_pattern is the file pattern to search for, e.g. "chm-mesh.tif"
+  call = paste0("iquest --no-page '%s/%s' \"select COLL_NAME, DATA_NAME where COLL_NAME like '", dir_pattern, "' and DATA_NAME like '", file_pattern, "'\"")
+  output = system(call, intern = TRUE)
+  return(output)
+}
+
+cyverse_list_dirs_recursive = function(dir_pattern) {
+  call = paste0("iquest --no-page '%s' \"select COLL_NAME where COLL_NAME like '", dir_pattern, "'\"")
+  output = system(call, intern = TRUE)
+  return(output)
+}
+
+cyverse_list_subdirs = function(dir) {
+  call = paste0("ils ", dir, "")
+  output = system(call, intern = TRUE)
+
+  # Remove the first line which is the header
+  output = output[-1]
+
+  # Remove the leading and trailing whitespace
+  output = str_trim(output)
+
+  # Remove the leading "C- "
+  output = str_replace(output, "^C- ", "")
+
+  return(output)
+}
+
+df_from_url = function(url) {
+  temp_file = tempfile(fileext = ".csv")
+  download.file(url, temp_file, quiet = TRUE, method = "wget")
+  read_csv(temp_file, col_types = cols(.default = "c"))
+}
+
+sf_from_url = function(url) {
+  temp_file = tempfile(fileext = ".gpkg")
+  download.file(url, temp_file, quiet = TRUE, method = "wget")
+  sf = st_read(temp_file, quiet = TRUE)
+  return(sf)
+}
 
 # Pull in all attributes to the plot summary table, compute relevant columns for display, (like
 # plot area in ha instead of m2), round numeric columns, create links to project and dataset pages
@@ -738,6 +792,25 @@ make_mission_details_pages = function(
     mission_id_foc = mission_ids[[i]]
     # Extract the mission-level metadata that's associated with that dataset
     mission_summary_foc = mission_summary |> filter(mission_id == mission_id_foc)
+
+
+    ##!!!!!#### TODO: RESUME HERE once image points for each dataset are uploaded
+
+    # From CyVerse, get the image-level metadata associated with this dataset
+    folder_foc = paste0("/iplant/home/shared/ofo/public/missions/", mission_id_foc)
+    image_point_path = cyverse_list_files("/iplant/home/shared/ofo/public/missions/%/footprint", "footprint.gpkg")
+    footprint_urls = cyverse_url(footprint_paths)
+
+    ## Download and merge them all
+    plan(multisession)
+    footprint_list = furrr::future_map(footprint_urls, sf_from_url, .options = furrr::furrr_options(seed = TRUE))
+    footprints = bind_rows(footprint_list)
+    plan(sequential)
+
+
+
+
+
     # Extract the image-level metadata that's associated with that dataset
     mission_points_foc = mission_points |> filter(mission_id == mission_id_foc)
 
