@@ -574,9 +574,12 @@ write_csv(image_reorg_data, exif_output_path)
 # original dataset ID was. This should include the what differed between them, including the
 # previously computed data frame for this (datasets_not_separable).
 folderid_baserow_crosswalk = image_data_w_outnames |>
-  select(dataset_id_baserow = dataset_id, dataset_id_imagefolder = folder_out_final) |>
-  group_by(dataset_id_baserow, dataset_id_imagefolder) |>
-  summarize(n_images = n())
+  select(dataset_id_baserow = dataset_id, sub_mission_id = folder_out_final) |>
+  mutate(mission_id = str_sub(sub_mission_id, 1, 6)) |>
+  group_by(dataset_id_baserow, sub_mission_id, mission_id) |>
+  summarize(n_images = n()) |>
+  ungroup() |>
+  mutate(project_name = IMAGERY_PROJECT_NAME)
 
 if (nrow(datasets_not_separable) > 0) {
 
