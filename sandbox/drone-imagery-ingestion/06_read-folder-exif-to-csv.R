@@ -64,10 +64,12 @@ extract_and_save_mission_exif = function(mission_id_foc) {
   write_csv(exif, file_out)
 
   gc()
+  rm(exif)
+  return(TRUE)
 
 }
 
 # Process each mission in parallel
-future::plan(future::multisession, workers = future::availableCores() * 1.9)
+future::plan(future::multisession, workers = future::availableCores() * 0.9)
 exif_list = future_map(missions_to_process, extract_and_save_mission_exif, .progress = TRUE,
                        .options = furrr_options(scheduling = Inf))
