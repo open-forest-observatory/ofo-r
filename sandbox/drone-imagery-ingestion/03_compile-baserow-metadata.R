@@ -73,9 +73,6 @@ crosswalk = read_csv(crosswalk_filepath)
 # Start with the sub-mission-level Baserow attributes
 sub_mission_baserow = left_join(crosswalk, baserow_datasets, by = c("dataset_id_baserow" = "dataset_id")) |>
   select(-dataset_id_baserow) |>
-  rename(sub_mission_id = dataset_id_imagefolder) |>
-  # Get the mission ID as the first part of the sub-mission ID
-  mutate(mission_id = str_sub(sub_mission_id, 1, 6)) |>
   # Create an alias for the sub_mission_id as dataset_id, since other metadata files at the
   # sub-mission level use this column name
   mutate(dataset_id = sub_mission_id)
@@ -119,7 +116,7 @@ grid_missions = baserow_dataset_associations |>
 # them.
 grid_mission_ids = crosswalk |>
   filter(dataset_id_baserow %in% grid_missions) |>
-  pull(dataset_id_imagefolder) |>
+  pull(sub_mission_id) |>
   # The folder names are the sub-mission IDs, so extract the mission ID from them
   str_sub(1, 6) |>
   unique()
