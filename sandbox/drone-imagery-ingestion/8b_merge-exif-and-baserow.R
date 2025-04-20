@@ -2,56 +2,101 @@
 # and the summarized (mission or sub-mission level) EXIF metadata extracted from the drone imagery.
 
 library(tidyverse)
+library(sf)
+library(furrr)
+library(ofo)
 
-# Handle difference in how the current directory is set between debugging and command line call
-if (file.exists("sandbox/drone-imagery-ingestion/imagery_project_name.txt")) {
-  IMAGERY_PROJECT_NAME_FILE = "sandbox/drone-imagery-ingestion/imagery_project_name.txt"
-} else {
-  IMAGERY_PROJECT_NAME_FILE = "imagery_project_name.txt"
-}
-IMAGERY_PROJECT_NAME = readr::read_lines(IMAGERY_PROJECT_NAME_FILE)
-
-EXTRACTED_METADATA_PATH = "/ofo-share/drone-imagery-organization/3c_metadata-extracted/"
-
-# Derived constants
 # In
-baserow_sub_mission_filepath = file.path(EXTRACTED_METADATA_PATH, paste0("sub-mission-baserow-metadata_", IMAGERY_PROJECT_NAME, ".csv"))
-baserow_mission_filepath = file.path(EXTRACTED_METADATA_PATH, paste0("mission-baserow-metadata_", IMAGERY_PROJECT_NAME, ".csv"))
-exif_metadata_mission_filepath = file.path(EXTRACTED_METADATA_PATH, paste0("mission-exif-metadata_perdataset_", IMAGERY_PROJECT_NAME, ".csv"))
-exif_metadata_sub_mission_filepath = file.path(EXTRACTED_METADATA_PATH, paste0("sub-mission-exif-metadata_perdataset_", IMAGERY_PROJECT_NAME, ".csv"))
+MISSIONS_TO_PROCESS_LIST_PATH = file.path("sandbox", "drone-imagery-ingestion", "missions-to-process.csv")
+CONTRIBUTED_METADATA_MISSION_PATH = "/ofo-share/drone-imagery-organization/metadata/2_intermediate/1_contributed-metadata-per-mission/"
+CONTRIBUTED_METADATA_SUB_MISSION_PATH = "/ofo-share/drone-imagery-organization/metadata/2_intermediate/2_contributed-metadata-per-sub-mission/"
+DERIVED_METADATA_MISSION_PATH = "/ofo-share/drone-imagery-organization/metadata/2_intermediate/6_derived-metadata-per-mission"
+DERIVED_METADATA_SUB_MISSION_PATH = "/ofo-share/drone-imagery-organization/metadata/2_intermediate/7_derived-metadata-per-sub-mission"
 
 # Out
-full_metadata_mission_filepath = file.path(EXTRACTED_METADATA_PATH, paste0("mission-full-metadata_", IMAGERY_PROJECT_NAME, ".csv"))
-full_metadata_sub_mission_filepath = file.path(EXTRACTED_METADATA_PATH, paste0("sub-mission-full-metadata_", IMAGERY_PROJECT_NAME, ".csv"))
+FULL_METADATA_MISSION_PATH = "/ofo-share/drone-imagery-organization/metadata/3_final/1_full-metadata-per-mission/"
+FULL_METADATA_SUB_MISSION_PATH = "/ofo-share/drone-imagery-organization/metadata/3_final/2_full-metadata-per-sub-mission/"
 
-# Load the metadata
-baserow_sub_mission = read_csv(baserow_sub_mission_filepath)
-baserow_mission = read_csv(baserow_mission_filepath)
-exif_metadata_mission = read_csv(exif_metadata_mission_filepath)
-exif_metadata_sub_mission = read_csv(exif_metadata_sub_mission_filepath)
+## Workflow
 
-# dataset_id is confusing so it is just dropped in general
-# In the context of a mission, the sub_mission_id has different meanings in baserow and the exif.
-# In baserow, it means the list of sub-missions included in the mission that a given image is part of.
-# In the exif it is just the sub-mission that a given image is a part of.
-baserow_mission = baserow_mission |>
-  rename(sub_mission_ids = sub_mission_id) |>
-  select(-dataset_id)
+# Determine which missions to process
+missions_to_process = read_csv(MISSIONS_TO_PROCESS_LIST_PATH) |>
+  pull(mission_id)
 
-baserow_sub_mission = subset(baserow_sub_mission, select = -dataset_id)
+# Create the output folders
+create_dir(FULL_METADATA_MISSION_PATH)
+create_dir(FULL_METADATA_SUB_MISSION_PATH)
 
-# Generate mission and sub-mission-level metadata
-metadata_mission = right_join(
-  baserow_mission,
-  exif_metadata_mission,
-  by = c("mission_id" = "mission_id"),
+
+merge_derived_and_contributed_metadata = function(mission_foc) {
+
+  # Derived filepaths
+  baserow_mission_filepath = file.path(CONTRIBUTED_METADATA_MISSION_PATH, paste0(mission_foc, ".csv"))
+  exif_metadata_mission_filepath = file.path(DERIVED_METADATA_MISSION_PATH, paste0(mission_foc, ".gpkg"))
+
+  # Load the mission-level metadata
+  baserow_mission = read_csv(baserow_mission_filepath)
+  exif_metadata_mission = st_read(exif_metadata_mission_filepath)
+
+  # dataset_id is confusing so it is just dropped in general
+  # In the context of a mission, the sub_mission_id has different meanings in baserow and the exif.
+  # In baserow, it means the list of sub-missions included in the mission that a given image is part of.
+  # In the exif it is just the sub-mission that a given image is a part of.
+  baserow_mission = baserow_mission |>
+    select(-dataset_id) |>
+    # Rename the sub_mission_id to be more descriptive (its a comma-separated list of sub-mission IDs)
+    rename(sub_mission_ids = sub_mission_id)
+
+  # Bind together the derived and contributed mission-level metadata
+  full_metadata_mission = bind_cols(
+      exif_metadata_mission |>
+      select(-mission_id),
+    baserow_mission) |>
+    # Put all the derived columns (which end in _derived) at the end
+    select(!ends_with("_derived"), everything())
+
+  # Write it
+  full_metadata_mission_filepath = file.path(FULL_METADATA_MISSION_PATH, paste0(mission_foc, ".gpkg"))
+  st_write(full_metadata_mission, full_metadata_mission_filepath, delete_dsn = TRUE)
+
+  # Get the sub-missions that make up the mission
+  sub_mission_files = list.files(
+    path = file.path(CONTRIBUTED_METADATA_SUB_MISSION_PATH),
+    pattern = paste0(mission_foc, "-[0-9]{2}"),
+    full.names = TRUE
+  )
+  sub_mission_ids = sub_mission_files |>
+    basename() |>
+    str_extract(paste0(mission_foc, "-[0-9]{2}"))
+
+  for (sub_mission_id_foc in sub_mission_ids) {
+    # Load the sub-mission metadata
+    baserow_sub_mission = read_csv(file.path(CONTRIBUTED_METADATA_SUB_MISSION_PATH, paste0(sub_mission_id_foc, ".csv")))
+    exif_metadata_sub_mission = st_read(file.path(DERIVED_METADATA_SUB_MISSION_PATH, paste0(sub_mission_id_foc, ".gpkg")))
+
+    # Remove the dataset_id column
+    baserow_sub_mission = baserow_sub_mission |>
+      select(-dataset_id)
+
+    # Bind together the derived and contributed sub-mission-level metadata
+    full_metadata_sub_mission = bind_cols(
+      exif_metadata_sub_mission |>
+        select(-sub_mission_id, -mission_id),
+      baserow_sub_mission) |>
+      # Put all the derived columns (which end in _derived) at the end
+      select(!ends_with("_derived"), everything())
+
+    # Write it
+    full_metadata_sub_mission_filepath = file.path(FULL_METADATA_SUB_MISSION_PATH, paste0(sub_mission_id_foc, ".gpkg"))
+    st_write(full_metadata_sub_mission, full_metadata_sub_mission_filepath, delete_dsn = TRUE)
+  }
+}
+
+
+# Parallelize across all selected missions
+future::plan(multisession)
+future_walk(
+  missions_to_process,
+  merge_derived_and_contributed_metadata,
+  .progress = TRUE
 )
-metadata_sub_mission = right_join(
-  baserow_sub_mission,
-  exif_metadata_sub_mission,
-  by = c("sub_mission_id" = "sub_mission_id"),
-)
-
-# Write the result
-write_csv(metadata_mission, full_metadata_mission_filepath)
-write_csv(metadata_sub_mission, full_metadata_sub_mission_filepath)
