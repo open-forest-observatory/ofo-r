@@ -5,6 +5,7 @@
 
 library(tidyverse)
 library(sf)
+library(furrr)
 
 # devtools::document()
 # devtools::install()
@@ -82,107 +83,115 @@ create_dir(DERIVED_METADATA_MISSION_PATH)
 create_dir(DERIVED_METADATA_SUB_MISSION_PATH)
 create_dir(PARSED_EXIF_FOR_RETAINED_IMAGES_PATH)
 
-# For dev
-mission_id_foc = missions_to_process[1]
 
-# Read in image-level metadata that was parsed in previous script
-metadata_perimage_input_filepath = file.path(PARSED_EXIF_METADATA_PATH, paste0(mission_id_foc, ".csv"))
-image_metadata = read_csv(metadata_perimage_input_filepath)
+summarize_exif = function(mission_id_foc) {
+  # Read in image-level metadata that was parsed in previous script
+  metadata_perimage_input_filepath = file.path(PARSED_EXIF_METADATA_PATH, paste0(mission_id_foc, ".csv"))
+  image_metadata = read_csv(metadata_perimage_input_filepath)
 
-mission_res = compute_polygons_and_images_retained(
-  image_metadata = image_metadata,
-  column_to_split_on = "mission_id",
-  image_merge_distance = IMAGE_MERGE_DISTANCE
-)
-sub_mission_res = compute_polygons_and_images_retained(
-  image_metadata = image_metadata,
-  column_to_split_on = "sub_mission_id",
-  image_merge_distance = IMAGE_MERGE_DISTANCE
-)
+  mission_res = compute_polygons_and_images_retained(
+    image_metadata = image_metadata,
+    column_to_split_on = "mission_id",
+    image_merge_distance = IMAGE_MERGE_DISTANCE
+  )
+  sub_mission_res = compute_polygons_and_images_retained(
+    image_metadata = image_metadata,
+    column_to_split_on = "sub_mission_id",
+    image_merge_distance = IMAGE_MERGE_DISTANCE
+  )
 
-# Compute the images that were retained in both the mission polygons and the sub-mission polygons
-images_retained_in_both = intersect(
-  mission_res$retained_image_IDs, sub_mission_res$retained_image_IDs
-)
+  # Compute the images that were retained in both the mission polygons and the sub-mission polygons
+  images_retained_in_both = intersect(
+    mission_res$retained_image_IDs, sub_mission_res$retained_image_IDs
+  )
 
-# Filter the image metadata to only include data for those images
-# TODO consider reporting how many were droppped per dataset
-image_metadata = image_metadata |> filter(image_id %in% images_retained_in_both)
+  # Filter the image metadata to only include data for those images
+  # TODO consider reporting how many were droppped per dataset
+  image_metadata = image_metadata |> filter(image_id %in% images_retained_in_both)
 
-# Make the images geospatial and write
-metadata_perimage_subset_filepath = file.path(PARSED_EXIF_FOR_RETAINED_IMAGES_PATH, paste0(mission_id_foc, ".gpkg"))
-image_metadata_sf = image_metadata |>
-  st_as_sf(coords = c("lon", "lat"), crs = 4326)
-st_write(image_metadata_sf, metadata_perimage_subset_filepath, delete_dsn = TRUE)
+  # Make the images geospatial and write
+  metadata_perimage_subset_filepath = file.path(PARSED_EXIF_FOR_RETAINED_IMAGES_PATH, paste0(mission_id_foc, ".gpkg"))
+  image_metadata_sf = image_metadata |>
+    st_as_sf(coords = c("lon", "lat"), crs = 4326)
+  st_write(image_metadata_sf, metadata_perimage_subset_filepath, delete_dsn = TRUE)
 
-# Re-compute the polygons now that extraneous images have been filtered out
-mission_res = compute_polygons_and_images_retained(
-  image_metadata = image_metadata,
-  column_to_split_on = "mission_id",
-  image_merge_distance = IMAGE_MERGE_DISTANCE
-)
-sub_mission_res = compute_polygons_and_images_retained(
-  image_metadata = image_metadata,
-  column_to_split_on = "sub_mission_id",
-  image_merge_distance = IMAGE_MERGE_DISTANCE
-)
-
-
-# Extract the summary statistics for the mission
-summary_mission = extract_imagery_dataset_metadata(
-  metadata = image_metadata,
-  # only one set of polygons is expected, since only passed one mission of data, so take the first
-  # index
-  mission_polygon = mission_res$polygons[[1]],
-  dataset_id = mission_id_foc
-)
-
-# Attribute the polygon with the metadata
-mission_poly = mission_res$polygons[[1]]
-mission_poly_attributed = bind_cols(mission_poly, summary_mission)
-
-# Give it a mission ID column
-mission_poly_attributed$mission_id = mission_id_foc
-
-# Write
-metadata_per_mission_filepath = file.path(DERIVED_METADATA_MISSION_PATH, paste0(mission_id_foc, ".gpkg"))
-st_write(
-  mission_poly_attributed,
-  metadata_per_mission_filepath,
-  delete_dsn = TRUE
-)
+  # Re-compute the polygons now that extraneous images have been filtered out
+  mission_res = compute_polygons_and_images_retained(
+    image_metadata = image_metadata,
+    column_to_split_on = "mission_id",
+    image_merge_distance = IMAGE_MERGE_DISTANCE
+  )
+  sub_mission_res = compute_polygons_and_images_retained(
+    image_metadata = image_metadata,
+    column_to_split_on = "sub_mission_id",
+    image_merge_distance = IMAGE_MERGE_DISTANCE
+  )
 
 
-# Now repeat for each sub-mission within the mission
-sub_mission_ids = unique(image_metadata$sub_mission_id)
-
-for (sub_mission_id_foc in sub_mission_ids) {
-  # Pull the metadata for the imges from this sub-mission
-  image_metadata_sub_mission = image_metadata |> filter(sub_mission_id == sub_mission_id_foc)
-
-  # Pull the polygon for this sub-mission
-  polygon_sub_mission_foc = sub_mission_res$polygons[[sub_mission_id_foc]]
-
-  # Extract the summary statistics for this sub-mission
-  summary_sub_mission = extract_imagery_dataset_metadata(
-    metadata = image_metadata_sub_mission,
-    mission_polygon = polygon_sub_mission_foc,
-    dataset_id = sub_mission_id_foc
+  # Extract the summary statistics for the mission
+  summary_mission = extract_imagery_dataset_metadata(
+    metadata = image_metadata,
+    # only one set of polygons is expected, since only passed one mission of data, so take the first
+    # index
+    mission_polygon = mission_res$polygons[[1]],
+    dataset_id = mission_id_foc
   )
 
   # Attribute the polygon with the metadata
-  sub_mission_poly_attributed = bind_cols(polygon_sub_mission_foc, summary_sub_mission)
+  mission_poly = mission_res$polygons[[1]]
+  mission_poly_attributed = bind_cols(mission_poly, summary_mission)
 
-  # Give it a mission ID and sub-mission ID column
-  sub_mission_poly_attributed$mission_id = mission_id_foc
-  sub_mission_poly_attributed$sub_mission_id = sub_mission_id_foc
-
-  metadata_per_sub_mission_filepath = file.path(DERIVED_METADATA_SUB_MISSION_PATH, paste0(sub_mission_id_foc, ".gpkg"))
+  # Give it a mission ID column
+  mission_poly_attributed$mission_id = mission_id_foc
 
   # Write
+  metadata_per_mission_filepath = file.path(DERIVED_METADATA_MISSION_PATH, paste0(mission_id_foc, ".gpkg"))
   st_write(
-    sub_mission_poly_attributed,
-    metadata_per_sub_mission_filepath,
+    mission_poly_attributed,
+    metadata_per_mission_filepath,
     delete_dsn = TRUE
   )
+
+  # Now repeat for each sub-mission within the mission
+  sub_mission_ids = unique(image_metadata$sub_mission_id)
+
+  for (sub_mission_id_foc in sub_mission_ids) {
+    # Pull the metadata for the imges from this sub-mission
+    image_metadata_sub_mission = image_metadata |> filter(sub_mission_id == sub_mission_id_foc)
+
+    # Pull the polygon for this sub-mission
+    polygon_sub_mission_foc = sub_mission_res$polygons[[sub_mission_id_foc]]
+
+    # Extract the summary statistics for this sub-mission
+    summary_sub_mission = extract_imagery_dataset_metadata(
+      metadata = image_metadata_sub_mission,
+      mission_polygon = polygon_sub_mission_foc,
+      dataset_id = sub_mission_id_foc
+    )
+
+    # Attribute the polygon with the metadata
+    sub_mission_poly_attributed = bind_cols(polygon_sub_mission_foc, summary_sub_mission)
+
+    # Give it a mission ID and sub-mission ID column
+    sub_mission_poly_attributed$mission_id = mission_id_foc
+    sub_mission_poly_attributed$sub_mission_id = sub_mission_id_foc
+
+    metadata_per_sub_mission_filepath = file.path(DERIVED_METADATA_SUB_MISSION_PATH, paste0(sub_mission_id_foc, ".gpkg"))
+
+    # Write
+    st_write(
+      sub_mission_poly_attributed,
+      metadata_per_sub_mission_filepath,
+      delete_dsn = TRUE
+    )
+  }
 }
+
+# Run for each mission_id
+future::plan(multisession)
+future_walk(
+  missions_to_process,
+  summarize_exif,
+  .progress = TRUE,
+  .options = furrr::furrr_options(seed = TRUE)
+)
