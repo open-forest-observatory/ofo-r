@@ -12,7 +12,7 @@ library(furrr)
 library(ofo)
 
 IMAGERY_INPUT_PATH = "/ofo-share/drone-imagery-organization/3_sorted-mission"
-EXIF_OUTPUT_PATH = "/ofo-share/drone-imagery-organization/metadata/2_intermediate/3_raw-exif-per-mission"
+EXIF_OUTPUT_PATH = "/ofo-share/drone-imagery-organization/metadata/2_intermediate/3_raw-exif"
 MISSIONS_TO_PROCESS_LIST_PATH = file.path("sandbox", "drone-imagery-ingestion", "missions-to-process.csv")
 
 
