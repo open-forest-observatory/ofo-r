@@ -154,7 +154,6 @@ parse_mission_exif_at_image_level = function(mission_id_foc) {
   # exif = bind_rows(exif_per_sub_mission)
 
   # Extract the metadata in a standardized manner no matter the platform
-  print("Started extracting metadata per image to a standardized format")
   metadata_perimage = extract_imagery_perimage_metadata(
     exif,
     platform_name = exif$aircraft_model_name
@@ -173,8 +172,6 @@ parse_mission_exif_at_image_level = function(mission_id_foc) {
   write_csv(metadata_perimage, metadata_perimage_filepath)
   return(TRUE)
 }
-
-res = map(missions_to_process, parse_mission_exif_at_image_level)
 
 # Run the function for each mission
 future::plan("multisession")
