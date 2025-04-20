@@ -9,7 +9,8 @@ library(tidyverse)
 IMAGERY_PROJECT_NAME = "2024-ofo2"
 
 # Optionally can specify a subset of these
-IMAGERY_PROJECT_SUBSET_MISSIONS = NULL #c(000643:000900) |> str_pad(6, pad = "0", side = "left")
+IMAGERY_PROJECT_SUBSET_MISSIONS = NULL
+IMAGERY_PROJECT_SUBSET_MISSIONS = c(000643:000900) |> str_pad(6, pad = "0", side = "left")
 
 # In
 MISSION_ID_CROSSWALK_DIR = "/ofo-share/drone-imagery-organization/metadata/1_reconciling-contributions/3_contributed-to-sorted-id-crosswalk/"
