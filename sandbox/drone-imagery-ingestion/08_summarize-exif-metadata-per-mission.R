@@ -1,7 +1,7 @@
-# Purpose: Read a CSV file containing the EXIF data for all images in a dataset (multiple missions),
+# Purpose: Read a CSV file containing the EXIF data for all images in a mission,
 # *at the mission level* (i.e., combining both dates of a two-date mission; both orientations of a
-# two-part grid mission) and extract/process into human-readable metadata at the image level and
-# sub-mission level using the metadata extraction functions of the ofo package.
+# two-part grid mission), and extract/process into human-readable metadata at the mission level and
+# sub-mission level using the metadata summarization functions of the ofo package.
 
 library(tidyverse)
 library(sf)
@@ -12,53 +12,35 @@ library(ofo)
 
 IMAGE_MERGE_DISTANCE = 50
 
+# If processing NRS datasets, use a larger merge distance because some datasets used very low overlap
+# IMAGE_MERGE_DISTANCE = 100
 
-# Handle difference in how the current directory is set between debugging and command line call
-if (file.exists("sandbox/drone-imagery-ingestion/imagery_project_name.txt")) {
-  IMAGERY_PROJECT_NAME_FILE = "sandbox/drone-imagery-ingestion/imagery_project_name.txt"
-} else {
-  IMAGERY_PROJECT_NAME_FILE = "imagery_project_name.txt"
-}
-IMAGERY_PROJECT_NAME = read_lines(IMAGERY_PROJECT_NAME_FILE)
+# In
+MISSIONS_TO_PROCESS_LIST_PATH = file.path("sandbox", "drone-imagery-ingestion", "missions-to-process.csv")
+PARSED_EXIF_METADATA_PATH = "/ofo-share/drone-imagery-organization/metadata/2_intermediate/4_parsed-exif"
 
-# For NRS datasets, use a larger merge distance because some datasets used very low overlap
-if (IMAGERY_PROJECT_NAME %in% c("2020-ucnrs", "2023-ucnrs", "2024-ucnrs")) {
-  IMAGE_MERGE_DISTANCE = 100
-}
-
-EXTRACTED_METADATA_PATH = "/ofo-share/drone-imagery-organization/3c_metadata-extracted/"
-
-## Derived constants
-
-# This per-image metadata was saved out in the last step
-metadata_perimage_input_filepath = file.path(EXTRACTED_METADATA_PATH, paste0("exif-metadata_perimage_", IMAGERY_PROJECT_NAME, ".csv"))
-
-# Output files per mission or sub-mission
-metadata_per_mission_filepath = file.path(EXTRACTED_METADATA_PATH, paste0("mission-exif-metadata_perdataset_", IMAGERY_PROJECT_NAME, ".csv"))
-mission_polygons_filepath = file.path(EXTRACTED_METADATA_PATH, paste0("mission-polygons_", IMAGERY_PROJECT_NAME, ".gpkg"))
-
-metadata_per_sub_mission_filepath = file.path(EXTRACTED_METADATA_PATH, paste0("sub-mission-exif-metadata_perdataset_", IMAGERY_PROJECT_NAME, ".csv"))
-sub_mission_polygons_filepath = file.path(EXTRACTED_METADATA_PATH, paste0("sub-mission-polygons_", IMAGERY_PROJECT_NAME, ".gpkg"))
-
-# Output data for the subset of images retained in both the mission polygons and sub-mission polygons are saved out here
-metadata_perimage_subset_filepath = file.path(EXTRACTED_METADATA_PATH, paste0("exif-metadata_perimage_subset_", IMAGERY_PROJECT_NAME, ".csv"))
+# Out
+PARSED_EXIF_FOR_RETAINED_IMAGES_PATH = "/ofo-share/drone-imagery-organization/metadata/2_intermediate/5_parsed-exif-for-retained-images"
+DERIVED_METADATA_MISSION_PATH = "/ofo-share/drone-imagery-organization/metadata/2_intermediate/6_derived-metadata-per-mission"
+DERIVED_METADATA_SUB_MISSION_PATH = "/ofo-share/drone-imagery-organization/metadata/2_intermediate/7_derived-metadata-per-sub-mission"
 
 
 ## Functions
 compute_polygons_and_images_retained = function(image_metadata, column_to_split_on, image_merge_distance) {
-  # Split the metadata by the values in the requested column
+  # Split the metadata by the values in the requested column. Note that for the mission level, this
+  # approach is overkill because it will only be passed one mission of metadata at a time. It is a
+  # vestige of a former way it was being applied. But it is still useful for the sub-mission level.
   split_metadata = split(image_metadata, image_metadata[[column_to_split_on]])
   # Those unique values are used as the dataset_id for logging purposes
   dataset_ids = names(split_metadata)
 
   # Extract the polygons for each chunk (mission or sub-mission) of metadata
-  polygons_and_inds = furrr::future_map2(
+  polygons_and_inds = purrr::map2(
     split_metadata,
     dataset_ids,
     extract_mission_polygon,
     image_merge_distance = image_merge_distance,
-    identify_images_in_polygon = TRUE,
-    .options = furrr::furrr_options(seed = TRUE)
+    identify_images_in_polygon = TRUE
   )
 
   # get count of retained images per dataset
@@ -88,57 +70,23 @@ compute_polygons_and_images_retained = function(image_metadata, column_to_split_
   return(list(polygons = polygons_sf, retained_image_IDs = intersection_image_ids))
 }
 
-compute_and_save_summary_statistics = function(
-    image_metadata,
-    polygons_perdataset,
-    column_to_split_on,
-    metadata_perdataset_filepath,
-    polygons_filepath) {
-  print("Started computing dataset-level summary statistics")
-  future::plan("multisession")
-  # Run dataset-level metadata extraction across each subset
-  metadata_chunks_per_dataset = split(image_metadata, image_metadata[[column_to_split_on]])
-
-  # Take only the polygons that have a non-zero number of images retained
-  polygons_perdataset = polygons_perdataset[names(metadata_chunks_per_dataset)]
-
-  # Extract the "dataset_id" from each metadata chunk
-  dataset_ids = names(metadata_chunks_per_dataset)
-
-  # Extract the summary statistics from each metadata chunk
-  summaries_perdataset = furrr::future_pmap(
-    list(metadata_chunks_per_dataset, polygons_perdataset, dataset_ids),
-    extract_imagery_dataset_metadata,
-    .progress = TRUE,
-    .options = furrr::furrr_options(seed = TRUE)
-  )
-  print("Finished computing dataset-level summary statistics")
-  # Extract the elements of the summary statistics
-  summaries_perdataset = dplyr::bind_rows(summaries_perdataset)
-  # Add the identifying column
-  summaries_perdataset[column_to_split_on] = dataset_ids
-  # Write out
-  readr::write_csv(summaries_perdataset, metadata_perdataset_filepath)
-
-  # Transform the polygons into the appropriate format. The polygons begin as a named list, with the
-  # names corresponding to the dataset ID ("column_to_split_on"). The goal is to convert it to a sf
-  # object with each row representing a different dataset ID and the associated multi-polygon
-  # bounds.
-
-  polygons_perdataset_sf = dplyr::bind_rows(polygons_perdataset)
-  polygons_perdataset_sf[, column_to_split_on] = names(polygons_perdataset)
-
-  # TODO: ^ the geometry col is named 'x', may need to rename 'geometry', or may not be necessary
-  # since it seems to save correctly
-
-  # TODO: ^ in the future we might want to ensure that all the polygons have the same CRS but for
-  # now they should all be EPSG::4326, and the bind_rows step should error out if they don't
-
-  sf::st_write(polygons_perdataset_sf, polygons_filepath, delete_dsn = TRUE)
-}
 
 ## Workflow
-# Read in image-level metadata that was parsed in step 07
+
+# Determine which missions to process
+missions_to_process = read_csv(MISSIONS_TO_PROCESS_LIST_PATH) |>
+  pull(mission_id)
+
+# Create the output folder
+create_dir(DERIVED_METADATA_MISSION_PATH)
+create_dir(DERIVED_METADATA_SUB_MISSION_PATH)
+create_dir(PARSED_EXIF_FOR_RETAINED_IMAGES_PATH)
+
+# For dev
+mission_id_foc = missions_to_process[1]
+
+# Read in image-level metadata that was parsed in previous script
+metadata_perimage_input_filepath = file.path(PARSED_EXIF_METADATA_PATH, paste0(mission_id_foc, ".csv"))
 image_metadata = read_csv(metadata_perimage_input_filepath)
 
 mission_res = compute_polygons_and_images_retained(
@@ -161,8 +109,11 @@ images_retained_in_both = intersect(
 # TODO consider reporting how many were droppped per dataset
 image_metadata = image_metadata |> filter(image_id %in% images_retained_in_both)
 
-# Write out the the filtered subset
-write_csv(image_metadata, metadata_perimage_subset_filepath)
+# Make the images geospatial and write
+metadata_perimage_subset_filepath = file.path(PARSED_EXIF_FOR_RETAINED_IMAGES_PATH, paste0(mission_id_foc, ".gpkg"))
+image_metadata_sf = image_metadata |>
+  st_as_sf(coords = c("lon", "lat"), crs = 4326)
+st_write(image_metadata_sf, metadata_perimage_subset_filepath, delete_dsn = TRUE)
 
 # Re-compute the polygons now that extraneous images have been filtered out
 mission_res = compute_polygons_and_images_retained(
@@ -176,21 +127,62 @@ sub_mission_res = compute_polygons_and_images_retained(
   image_merge_distance = IMAGE_MERGE_DISTANCE
 )
 
-# Create the output folder
-create_dir(EXTRACTED_METADATA_PATH)
-# Compute summary statistics and save out results for mission-level data
-compute_and_save_summary_statistics(
-  image_metadata = image_metadata,
-  column_to_split_on = "mission_id",
-  polygons_perdataset = mission_res$polygons,
-  metadata_perdataset_filepath = metadata_per_mission_filepath,
-  polygons_filepath = mission_polygons_filepath
+
+# Extract the summary statistics for the mission
+summary_mission = extract_imagery_dataset_metadata(
+  metadata = image_metadata,
+  # only one set of polygons is expected, since only passed one mission of data, so take the first
+  # index
+  mission_polygon = mission_res$polygons[[1]],
+  dataset_id = mission_id_foc
 )
-# Compute summary statistics and save out results for sub-mission-level data
-compute_and_save_summary_statistics(
-  image_metadata = image_metadata,
-  column_to_split_on = "sub_mission_id",
-  polygons_perdataset = sub_mission_res$polygons,
-  metadata_perdataset_filepath = metadata_per_sub_mission_filepath,
-  polygons_filepath = sub_mission_polygons_filepath
+
+# Attribute the polygon with the metadata
+mission_poly = mission_res$polygons[[1]]
+mission_poly_attributed = bind_cols(mission_poly, summary_mission)
+
+# Give it a mission ID column
+mission_poly_attributed$mission_id = mission_id_foc
+
+# Write
+metadata_per_mission_filepath = file.path(DERIVED_METADATA_MISSION_PATH, paste0(mission_id_foc, ".gpkg"))
+st_write(
+  mission_poly_attributed,
+  metadata_per_mission_filepath,
+  delete_dsn = TRUE
 )
+
+
+# Now repeat for each sub-mission within the mission
+sub_mission_ids = unique(image_metadata$sub_mission_id)
+
+for (sub_mission_id_foc in sub_mission_ids) {
+  # Pull the metadata for the imges from this sub-mission
+  image_metadata_sub_mission = image_metadata |> filter(sub_mission_id == sub_mission_id_foc)
+
+  # Pull the polygon for this sub-mission
+  polygon_sub_mission_foc = sub_mission_res$polygons[[sub_mission_id_foc]]
+
+  # Extract the summary statistics for this sub-mission
+  summary_sub_mission = extract_imagery_dataset_metadata(
+    metadata = image_metadata_sub_mission,
+    mission_polygon = polygon_sub_mission_foc,
+    dataset_id = sub_mission_id_foc
+  )
+
+  # Attribute the polygon with the metadata
+  sub_mission_poly_attributed = bind_cols(polygon_sub_mission_foc, summary_sub_mission)
+
+  # Give it a mission ID and sub-mission ID column
+  sub_mission_poly_attributed$mission_id = mission_id_foc
+  sub_mission_poly_attributed$sub_mission_id = sub_mission_id_foc
+
+  metadata_per_sub_mission_filepath = file.path(DERIVED_METADATA_SUB_MISSION_PATH, paste0(sub_mission_id_foc, ".gpkg"))
+
+  # Write
+  st_write(
+    sub_mission_poly_attributed,
+    metadata_per_sub_mission_filepath,
+    delete_dsn = TRUE
+  )
+}
