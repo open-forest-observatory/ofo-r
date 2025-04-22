@@ -13,7 +13,7 @@ library(furrr)
 ## Constants
 
 # In
-RAW_EXIF_PATH = "/ofo-share/drone-imagery-organization/metadata/2_intermediate/3_raw-exif"
+IMAGE_EXIF_W_SORTING_PLAN_PATH = "/ofo-share/drone-imagery-organization/metadata/1_reconciling-contributions/2_exif-w-sorting-plan"
 CONTRIBUTED_METADATA_PER_SUB_MISSION_PATH = "/ofo-share/drone-imagery-organization/metadata/2_intermediate/2_contributed-metadata-per-sub-mission/"
 MISSIONS_TO_PROCESS_LIST_PATH = file.path("sandbox", "drone-imagery-ingestion", "missions-to-process.csv")
 
@@ -67,11 +67,12 @@ parse_mission_exif_at_image_level = function(mission_id_foc) {
   # before the real warning. warning(paste("Parsing EXIF for mission ID:", mission_id_foc))
 
   # Input data
-  exif_filepath = file.path(RAW_EXIF_PATH, paste0(mission_id_foc, ".csv"))
+  exif_filepath = file.path(IMAGE_EXIF_W_SORTING_PLAN_PATH, paste0(mission_id_foc, ".csv"))
   exif = read_csv(exif_filepath)
 
   # All sub-mission contributed metadata files (at the sub-mission level) for the focal mission, to
-  # obtain the aircraft model name
+  # obtain the aircraft model name for each image (may theoretically be different for different sub-missions
+  # within the mission)
   pattern = paste0(mission_id_foc, "-[0-9]{2}.csv")
   files = list.files(
     path = CONTRIBUTED_METADATA_PER_SUB_MISSION_PATH,
@@ -100,7 +101,7 @@ parse_mission_exif_at_image_level = function(mission_id_foc) {
   )
 
   # Only retain sub-missions for which there was valid baserow data identifying the aircraft model,
-  # but give a warning if there are any missing aircraft model names, where the sub-mission ID without
+  # and give a warning if there are any missing aircraft model names, where the sub-mission ID without
   # the name is printed. This may be unnecessary because the extract_imagery_perimage_metadata
   # function errors if an unsupported aircraft model name is passed to it (need to confirm this is
   # also the case for NA values).
@@ -121,7 +122,7 @@ parse_mission_exif_at_image_level = function(mission_id_foc) {
 
   # Previous code where we split the exif data by sub-mission (potentially different platforms) and
   # then extracted the metadata per image. This would be useful if we go back to the approach where
-  # the metadata extraction is not vectorized acros a vector aircraft platforms (one platform per
+  # the metadata extraction is not vectorized acros a vector of aircraft platforms (one platform per
   # image), but instead is passed a single aircraft platform per exif dataframe.
   #
   # # For parallelizing, make a list of subsets of the exif dataframe, one for each sub-mission
@@ -162,6 +163,12 @@ parse_mission_exif_at_image_level = function(mission_id_foc) {
   # Copy the sub-mission and mission ID to the output metadata
   metadata_perimage$sub_mission_id = exif$sub_mission_id
   metadata_perimage$mission_id = exif$mission_id
+
+  # Pass through the received and planned destination filepaths
+  metadata_perimage$image_path_contrib = exif$image_path_in_rel
+  metadata_perimage$image_path_ofo = exif$image_path_ofo
+
+
   # Pad the mission ID since it may start as an integer (not the case for the sub-mission ID since it
   # contains a dash and thus never gets misinterpreted as an int)
   metadata_perimage = metadata_perimage |> mutate(mission_id = str_pad(mission_id, 6, pad = "0", side = "left"))
