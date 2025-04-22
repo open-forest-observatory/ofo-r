@@ -617,9 +617,8 @@ image_data = image_data |>
   mutate(extension = tools::file_ext(image_path_in)) |>
   rename(mission_id = dataset_id_out_final,
          sub_mission_id = folder_out_final) |>
-  mutate(image_path_in_rel = str_split(image_path_in, IMAGERY_PROJECT_NAME) |> map(2)) |>
-  # drop the leading slash
-  mutate(image_path_in_rel = str_sub(image_path_in_rel, 2)) |>
+  mutate(image_path_in_rel = str_replace(image_path_in, paste0(".*", IMAGERY_PROJECT_NAME, "\\/"), "")) |>
+  mutate(image_path_in_rel = paste0(IMAGERY_PROJECT_NAME, "/", image_path_in_rel)) |>
   group_by(sub_mission_id) |>
   mutate(image_number = row_number()) |>
   ungroup() |>
