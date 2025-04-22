@@ -109,7 +109,7 @@ summarize_exif = function(mission_id_foc) {
   # TODO consider reporting how many were droppped per dataset
   image_metadata = image_metadata |> filter(image_id %in% images_retained_in_both)
 
-  # Make the images geospatial and write
+  # Make the image points geospatial and write
   metadata_perimage_subset_filepath = file.path(PARSED_EXIF_FOR_RETAINED_IMAGES_PATH, paste0(mission_id_foc, ".gpkg"))
   image_metadata_sf = image_metadata |>
     st_as_sf(coords = c("lon", "lat"), crs = 4326)

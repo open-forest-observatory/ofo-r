@@ -43,14 +43,13 @@ merge_derived_and_contributed_metadata = function(mission_foc) {
   # In baserow, it means the list of sub-missions included in the mission that a given image is part of.
   # In the exif it is just the sub-mission that a given image is a part of.
   baserow_mission = baserow_mission |>
-    select(-dataset_id) |>
     # Rename the sub_mission_id to be more descriptive (its a comma-separated list of sub-mission IDs)
     rename(sub_mission_ids = sub_mission_id)
 
   # Bind together the derived and contributed mission-level metadata
   full_metadata_mission = bind_cols(
-      exif_metadata_mission |>
-      select(-mission_id),
+    exif_metadata_mission |>
+      select(-mission_id), # remove redundant col
     baserow_mission) |>
     # Put all the derived columns (which end in _derived) at the end
     select(!ends_with("_derived"), everything())
@@ -73,10 +72,6 @@ merge_derived_and_contributed_metadata = function(mission_foc) {
     # Load the sub-mission metadata
     baserow_sub_mission = read_csv(file.path(CONTRIBUTED_METADATA_SUB_MISSION_PATH, paste0(sub_mission_id_foc, ".csv")))
     exif_metadata_sub_mission = st_read(file.path(DERIVED_METADATA_SUB_MISSION_PATH, paste0(sub_mission_id_foc, ".gpkg")))
-
-    # Remove the dataset_id column
-    baserow_sub_mission = baserow_sub_mission |>
-      select(-dataset_id)
 
     # Bind together the derived and contributed sub-mission-level metadata
     full_metadata_sub_mission = bind_cols(
