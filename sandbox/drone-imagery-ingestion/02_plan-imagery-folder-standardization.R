@@ -617,9 +617,9 @@ image_data = image_data |>
   mutate(extension = tools::file_ext(image_path_in)) |>
   rename(mission_id = dataset_id_out_final,
          sub_mission_id = folder_out_final) |>
-  mutate(image_path_rel = str_split(image_path_in, IMAGERY_PROJECT_NAME) |> map(2)) |>
+  mutate(image_path_in_rel = str_split(image_path_in, IMAGERY_PROJECT_NAME) |> map(2)) |>
   # drop the leading slash
-  mutate(image_path_rel = str_sub(image_path_rel, 2)) |>
+  mutate(image_path_in_rel = str_sub(image_path_in_rel, 2)) |>
   group_by(sub_mission_id) |>
   mutate(image_number = row_number()) |>
   ungroup() |>
@@ -628,18 +628,17 @@ image_data = image_data |>
   # Separate subfolders for each 10,000 images
   mutate(subfolder = floor((image_number) / 10000)) |>
   mutate(subfolder_str = str_pad(subfolder, 2, pad = "0")) |>
-  mutate(image_path_out_rel = file.path(mission_id, sub_mission_id, subfolder_str, image_filename_out)) |>
-  mutate(image_path_out = file.path(SORTED_IMAGERY_OUT_FOLDER, image_path_out_rel))
+  mutate(image_path_ofo = file.path(mission_id, sub_mission_id, subfolder_str, image_filename_out))
 
 
 # Remove intermediate columns not needed downstream
 
 cols_remove = c("folder_in", "folder_in_2", "folder_in_3", "date", "dataset_id", "dataset_id_2", "dataset_id_3",
                 "dataset_id_out", "subdataset_out", "group_id_full",
-                "subdataset_out_final",  "image_path_rel", "image_number",
+                "subdataset_out_final", "image_number", "image_path_in",
                 "image_number_str", "subfolder", "subfolder_str")
 image_data = image_data |>
-  select(-all_of(cols_remove))
+  select(-any_of(cols_remove))
 
 # For each sub-mission, save the exif data (which now also contains the image sorting plan) to a CSV
 
