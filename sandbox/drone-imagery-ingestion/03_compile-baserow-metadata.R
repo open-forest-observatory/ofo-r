@@ -60,8 +60,8 @@ baserow_datasets = baserow_datasets |>
   select(-contributor_names_override, -contact_info_override)
 
 
-# Load the crosswalk linking sub-dataset folder names to baserow rows. If there is more than one sub-mission for
-# a mission, they may or may not have different entries in Baserow, and their manually extracted
+# Load the crosswalk linking sub-mission folder names to baserow rows. If there is more than one sub-mission for
+# a mission, they may or may not have different entries in Baserow, and their extracted
 # exif may or may not have differences.
 crosswalk = read_csv(crosswalk_filepath)
 
@@ -72,10 +72,7 @@ crosswalk = read_csv(crosswalk_filepath)
 
 # Start with the sub-mission-level Baserow attributes
 sub_mission_baserow = left_join(crosswalk, baserow_datasets, by = c("dataset_id_baserow" = "dataset_id")) |>
-  select(-dataset_id_baserow) |>
-  # Create an alias for the sub_mission_id as dataset_id, since other metadata files at the
-  # sub-mission level use this column name
-  mutate(dataset_id = sub_mission_id)
+  select(-dataset_id_baserow)
 
 # Next, the mission-level Baserow attributes, including concatenating the sub-mission-level
 # attributes if they differ
@@ -94,7 +91,6 @@ concat_unique = function(x) {
 
 mission_baserow = sub_mission_baserow |>
   # At the mission level, the dataset_id is the mission_id
-  mutate(dataset_id = mission_id) |>
   mutate(across(everything(), as.character)) |>
   group_by(mission_id) |>
   summarize(across(everything(), concat_unique)) |>
@@ -116,9 +112,7 @@ grid_missions = baserow_dataset_associations |>
 # them.
 grid_mission_ids = crosswalk |>
   filter(dataset_id_baserow %in% grid_missions) |>
-  pull(sub_mission_id) |>
-  # The folder names are the sub-mission IDs, so extract the mission ID from them
-  str_sub(1, 6) |>
+  pull(mission_id) |>
   unique()
 
 # Identify which mission-level baserow records match grid missions and set the flight pattern to
