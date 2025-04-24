@@ -55,7 +55,7 @@ merge_derived_and_contributed_metadata = function(mission_foc) {
     select(!ends_with("_derived"), everything())
 
   # Write it
-  full_metadata_mission_filepath = file.path(FULL_METADATA_MISSION_PATH, paste0(mission_foc, ".gpkg"))
+  full_metadata_mission_filepath = file.path(FULL_METADATA_MISSION_PATH, paste0(mission_foc, "_mission-metadata.gpkg"))
   st_write(full_metadata_mission, full_metadata_mission_filepath, delete_dsn = TRUE)
 
   # Get the sub-missions that make up the mission
@@ -82,7 +82,7 @@ merge_derived_and_contributed_metadata = function(mission_foc) {
       select(!ends_with("_derived"), everything())
 
     # Write it
-    full_metadata_sub_mission_filepath = file.path(FULL_METADATA_SUB_MISSION_PATH, paste0(sub_mission_id_foc, ".gpkg"))
+    full_metadata_sub_mission_filepath = file.path(FULL_METADATA_SUB_MISSION_PATH, paste0(sub_mission_id_foc, "_sub-mission-metadata.gpkg"))
     st_write(full_metadata_sub_mission, full_metadata_sub_mission_filepath, delete_dsn = TRUE)
   }
 }
