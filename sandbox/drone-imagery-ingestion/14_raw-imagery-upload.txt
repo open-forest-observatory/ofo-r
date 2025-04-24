@@ -1,4 +1,0 @@
-# This is a command line call to upload processed imagery to CyVerse. It assumes you have configured
-rclone with a remote called cyverse, as described in the ofo-credentials doc
-
-rclone copy /ofo-share/drone-data-publish/02 cyverse:iplant/projects/ofo/public/missions/ --progress --transfers 5
