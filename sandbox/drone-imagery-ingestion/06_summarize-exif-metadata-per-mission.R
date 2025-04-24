@@ -14,7 +14,7 @@ library(ofo)
 IMAGE_MERGE_DISTANCE = 50
 
 # If processing NRS datasets, use a larger merge distance because some datasets used very low overlap
-# IMAGE_MERGE_DISTANCE = 100
+IMAGE_MERGE_DISTANCE = 100
 
 # In
 MISSIONS_TO_PROCESS_LIST_PATH = file.path("sandbox", "drone-imagery-ingestion", "missions-to-process.csv")
