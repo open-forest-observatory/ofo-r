@@ -18,7 +18,7 @@ library(ofo)
 # File paths
 
 # In
-RAW_IMAGES_PATH = "/ofo-share/drone-imagery-organization/3_sorted-mission"
+RAW_IMAGES_PATH = "/ofo-share/drone-imagery-organization/2_sorted"
 MISSION_METADATA_PATH = "/ofo-share/drone-imagery-organization/metadata/3_final/1_full-metadata-per-mission"
 IMAGE_METADATA_PATH = "/ofo-share/drone-imagery-organization/metadata/3_final/3_parsed-exif-per-image"
 MISSIONS_TO_PROCESS_LIST_PATH = file.path("sandbox", "drone-imagery-ingestion", "missions-to-process.csv")
@@ -30,7 +30,7 @@ IN_PROCESS_PATH = "/ofo-share/tmp/raw-imagery-publish-prep-progress-tracking/"
 # Processing constants
 N_EXAMPLE_IMAGES = 4
 THUMBNAIL_SIZE = "800"
-SKIP_EXISTING = TRUE # Skip processing for missions that already have all outputs
+SKIP_EXISTING = FALSE # Skip processing for missions that already have all outputs
 
 
 ## Functions
@@ -42,7 +42,7 @@ imagery_publish_prep_mission = function(mission_id_foc) {
 
   # Skip if the mission already has all outputs, asuming that if the zip file exists, the entire
   # mission was processed to completion
-  zip_outpath = file.path(PUBLISHABLE_IMAGES_PATH, mission_id_foc, "images", "images.zip")
+  zip_outpath = file.path(PUBLISHABLE_IMAGES_PATH, mission_id_foc, "images", paste0(mission_id_foc, "_images.zip"))
 
   if (SKIP_EXISTING && file.exists(zip_outpath)) {
     cat("Already exists. Skipping.\n")
@@ -55,11 +55,11 @@ imagery_publish_prep_mission = function(mission_id_foc) {
   write.csv(fake_df, processing_file)
 
   # Get the mission images metadata (points gpkg)
-  points_filepath = file.path(IMAGE_METADATA_PATH, paste0(mission_id_foc, ".gpkg"))
+  points_filepath = file.path(IMAGE_METADATA_PATH, paste0(mission_id_foc, "_image-metadata.gpkg"))
   mission_images_metadata = st_read(points_filepath)
 
   # Get the mission footprint (polygon gpkg)
-  footprint_filepath = file.path(MISSION_METADATA_PATH, paste0(mission_id_foc, ".gpkg"))
+  footprint_filepath = file.path(MISSION_METADATA_PATH, paste0(mission_id_foc, "_mission-metadata.gpkg"))
   mission_footprint = st_read(footprint_filepath)
 
   # Project mission image locs and footprint to the local UTM zone
@@ -114,7 +114,7 @@ imagery_publish_prep_mission = function(mission_id_foc) {
   }
 
   # Hardlink the selected images to the publishable folder
-  inpaths = file.path(RAW_IMAGES_PATH, mission_id_foc, selected_images$received_image_path)
+  inpaths = file.path(RAW_IMAGES_PATH, selected_images$image_path_ofo)
   extensions = tools::file_ext(inpaths)
   outpaths = file.path(PUBLISHABLE_IMAGES_PATH, mission_id_foc, "images", "examples", "fullsize", paste0("example_", 1:N_EXAMPLE_IMAGES, ".", extensions))
 
