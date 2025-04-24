@@ -283,31 +283,6 @@ extract_white_balance = function(exif) {
   return(white_balance)
 }
 
-#### received_image_path (Image path in as-received dataset, with the top level being the folder named with the dataset ID) ####
-
-#' Returns image path
-#'
-#' Returns path in as-received dataset, with the top level being the folder named with the dataset ID, to include in image-level metadata collation.
-#'
-#' @param exif the exif metadata file
-#'
-#' @return received image path
-#'
-#' @examples
-#' extract_received_image_path(exif)
-#'
-#' @export
-
-extract_received_image_path = function(exif) {
-  received_image_path = stringr::str_split_fixed(exif$SourceFile, stringr::fixed(exif$sub_mission_id), 2)
-
-  received_image_path <- received_image_path[, 2]
-
-  received_image_path <- paste0(exif$sub_mission_id, received_image_path)
-
-  return(received_image_path)
-}
-
 #### altitude: returns altitude above sea level (asl) in meters ####
 
 #' Returns altitude above sea level (asl) in meters
@@ -343,7 +318,7 @@ extract_original_file_name = function(exif, candidate_file_name_columns = c("Ima
 #' wrapper)
 #' @param input_type the type of input, either "dataframe" or "filepath" to a .csv file
 #'
-#' @return a data.frame of datetime_local, lat, lon, rtk_fix, accuracy_x, accuracy_y, camera_pitch, camera_roll, camera_yaw, exposure, aperture, iso, white_balance, received_image_path, and altitude_asl
+#' @return a data.frame of datetime_local, lat, lon, rtk_fix, accuracy_x, accuracy_y, camera_pitch, camera_roll, camera_yaw, exposure, aperture, iso, white_balance, and altitude_asl
 #'
 #' @examples
 #' extract_metadata_emp(exif)
@@ -402,7 +377,6 @@ extract_imagery_perimage_metadata = function(exif, platform_name, plot_flightpat
   aperture = extract_aperture(exif)
   iso = extract_iso(exif)
   white_balance = extract_white_balance(exif)
-  received_image_path = extract_received_image_path(exif)
   altitude_asl_drone = extract_altitude_asl(exif)
   image_shape = extract_image_shape(exif)
   file_format = extract_file_format(exif)
@@ -420,7 +394,6 @@ extract_imagery_perimage_metadata = function(exif, platform_name, plot_flightpat
     aperture = aperture,
     iso = iso,
     white_balance = white_balance,
-    received_image_path = received_image_path,
     altitude_asl_drone = altitude_asl_drone,
     image_shape,
     file_format = file_format,
