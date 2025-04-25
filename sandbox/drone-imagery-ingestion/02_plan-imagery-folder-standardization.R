@@ -311,11 +311,11 @@ for (i in seq_len(nrow(combos_by_exif))) {
       exif_summ_foc = exif_summ2[j, ]
       image_data[image_data$dataset_id == dataset_id_foc &
                     image_data$date == exif_summ_foc$date &
-                    image_data$serialnumber == exif_summ_foc$serialnumber,
+                    image_data$SerialNumber == exif_summ_foc$SerialNumber,
                   "dataset_id_out"] = dataset_id_foc
       image_data[image_data$dataset_id == dataset_id_foc &
                     image_data$date == exif_summ_foc$date &
-                    image_data$serialnumber == exif_summ_foc$serialnumber,
+                    image_data$SerialNumber == exif_summ_foc$SerialNumber,
                   "subdataset_out"] = j
     }
 
