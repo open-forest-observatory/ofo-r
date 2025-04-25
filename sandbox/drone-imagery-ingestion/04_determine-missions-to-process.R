@@ -5,12 +5,22 @@ library(tidyverse)
 
 ## Constants
 
-# One way to specify which missions is all that make up a project, as specified here:
-IMAGERY_PROJECT_NAME = "2024-ofo2"
+# # One way to specify which missions is all that make up a project, as specified here:
+# IMAGERY_PROJECT_NAME = "2024-ofo2"
 
-# Optionally can specify a subset of these
+# Another way is to read the project name from the text file
+# Handle difference in how the current directory is set between debugging and command line call
+if (file.exists("sandbox/drone-imagery-ingestion/imagery_project_name.txt")) {
+  IMAGERY_PROJECT_NAME_FILE = "sandbox/drone-imagery-ingestion/imagery_project_name.txt"
+} else {
+  IMAGERY_PROJECT_NAME_FILE = "imagery_project_name.txt"
+}
+IMAGERY_PROJECT_NAME = read_lines(IMAGERY_PROJECT_NAME_FILE)
+
+
+# # Optionally can specify a subset of missions
 IMAGERY_PROJECT_SUBSET_MISSIONS = NULL
-IMAGERY_PROJECT_SUBSET_MISSIONS = c(000643:000900) |> str_pad(6, pad = "0", side = "left")
+# IMAGERY_PROJECT_SUBSET_MISSIONS = c(000643:000900) |> str_pad(6, pad = "0", side = "left")
 
 # In
 MISSION_ID_CROSSWALK_DIR = "/ofo-share/drone-imagery-organization/metadata/1_reconciling-contributions/3_contributed-to-sorted-id-crosswalk/"
