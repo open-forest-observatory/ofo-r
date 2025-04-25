@@ -27,7 +27,7 @@ missions_to_process = read_csv(MISSIONS_TO_PROCESS_LIST_PATH) |>
 
 
 copy_mission_images = function(mission_id_foc) {
-  image_metadata_file = file.path(PARSED_EXIF_FOR_RETAINED_IMAGES_PATH, paste0(mission_id_foc, ".gpkg"))
+  image_metadata_file = file.path(PARSED_EXIF_FOR_RETAINED_IMAGES_PATH, paste0(mission_id_foc, "_image-metadata.gpkg"))
   image_metadata = st_read(image_metadata_file)
 
 
