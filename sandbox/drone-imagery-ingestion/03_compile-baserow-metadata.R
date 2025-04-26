@@ -22,16 +22,17 @@ if (file.exists("sandbox/drone-imagery-ingestion/imagery_project_name.txt")) {
 IMAGERY_PROJECT_NAME = readr::read_lines(IMAGERY_PROJECT_NAME_FILE)
 
 BASEROW_DATA_PATH = "/ofo-share/drone-imagery-organization/ancillary/baserow-snapshots"
-FOLDER_BASEROW_CROSSWALK_PATH = "/ofo-share/drone-imagery-organization/1c_exif-for-sorting/"
+FOLDER_BASEROW_CROSSWALK_PATH = "/ofo-share/drone-imagery-organization/metadata/1_reconciling-contributions/3_contributed-to-sorted-id-crosswalk/"
 
-EXTRACTED_METADATA_PATH = "/ofo-share/drone-imagery-organization/3c_metadata-extracted/"
+# Out
+EXTRACTED_METADATA_PER_MISSION_PATH = "/ofo-share/drone-imagery-organization/metadata/2_intermediate/1_contributed-metadata-per-mission/"
+EXTRACTED_METADATA_PER_SUB_MISSION_PATH = "/ofo-share/drone-imagery-organization/metadata/2_intermediate/2_contributed-metadata-per-sub-mission/"
 
 # Derived constants
-crosswalk_filepath = file.path(FOLDER_BASEROW_CROSSWALK_PATH, paste0(IMAGERY_PROJECT_NAME, "_crosswalk.csv"))
-metadata_sub_mission_filepath = file.path(EXTRACTED_METADATA_PATH, paste0("sub-mission-baserow-metadata_", IMAGERY_PROJECT_NAME, ".csv"))
-metadata_mission_filepath = file.path(EXTRACTED_METADATA_PATH, paste0("mission-baserow-metadata_", IMAGERY_PROJECT_NAME, ".csv"))
-
-
+crosswalk_filepath = file.path(FOLDER_BASEROW_CROSSWALK_PATH, paste0(IMAGERY_PROJECT_NAME, ".csv"))
+# metadata_sub_mission_filepath = file.path(EXTRACTED_METADATA_PATH, paste0("sub-mission-baserow-metadata_", IMAGERY_PROJECT_NAME, ".csv"))
+# metadata_mission_filepath = file.path(EXTRACTED_METADATA_PATH, paste0("mission-baserow-metadata_",
+# IMAGERY_PROJECT_NAME, ".csv"))
 # Pull in the baserow (human-entered) metadata
 baserow_datasets = read_csv(file.path(BASEROW_DATA_PATH, "export - datasets-imagery.csv"))
 baserow_projects = read_csv(file.path(BASEROW_DATA_PATH, "export - acquisition-projects.csv"))
@@ -59,8 +60,8 @@ baserow_datasets = baserow_datasets |>
   select(-contributor_names_override, -contact_info_override)
 
 
-# Load the crosswalk linking sub-dataset folder names to baserow rows. If there is more than one sub-mission for
-# a mission, they may or may not have different entries in Baserow, and their manually extracted
+# Load the crosswalk linking sub-mission folder names to baserow rows. If there is more than one sub-mission for
+# a mission, they may or may not have different entries in Baserow, and their extracted
 # exif may or may not have differences.
 crosswalk = read_csv(crosswalk_filepath)
 
@@ -71,13 +72,7 @@ crosswalk = read_csv(crosswalk_filepath)
 
 # Start with the sub-mission-level Baserow attributes
 sub_mission_baserow = left_join(crosswalk, baserow_datasets, by = c("dataset_id_baserow" = "dataset_id")) |>
-  select(-dataset_id_baserow) |>
-  rename(sub_mission_id = dataset_id_imagefolder) |>
-  # Get the mission ID as the first part of the sub-mission ID
-  mutate(mission_id = str_sub(sub_mission_id, 1, 6)) |>
-  # Create an alias for the sub_mission_id as dataset_id, since other metadata files at the
-  # sub-mission level use this column name
-  mutate(dataset_id = sub_mission_id)
+  select(-dataset_id_baserow)
 
 # Next, the mission-level Baserow attributes, including concatenating the sub-mission-level
 # attributes if they differ
@@ -96,7 +91,6 @@ concat_unique = function(x) {
 
 mission_baserow = sub_mission_baserow |>
   # At the mission level, the dataset_id is the mission_id
-  mutate(dataset_id = mission_id) |>
   mutate(across(everything(), as.character)) |>
   group_by(mission_id) |>
   summarize(across(everything(), concat_unique)) |>
@@ -118,15 +112,39 @@ grid_missions = baserow_dataset_associations |>
 # them.
 grid_mission_ids = crosswalk |>
   filter(dataset_id_baserow %in% grid_missions) |>
-  pull(dataset_id_imagefolder) |>
-  # The folder names are the sub-mission IDs, so extract the mission ID from them
-  str_sub(1, 6) |>
+  pull(mission_id) |>
   unique()
 
 # Identify which mission-level baserow records match grid missions and set the flight pattern to
 # "grid"
 mission_baserow[mission_baserow$mission_id %in% grid_mission_ids, "flight_pattern"] = "grid"
 
-# Save out the metadata
-write_csv(sub_mission_baserow, metadata_sub_mission_filepath)
-write_csv(mission_baserow, metadata_mission_filepath)
+# Save out the metadata, one file per mission or sub-mission
+dir.create(EXTRACTED_METADATA_PER_MISSION_PATH, recursive = TRUE, showWarnings = FALSE)
+dir.create(EXTRACTED_METADATA_PER_SUB_MISSION_PATH, recursive = TRUE, showWarnings = FALSE)
+
+mission_ids = unique(mission_baserow$mission_id)
+
+for (mission_id_foc in mission_ids) {
+
+  mission_baserow_foc = mission_baserow |>
+    filter(mission_id == mission_id_foc)
+
+  file_out = file.path(EXTRACTED_METADATA_PER_MISSION_PATH, paste0(mission_id_foc, ".csv"))
+
+  write_csv(mission_baserow_foc, file_out)
+
+}
+
+sub_mission_ids = unique(sub_mission_baserow$sub_mission_id)
+
+for (sub_mission_id_foc in sub_mission_ids) {
+
+  sub_mission_baserow_foc = sub_mission_baserow |>
+    filter(sub_mission_id == sub_mission_id_foc)
+
+  file_out = file.path(EXTRACTED_METADATA_PER_SUB_MISSION_PATH, paste0(sub_mission_id_foc, ".csv"))
+
+  write_csv(sub_mission_baserow_foc, file_out)
+
+}

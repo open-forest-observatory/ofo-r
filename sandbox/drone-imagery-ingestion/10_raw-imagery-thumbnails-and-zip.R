@@ -1,5 +1,6 @@
 # Purpose: Take the raw imagery folders and compute the "deliverable" versions of the outputs by
-# postprocessing. Perform at the mission level.
+# postprocessing. Outputs include example images and a zipped folder of all images. Perform at the
+# mission level.
 
 # TODO: This relies on an attribute of the image-level metadata called "received_image_path" that
 # really represents the path of the image in the raw, organized imagery folder (i.e., likely
@@ -16,31 +17,32 @@ library(ofo)
 
 # File paths
 
-RAW_IMAGES_PATH = "/ofo-share/drone-imagery-organization/6_combined-across-projects"
-RAW_IMAGES_METADATA_PATH = "/ofo-share/drone-imagery-organization/3c_metadata-extracted/all-points-w-metadata.gpkg"
-MISSION_FOOTPRINTS_PATH = "/ofo-share/drone-imagery-organization/3c_metadata-extracted/all-mission-polygons-w-metadata.gpkg"
-PUBLISHABLE_IMAGES_PATH = "/ofo-share/drone-imagery-organization/7_to-publish"
+# In
+RAW_IMAGES_PATH = "/ofo-share/drone-imagery-organization/2_sorted"
+MISSION_METADATA_PATH = "/ofo-share/drone-imagery-organization/metadata/3_final/1_full-metadata-per-mission"
+IMAGE_METADATA_PATH = "/ofo-share/drone-imagery-organization/metadata/3_final/3_parsed-exif-per-image"
+MISSIONS_TO_PROCESS_LIST_PATH = file.path("sandbox", "drone-imagery-ingestion", "missions-to-process.csv")
+
+# Out
+PUBLISHABLE_IMAGES_PATH = "/ofo-share/drone-imagery-organization/4_to-publish"
 IN_PROCESS_PATH = "/ofo-share/tmp/raw-imagery-publish-prep-progress-tracking/"
 
 # Processing constants
 N_EXAMPLE_IMAGES = 4
-THUMBNAIL_SIZE = "512"
-SKIP_EXISTING = TRUE # Skip processing for missions that already have all outputs
-# Only process mission IDs between these two values (inclusive)
-MIN_MISSION_ID = "000643"
-MAX_MISSION_ID = "001537"
+THUMBNAIL_SIZE = "800"
+SKIP_EXISTING = FALSE # Skip processing for missions that already have all outputs
 
 
 ## Functions
 
 # Function to do all the imagery prep for a given mission, with pre-subsetted metadata and footprint
-imagery_publish_prep_mission = function(mission_id_foc, mission_images_metadata, mission_footprint) {
+imagery_publish_prep_mission = function(mission_id_foc) {
 
   cat("Processing mission", mission_id_foc, "\n")
 
   # Skip if the mission already has all outputs, asuming that if the zip file exists, the entire
   # mission was processed to completion
-  zip_outpath = file.path(PUBLISHABLE_IMAGES_PATH, mission_id_foc, "images", "images.zip")
+  zip_outpath = file.path(PUBLISHABLE_IMAGES_PATH, mission_id_foc, "images", paste0(mission_id_foc, "_images.zip"))
 
   if (SKIP_EXISTING && file.exists(zip_outpath)) {
     cat("Already exists. Skipping.\n")
@@ -51,6 +53,14 @@ imagery_publish_prep_mission = function(mission_id_foc, mission_images_metadata,
   processing_file = file.path(IN_PROCESS_PATH, paste0(mission_id_foc, ".csv"))
   fake_df = data.frame(a = 1, b = 1)
   write.csv(fake_df, processing_file)
+
+  # Get the mission images metadata (points gpkg)
+  points_filepath = file.path(IMAGE_METADATA_PATH, paste0(mission_id_foc, "_image-metadata.gpkg"))
+  mission_images_metadata = st_read(points_filepath)
+
+  # Get the mission footprint (polygon gpkg)
+  footprint_filepath = file.path(MISSION_METADATA_PATH, paste0(mission_id_foc, "_mission-metadata.gpkg"))
+  mission_footprint = st_read(footprint_filepath)
 
   # Project mission image locs and footprint to the local UTM zone
   mission_images_metadata = transform_to_local_utm(mission_images_metadata)
@@ -104,7 +114,7 @@ imagery_publish_prep_mission = function(mission_id_foc, mission_images_metadata,
   }
 
   # Hardlink the selected images to the publishable folder
-  inpaths = file.path(RAW_IMAGES_PATH, mission_id_foc, selected_images$received_image_path)
+  inpaths = file.path(RAW_IMAGES_PATH, selected_images$image_path_ofo)
   extensions = tools::file_ext(inpaths)
   outpaths = file.path(PUBLISHABLE_IMAGES_PATH, mission_id_foc, "images", "examples", "fullsize", paste0("example_", 1:N_EXAMPLE_IMAGES, ".", extensions))
 
@@ -127,7 +137,7 @@ imagery_publish_prep_mission = function(mission_id_foc, mission_images_metadata,
     thumb_outpath = file.path(PUBLISHABLE_IMAGES_PATH, mission_id_foc, "images", "examples", "thumbnails", paste0("example_", i, ".", extensions[i]))
 
     outdirs = unique(dirname(thumb_outpath))
-    walk(outdirs, dir.create, recursive = TRUE)
+    walk(outdirs, dir.create, recursive = TRUE, showWarnings = FALSE)
 
     image_write(img, thumb_outpath)
   }
@@ -143,8 +153,7 @@ imagery_publish_prep_mission = function(mission_id_foc, mission_images_metadata,
     file.remove(tempfile)
   }
   # Create dir
-  dir.create(dirname(tempfile), recursive = TRUE)
-
+  dir.create(dirname(tempfile), recursive = TRUE, showWarnings = FALSE)
 
   system(paste("zip -r -0", shQuote(tempfile), shQuote(inpath)), ignore.stdout = TRUE)
   file.rename(tempfile, zip_outpath)
@@ -158,47 +167,20 @@ imagery_publish_prep_mission = function(mission_id_foc, mission_images_metadata,
 
 ## Workflow
 
-future::plan("multisession")
+# Determine which missions to process
+mission_ids_to_process = read_csv(MISSIONS_TO_PROCESS_LIST_PATH) |>
+  pull(mission_id)
+
+future::plan("multisession", workers = future::availableCores() * 1.9)
 magick:::magick_threads(1)
 
-# Read in the raw image locations and the mission footptings (both with metadata)
-raw_images_metadata = st_read(RAW_IMAGES_METADATA_PATH)
-mission_footprints = st_read(MISSION_FOOTPRINTS_PATH)
+# # Read in the raw image locations and the mission footptings (both with metadata)
+# raw_images_metadata = st_read(RAW_IMAGES_METADATA_PATH)
+# mission_footprints = st_read(MISSION_FOOTPRINTS_PATH)
 
-# Get all the mission IDs
-mission_ids = raw_images_metadata$mission_id |> unique()
-# Subset the mission IDs
-mission_ids_to_run = mission_ids[mission_ids >= MIN_MISSION_ID & mission_ids <= MAX_MISSION_ID]
-
-
-# Split the raw images metadata and mission footprints by mission ID
-mission_images_metadata_list = list()
-mission_footprints_list = list()
-for (mission_id_foc in mission_ids_to_run) {
-
-  # Get the mission metadata (for image locations)
-  mission_images_metadata_list[[mission_id_foc]] = raw_images_metadata |> filter(mission_id == mission_id_foc)
-
-  # Get the mission footprint
-  mission_footprints_list[[mission_id_foc]] = mission_footprints |> filter(mission_id == mission_id_foc)
-
-}
-
-# # Run the imagery prep for each mission
-# pwalk(
-#   list(
-#     mission_id_foc = mission_ids_to_run,
-#     mission_images_metadata = mission_images_metadata_list,
-#     mission_footprint = mission_footprints_list
-#   ),
-#   imagery_publish_prep_mission)
-
-future_pwalk(
-  list(
-    mission_id_foc = mission_ids_to_run,
-    mission_images_metadata = mission_images_metadata_list,
-    mission_footprint = mission_footprints_list
-  ),
+future_walk(
+  mission_ids_to_process,
   imagery_publish_prep_mission,
+  .progress = TRUE,
   .options = furrr_options(seed = TRUE,
                            scheduling = Inf))

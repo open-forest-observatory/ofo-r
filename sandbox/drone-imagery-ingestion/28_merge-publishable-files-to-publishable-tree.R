@@ -8,6 +8,8 @@ library(purrr)
 # File paths
 
 PUBLISHABLE_MISSION_FOOTPRINTS_PATH = "/ofo-share/drone-imagery-processed/01/mission-footprints-publish"
+# PUBLISHABLE_SUB_MISSION_FOOTPRINTS_PATH = "/ofo-share/drone-imagery-processed/01/sub-mission-footprints-publish"
+PUBLISHABLE_MISSION_POINTS_PATH = "/ofo-share/drone-imagery-processed/01/mission-points-publish"
 PUBLISHABLE_IMAGES_PATH = "/ofo-share/drone-imagery-organization/7_to-publish"
 PHOTOGRAMMETRY_PUBLISH_PATH = "/ofo-share/drone-imagery-processed/01/photogrammetry-publish"
 ITD_PUBLISH_PATH = "/ofo-share/drone-imagery-processed/01/tree-detection-publish"
@@ -35,6 +37,28 @@ outdirs = unique(dirname(outfiles))
 
 walk(outdirs, dir.create, recursive = TRUE)
 
+file.link(infiles_full, outfiles)
+
+# # SUB-MISSION FOOTPRINTS
+
+# # Hardlink all files from the publishable sub-mission footprints dir to the unified publishable tree
+# # First make the directories
+# infiles = list.files(PUBLISHABLE_SUB_MISSION_FOOTPRINTS_PATH, full.names = FALSE, recursive = TRUE)
+# infiles_full = file.path(PUBLISHABLE_SUB_MISSION_FOOTPRINTS_PATH, infiles)
+# outfiles = file.path(PUBLISHABLE_DATA_TREE, infiles)
+# outdirs = unique(dirname(outfiles))
+# walk(outdirs, dir.create, recursive = TRUE)
+# file.link(infiles_full, outfiles)
+
+# MISSION POINTS
+
+# Hardlink all files from the publishable mission points dir to the unified publishable tree
+# First make the directories
+infiles = list.files(PUBLISHABLE_MISSION_POINTS_PATH, full.names = FALSE, recursive = TRUE)
+infiles_full = file.path(PUBLISHABLE_MISSION_POINTS_PATH, infiles)
+outfiles = file.path(PUBLISHABLE_DATA_TREE, infiles)
+outdirs = unique(dirname(outfiles))
+walk(outdirs, dir.create, recursive = TRUE)
 file.link(infiles_full, outfiles)
 
 

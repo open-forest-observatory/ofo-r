@@ -10,9 +10,9 @@ if (file.exists("sandbox/drone-imagery-ingestion/imagery_project_name.txt")) {
 }
 IMAGERY_PROJECT_NAME = readr::read_lines(IMAGERY_PROJECT_NAME_FILE)
 
-DATASET_DIR = "/ofo-share/drone-imagery-organization/3_sorted-notcleaned-combined" # Ultimately, will want to move this run on to 3_sorted_cleaned, but can run it on this upstream folder if we need data from the photogrammetry outputs (e.g. altitude AGL) in the interim
+DATASET_DIR = "/ofo-share/drone-imagery-organization/2_sorted"
 BASE_YAML_FILEPATH = "/ofo-share/repos-derek/ofo-r/sandbox/drone-imagery-ingestion/full-run-configs/base.yml"
-DERIVED_YAML_OUTFOLDER = "/ofo-share/repos-derek/ofo-r/sandbox/drone-imagery-ingestion/full-run-configs"
+DERIVED_YAML_OUTFOLDER = "/ofo-share/repos-derek/ofo-r/sandbox/drone-imagery-ingestion/full-run-configs/02"
 AUTOMATE_METASHAPE_PATH = "/ofo-share/repos-derek/automate-metashape"
 METASHAPE_OUTPUT_PATH = "/ofo-share/drone-imagery-processed/01/metashape-outputs"
 METASHAPE_PROJECT_PATH = "/ofo-share/drone-imagery-processed/01/metashape-projects"

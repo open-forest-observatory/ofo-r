@@ -14,8 +14,12 @@ if (file.exists("sandbox/drone-imagery-ingestion/imagery_project_name.txt")) {
 IMAGERY_PROJECT_NAME = read_lines(IMAGERY_PROJECT_NAME_FILE)
 
 BASEROW_DATA_PATH = "/ofo-share/drone-imagery-organization/ancillary/baserow-snapshots"
-EXIF_INPUT_PATH = "/ofo-share/drone-imagery-organization/1b_exif-unprocessed"
-PROCESSED_EXIF_OUTPUT_PATH = "/ofo-share/drone-imagery-organization/1c_exif-for-sorting"
+EXIF_INPUT_PATH = "/ofo-share/drone-imagery-organization/metadata/1_reconciling-contributions/1_raw-exif/"
+
+# Out
+CROSSWALK_OUTPUT_PATH = "/ofo-share/drone-imagery-organization/metadata/1_reconciling-contributions/3_contributed-to-sorted-id-crosswalk/"
+SORTED_IMAGERY_OUT_FOLDER = "/ofo-share/drone-imagery-organization/2_sorted"
+IMAGE_EXIF_W_SORTING_PLAN_FOLDER = "/ofo-share/drone-imagery-organization/metadata/1_reconciling-contributions/2_exif-w-sorting-plan/"
 
 # What is the padding width for the dataset ID in the folder names of the imagery folders to be ingested? (New format) This is used to
 # force the Baserow dataset ID column to conform to the image folder names, so this should reflect
@@ -26,9 +30,11 @@ FOLDER_DATASET_ID_PADDING = 6
 
 ## Set up derived constants
 exif_input_path = file.path(EXIF_INPUT_PATH, paste0(IMAGERY_PROJECT_NAME, ".csv"))
-exif_output_path = file.path(PROCESSED_EXIF_OUTPUT_PATH, paste0(IMAGERY_PROJECT_NAME, "_exif.csv"))
-crosswalk_output_path = file.path(PROCESSED_EXIF_OUTPUT_PATH, paste0(IMAGERY_PROJECT_NAME, "_crosswalk.csv"))
+crosswalk_output_path = file.path(CROSSWALK_OUTPUT_PATH, paste0(IMAGERY_PROJECT_NAME, ".csv"))
 
+if (!dir.exists(CROSSWALK_OUTPUT_PATH)) {
+  dir.create(CROSSWALK_OUTPUT_PATH, recursive = TRUE)
+}
 
 ## Prep baserow metadata
 
@@ -50,6 +56,12 @@ split_to_list = function(x) {
 assoc = dataset_associations |>
   # Separate the multiple dataset IDs (currently in a column separated by commas) into a list column
   mutate(dataset_ids = split_to_list(dataset_ids))
+
+# Drop associations of rgb to multispectral, since we do not want to combine these now (though the
+# user still could)
+assoc = assoc |>
+  filter(assoc_type != "ms-and-rgb")
+
 
 # TODO: Make this more efficient. Though it is not that slow.
 baserow$association_id = NA
@@ -79,8 +91,9 @@ for (i in 1:nrow(baserow)) {
 }
 
 
-# Create a column for the canonical dataset ID (and get the date out of the old ID given it was not
-# previously recorded separately, just as a part of the dataset ID)
+# Create a column for the canonical dataset ID (and get the date out of the "old ID" that was used
+# for some datasets initially, since at that time were were not recording the date as its own field,
+# it was just embedded in the dataset ID)
 b = baserow |>
   # Remove a database row ID (not an actual dataset ID)
   select(-id) |>
@@ -117,31 +130,51 @@ b2 = b |>
 
 ## Process the image-level data into dataset-level data to determine how to split and group the image files in their ultimate standardized folders
 
-image_data = read_csv(file.path(exif_input_path))
+# We need read.csv instead of read_csv because the latter was removing the decimal portion of the
+# GPSTimeStamp tag, which is needed to determine whether we need to apply an EXIF fix to timestamps
+# formatted that way (because it will cause an error in Metashape)
+image_data = read.csv(file.path(exif_input_path))
 
 # Remove images without a date (likely corrupted)
 image_data = image_data |>
-  filter(!is.na(date))
+  filter(!is.na(DateTimeOriginal))
 
 # Standardize date and separate the folder name into its components (if it is a composite dataset
 # with names separated by "_and_" because the imagery in the folder corresponds to multiple baserow
 # records and the imagery folder could not be split into multiple folders with unique dataset IDs
 # based on the information available to the curator)
 image_data = image_data |>
-  mutate(date = str_split(date, " ", simplify = TRUE)[, 1] |>
+  mutate(date = str_split(DateTimeOriginal, " ", simplify = TRUE)[, 1] |>
            str_replace_all(fixed(":"), "-") |>
            as.Date()) |>
   mutate(folder_in = str_replace_all(folder_in, fixed("/"), "")) |>
   separate_wider_delim(delim = "_and_", cols = "folder_in", names = c("folder_in", "folder_in_2", "folder_in_3"), too_few = "align_start") |>
-  filter(!is.na(date))
+  filter(!is.na(date)) |>
+  mutate(across(c(folder_in, folder_in_2, folder_in_3), ~ str_pad(.x, width = FOLDER_DATASET_ID_PADDING, side = "left", pad = "0" )))
 
 
 # Bring in the dataset ID (as listed in Baserow) corresponding to each image folder name (this is
 # needed to accommodate folder names with the older format ({date}-{id}), to accommodate those names
 # created before we were using the canonical baserow ID to name the folders). If there were multiple
 # dataset IDs, then bring in all of them (up to 3)
+
+# First remove multispectral folders from Baserow and the exif
+multispec_folder_names = b |>
+  filter(modality != "rgb") |>
+  pull(folder_name)
+# We are assuming that the contributor would not have combined multispectral and RGB images in the
+# same folder, so we would never have a folder named something like "1011 and 1012" that would
+# contain both RGB and multispectral images, corresponding to two separate baserow records. Since we
+# don't need to deal with this case, we just need to check whether the first folder name is RGB or
+# multispec.
+image_data = image_data |>
+  filter(!(folder_in %in% multispec_folder_names))
+b = b |>
+  filter(modality == "rgb")
+
 crosswalk = b |>
   select(dataset_id_baserow = dataset_id, folder_name)
+
 image_data = image_data |>
   left_join(crosswalk, by = c("folder_in" = "folder_name")) |>
   rename(dataset_id = dataset_id_baserow)
@@ -153,7 +186,7 @@ image_data = image_data |>
   rename(dataset_id_3 = dataset_id_baserow)
 
 datasets = image_data |>
-  group_by(dataset_id, dataset_id_2, dataset_id_3, folder_in, serialnumber, date) |>
+  group_by(dataset_id, dataset_id_2, dataset_id_3, folder_in, SerialNumber, date) |>
   summarize(n_images = n()) |>
   # Datasets with < 30 images are likely not useful
   filter(n_images > 30) |>
@@ -202,13 +235,12 @@ if (any(is.na(a$dataset_id_3))) {
   warning("Tertiary (of composite) image folder names ", paste(folders_no_id, collapse = ", ") , " could not be matched to a dataset ID. Make sure these is a corresponding record in Baserow. Pretending the main folder is not part of a composite.")
 }
 
-
 # Split out datasets that have more than one date or drone serial number.
 # When does the same dataset ID (image folder) contain more than one date or serial number?
 combos_by_exif = datasets |>
   group_by(dataset_id) |>
   summarize(n_dates = n_distinct(date),
-            n_serialnumbers = n_distinct(serialnumber)) |>
+            n_serialnumbers = n_distinct(SerialNumber)) |>
   filter(n_dates > 1 | n_serialnumbers > 1)
 
 ## If the same dataset ID contains multiple dates or drone serial numbers, deal with splitting it
@@ -234,7 +266,7 @@ for (i in seq_len(nrow(combos_by_exif))) {
     # The first of the folder name dataset IDs is the one that was assigned to the dataset_id column
     # for the image-level data, so filter on that
     filter(dataset_id == dataset_id_foc) |>
-    group_by(date, serialnumber) |>
+    group_by(date, SerialNumber) |>
     summarize(n_images = n()) |>
     arrange(date, -n_images)
 
@@ -283,11 +315,11 @@ for (i in seq_len(nrow(combos_by_exif))) {
       exif_summ_foc = exif_summ2[j, ]
       image_data[image_data$dataset_id == dataset_id_foc &
                     image_data$date == exif_summ_foc$date &
-                    image_data$serialnumber == exif_summ_foc$serialnumber,
+                    image_data$SerialNumber == exif_summ_foc$SerialNumber,
                   "dataset_id_out"] = dataset_id_foc
       image_data[image_data$dataset_id == dataset_id_foc &
                     image_data$date == exif_summ_foc$date &
-                    image_data$serialnumber == exif_summ_foc$serialnumber,
+                    image_data$SerialNumber == exif_summ_foc$SerialNumber,
                   "subdataset_out"] = j
     }
 
@@ -321,11 +353,11 @@ for (i in seq_len(nrow(combos_by_exif))) {
       exif_summ_foc = exif_summ2[j, ]
       image_data[image_data$dataset_id == dataset_id_foc &
                     image_data$date == exif_summ_foc$date &
-                    image_data$serialnumber == exif_summ_foc$serialnumber,
+                    image_data$SerialNumber == exif_summ_foc$SerialNumber,
                   "dataset_id_out"] = dataset_id_foc
       image_data[image_data$dataset_id == dataset_id_foc &
                     image_data$date == exif_summ_foc$date &
-                    image_data$serialnumber == exif_summ_foc$serialnumber,
+                    image_data$SerialNumber == exif_summ_foc$SerialNumber,
                   "subdataset_out"] = j
     }
 
@@ -347,11 +379,11 @@ for (i in seq_len(nrow(combos_by_exif))) {
       exif_summ_foc = exif_summ2[j, ]
       image_data[image_data$dataset_id == dataset_id_foc &
                     image_data$date == exif_summ_foc$date &
-                    image_data$serialnumber == exif_summ_foc$serialnumber,
+                    image_data$SerialNumber == exif_summ_foc$SerialNumber,
                   "dataset_id_out"] = dataset_id_foc
       image_data[image_data$dataset_id == dataset_id_foc &
                     image_data$date == exif_summ_foc$date &
-                    image_data$serialnumber == exif_summ_foc$serialnumber,
+                    image_data$SerialNumber == exif_summ_foc$SerialNumber,
                   "subdataset_out"] = j
     }
     next()
@@ -386,7 +418,7 @@ for (i in seq_len(nrow(combos_by_exif))) {
 
 composites_not_split = image_data |>
   filter(is.na(dataset_id_out) & (!is.na(dataset_id_2) | !is.na(dataset_id_3))) |>
-  group_by(dataset_id, dataset_id_2, dataset_id_3, date, serialnumber) |>
+  group_by(dataset_id, dataset_id_2, dataset_id_3, date, SerialNumber) |>
   summarize(n_images = n())
 
 # For each one, determine what's different between the baserow records and save that info
@@ -449,7 +481,7 @@ image_data = image_data |>
 
 # Summarize image_data to inspect
 inspect = image_data |>
-  group_by(dataset_id, dataset_id_2, dataset_id_3, date, serialnumber, dataset_id_out, subdataset_out) |>
+  group_by(dataset_id, dataset_id_2, dataset_id_3, date, SerialNumber, dataset_id_out, subdataset_out) |>
   summarize(n_images = n())
 inspect
 
@@ -543,31 +575,28 @@ final_ids_for_images = image_data |>
   select(dataset_id_out, subdataset_out, dataset_id_out_final, subdataset_out_final)
 
 # Pull it in to image data
-image_data_w_outnames = image_data |>
+image_data = image_data |>
   left_join(final_ids_for_images, by = join_by("dataset_id_out" == "dataset_id_out",
                                                "subdataset_out" == "subdataset_out")) |>
   # Format it for writing a folder name
   mutate(subdataset_out_final = str_pad(subdataset_out_final, 2, side = "left", pad = "0"),
          folder_out_final = paste(dataset_id_out_final, subdataset_out_final, sep = "-"))
 
-inspect = image_data_w_outnames |>
-  group_by(dataset_id, dataset_id_2, dataset_id_3, folder_in, date, serialnumber, folder_out_final) |>
+inspect = image_data |>
+  group_by(dataset_id, dataset_id_2, dataset_id_3, folder_in, date, SerialNumber, folder_out_final) |>
   summarize(n_images = n())
 inspect
 
-# Save a table of the data needed for creating the new folder structure
-image_reorg_data = image_data_w_outnames |>
-  select(folder_in, image_path, folder_out_final)
-write_csv(image_reorg_data, exif_output_path)
-
-
-# Save a record of, for each final dataset X subdataset, what the
+# Save a record of, for each final subdataset, what the
 # original dataset ID was. This should include the what differed between them, including the
 # previously computed data frame for this (datasets_not_separable).
-folderid_baserow_crosswalk = image_data_w_outnames |>
-  select(dataset_id_baserow = dataset_id, dataset_id_imagefolder = folder_out_final) |>
-  group_by(dataset_id_baserow, dataset_id_imagefolder) |>
-  summarize(n_images = n())
+folderid_baserow_crosswalk = image_data |>
+  select(dataset_id_baserow = dataset_id, sub_mission_id = folder_out_final) |>
+  mutate(mission_id = str_sub(sub_mission_id, 1, 6)) |>
+  group_by(dataset_id_baserow, sub_mission_id, mission_id) |>
+  summarize(n_images = n()) |>
+  ungroup() |>
+  mutate(project_name = IMAGERY_PROJECT_NAME)
 
 if (nrow(datasets_not_separable) > 0) {
 
@@ -581,3 +610,47 @@ if (nrow(datasets_not_separable) > 0) {
 }
 
 write_csv(folderid_baserow_crosswalk, crosswalk_output_path)
+
+## NEW, formerly from script 04_copy-images-to-sorted-folders.R
+# Determine the output folder and filename for each image
+
+# Compute a filename for each image from: folder_out (the dataset ID), and an incrementing number
+# padded to 6 digits
+
+image_data = image_data |>
+  mutate(extension = tools::file_ext(image_path_in)) |>
+  rename(mission_id = dataset_id_out_final,
+         sub_mission_id = folder_out_final) |>
+  mutate(image_path_in_rel = str_replace(image_path_in, paste0(".*", IMAGERY_PROJECT_NAME, "\\/"), "")) |>
+  mutate(image_path_in_rel = paste0(IMAGERY_PROJECT_NAME, "/", image_path_in_rel)) |>
+  group_by(sub_mission_id) |>
+  mutate(image_number = row_number()) |>
+  ungroup() |>
+  mutate(image_number_str = str_pad(image_number, 6, pad = "0")) |>
+  mutate(image_filename_out = paste0(sub_mission_id, "_", image_number_str, ".", extension)) |>
+  # Separate subfolders for each 10,000 images
+  mutate(subfolder = floor((image_number) / 10000)) |>
+  mutate(subfolder_str = str_pad(subfolder, 2, pad = "0")) |>
+  mutate(image_path_ofo = file.path(mission_id, sub_mission_id, subfolder_str, image_filename_out))
+
+
+# Remove intermediate columns not needed downstream
+
+cols_remove = c("folder_in", "folder_in_2", "folder_in_3", "date", "dataset_id", "dataset_id_2", "dataset_id_3",
+                "dataset_id_out", "subdataset_out", "group_id_full",
+                "subdataset_out_final", "image_number", "image_path_in",
+                "image_number_str", "subfolder", "subfolder_str")
+image_data = image_data |>
+  select(-any_of(cols_remove))
+
+# For each sub-mission, save the exif data (which now also contains the image sorting plan) to a CSV
+
+if(!dir.exists(IMAGE_EXIF_W_SORTING_PLAN_FOLDER)) {
+  dir.create(IMAGE_EXIF_W_SORTING_PLAN_FOLDER, recursive = TRUE)
+}
+
+for (mission_id_foc in unique(image_data$mission_id)) {
+  image_data_foc = image_data |>
+    filter(mission_id == mission_id_foc)
+  write_csv(image_data_foc, file.path(IMAGE_EXIF_W_SORTING_PLAN_FOLDER, paste0(mission_id_foc, ".csv")))
+}

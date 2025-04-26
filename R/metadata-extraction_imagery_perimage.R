@@ -173,17 +173,22 @@ extract_pitch_roll_yaw = function(exif,
 
   # DJI platforms use an alternative pitch convention so we need shift it so it reflects degrees
   # up from nadir
-  if(platform_name %in% c("Phantom 4 Pro v2.0",
+  dji_platforms = c(
+    "Phantom 4 Pro v2.0",
     "Phantom 4 Advanced",
     "Mavic 3 Multispectral",
     "Phantom 4 RTK",
     "Phantom 4 Standard",
     "Matrice 210 RTK",
     "Matrice 100",
-    "Matrice 300")
-  ){
-    camera_pitch = camera_pitch + 90
-  }
+    "Matrice 300"
+  )
+
+  camera_pitch = dplyr::case_when(
+    platform_name %in% dji_platforms ~ camera_pitch + 90,
+    # else
+    TRUE ~ camera_pitch
+  )
 
   camera_pitch = round(camera_pitch, 2)
   camera_roll = round(camera_roll, 2)
@@ -278,31 +283,6 @@ extract_white_balance = function(exif) {
   return(white_balance)
 }
 
-#### received_image_path (Image path in as-received dataset, with the top level being the folder named with the dataset ID) ####
-
-#' Returns image path
-#'
-#' Returns path in as-received dataset, with the top level being the folder named with the dataset ID, to include in image-level metadata collation.
-#'
-#' @param exif the exif metadata file
-#'
-#' @return received image path
-#'
-#' @examples
-#' extract_received_image_path(exif)
-#'
-#' @export
-
-extract_received_image_path = function(exif) {
-  received_image_path = stringr::str_split_fixed(exif$SourceFile, stringr::fixed(exif$sub_mission_id), 2)
-
-  received_image_path <- received_image_path[, 2]
-
-  received_image_path <- paste0(exif$sub_mission_id, received_image_path)
-
-  return(received_image_path)
-}
-
 #### altitude: returns altitude above sea level (asl) in meters ####
 
 #' Returns altitude above sea level (asl) in meters
@@ -338,15 +318,20 @@ extract_original_file_name = function(exif, candidate_file_name_columns = c("Ima
 #' wrapper)
 #' @param input_type the type of input, either "dataframe" or "filepath" to a .csv file
 #'
-#' @return a data.frame of datetime_local, lat, lon, rtk_fix, accuracy_x, accuracy_y, camera_pitch, camera_roll, camera_yaw, exposure, aperture, iso, white_balance, received_image_path, and altitude_asl
+#' @return a data.frame of datetime_local, lat, lon, rtk_fix, accuracy_x, accuracy_y, camera_pitch, camera_roll, camera_yaw, exposure, aperture, iso, white_balance, and altitude_asl
 #'
 #' @examples
 #' extract_metadata_emp(exif)
 #'
 #' @export
 extract_imagery_perimage_metadata = function(exif, platform_name, plot_flightpath = FALSE) {
+
+  # Note to devs: This is designed to be vectorized, where the user can supply either 1 value of
+  # platform_name that will be used for all images, or a vector of platform names that is the same
+  # length as the exif data (i.e. one platform name per image).
+
   # Check if the platform is supported
-  if (!(platform_name %in% c(
+  supported_platforms = c(
     "Phantom 4 Pro v2.0",
     "Phantom 4 Advanced",
     "Mavic 3 Multispectral",
@@ -357,8 +342,14 @@ extract_imagery_perimage_metadata = function(exif, platform_name, plot_flightpat
     "Matrice 300",
     "eBee X",
     "Evo II v2"
-  ))) {
-    stop(paste("Platform ", platform_name, " is not supported"))
+  )
+
+  if (any(!(platform_name %in% supported_platforms))) {
+
+    # find unsupported platforms by setdiff
+    unsupported_platforms = setdiff(platform_name, supported_platforms)
+
+    stop(paste("Platform(s) ", paste(unsupported_platforms, collapse = ", "), " not supported"))
   }
 
   # In the future, some of these parsing steps might be dependent on the platform but for now it's
@@ -371,6 +362,10 @@ extract_imagery_perimage_metadata = function(exif, platform_name, plot_flightpat
   # we could have a function that extracts a parameter for a group of platforms, such as one
   # function for extracting the image_id for all DJI platforms and another for all eBee platfroms.
   # Then, the appropriate parsing function would be called in this function, based on the platform.
+  # The latter logic would need a little more thought to allow it to be vectorizable (or maybe we
+  # will determine that vectorization is not important -- but in that case, will need to update the
+  # calling scripts because they are set up in the vectorized way -- but would not be hard to change
+  # that).
   image_id = extract_image_id(exif)
   original_file_name = extract_original_file_name(exif)
   datetime_local = extract_datetime_local(exif)
@@ -382,7 +377,6 @@ extract_imagery_perimage_metadata = function(exif, platform_name, plot_flightpat
   aperture = extract_aperture(exif)
   iso = extract_iso(exif)
   white_balance = extract_white_balance(exif)
-  received_image_path = extract_received_image_path(exif)
   altitude_asl_drone = extract_altitude_asl(exif)
   image_shape = extract_image_shape(exif)
   file_format = extract_file_format(exif)
@@ -400,7 +394,6 @@ extract_imagery_perimage_metadata = function(exif, platform_name, plot_flightpat
     aperture = aperture,
     iso = iso,
     white_balance = white_balance,
-    received_image_path = received_image_path,
     altitude_asl_drone = altitude_asl_drone,
     image_shape,
     file_format = file_format,
