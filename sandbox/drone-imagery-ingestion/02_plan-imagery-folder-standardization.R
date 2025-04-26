@@ -130,7 +130,10 @@ b2 = b |>
 
 ## Process the image-level data into dataset-level data to determine how to split and group the image files in their ultimate standardized folders
 
-image_data = read_csv(file.path(exif_input_path))
+# We need read.csv instead of read_csv because the latter was removing the decimal portion of the
+# GPSTimeStamp tag, which is needed to determine whether we need to apply an EXIF fix to timestamps
+# formatted that way (because it will cause an error in Metashape)
+image_data = read.csv(file.path(exif_input_path))
 
 # Remove images without a date (likely corrupted)
 image_data = image_data |>
@@ -146,7 +149,8 @@ image_data = image_data |>
            as.Date()) |>
   mutate(folder_in = str_replace_all(folder_in, fixed("/"), "")) |>
   separate_wider_delim(delim = "_and_", cols = "folder_in", names = c("folder_in", "folder_in_2", "folder_in_3"), too_few = "align_start") |>
-  filter(!is.na(date))
+  filter(!is.na(date)) |>
+  mutate(across(c(folder_in, folder_in_2, folder_in_3), ~ str_pad(.x, width = FOLDER_DATASET_ID_PADDING, side = "left", pad = "0" )))
 
 
 # Bring in the dataset ID (as listed in Baserow) corresponding to each image folder name (this is
