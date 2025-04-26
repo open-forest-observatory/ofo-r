@@ -19,7 +19,7 @@ source(file.path(repo_root,"sandbox/drone-imagery-ingestion/07_merge-exif-and-ba
 cat("\n\n****Starting script 8****\n\n")
 source(file.path(repo_root,"sandbox/drone-imagery-ingestion/08_copy-images-to-standardized-folders.R"))
 cat("\n\n****Starting script 9****\n\n")
-source(file.path(repo_root,"sandbox/drone-imagery-ingestion/09_fix-orientation-flag.R"))
+source(file.path(repo_root,"sandbox/drone-imagery-ingestion/09_fix-exif.R"))
 cat("\n\n****Starting script 10****\n\n")
 source(file.path(repo_root,"sandbox/drone-imagery-ingestion/10_raw-imagery-thumbnails-and-zip.R"))
 cat("\n\n****Starting script 11****\n\n")
