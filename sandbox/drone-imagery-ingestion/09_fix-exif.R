@@ -51,15 +51,17 @@ fix_orientation_flag = function(mission_id_foc) {
 
   # Load the previously extracted EXIF data and keep only the relevant columns
   exif = read.csv(file.path(IMAGE_EXIF_W_SORTING_PLAN_FOLDER, paste0(mission_id_foc, ".csv"))) |>
-    select(image_filename_out, Orientation, GPSTimeStamp)
+    select(any_of(c("image_filename_out", "Orientation", "GPSTimeStamp")))
 
   # Sort the exif to match the image filepaths
   exif = left_join(images, exif, by = c("filename" = "image_filename_out"))
 
-  # Determine if we need to fix the orientation flag, the GPSTimeStamp, or both
+  # Redo in base R
+  exif$fix_orientation = ifelse(is.null(exif$Orientation), FALSE, (exif$Orientation != 1))
+  exif$fix_gpstimestamp = ifelse(is.null(exif$GPSTimeStamp), FALSE, (grepl("[0-9]+:[0-9]+:[0-9]+\\.[0-9]+", exif$GPSTimeStamp)))
+
+  # Encode as one-hot between orientation, gpstimestamp, or both
   exif = exif |>
-    mutate(fix_orientation = (!is.na(Orientation) & Orientation != 1),
-           fix_gpstimestamp = (!is.na(GPSTimeStamp) & grepl("[0-9]+:[0-9]+:[0-9]+\\.[0-9]+", GPSTimeStamp))) |>
     mutate(fix_both = (fix_orientation & fix_gpstimestamp)) |>
     # if both are true, then set the other two to false
     mutate(fix_orientation = ifelse(fix_both, FALSE, fix_orientation),
